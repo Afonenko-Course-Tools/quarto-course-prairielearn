@@ -1,0 +1,7 @@
+# Задания {#sec-tasks}
+
+:::: {#exr-clamp target="prairielearn" project="/projects/clamp"}
+## Ограничение диапазона
+
+Реализуйте `Clamp.clamp(value, lower, upper)`. При `lower > upper` выбросьте `IllegalArgumentException`. Проверьте обе границы диапазона.
+::::

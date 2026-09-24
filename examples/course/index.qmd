@@ -1,0 +1,3 @@
+# О курсе {.unnumbered #sec-intro}
+
+Условия находятся в @sec-tasks. Состав занятия задан в @sec-lab-01.

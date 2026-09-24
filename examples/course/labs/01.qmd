@@ -1,0 +1,12 @@
+---
+assessment:
+  kind: lab
+---
+
+# Лабораторная 1 {#sec-lab-01}
+
+Изучите @sec-tasks перед началом занятия.
+
+::: {.assessment-items}
+1. @exr-clamp
+:::

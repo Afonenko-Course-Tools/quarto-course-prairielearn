@@ -1,0 +1,20 @@
+# Quarto local state. Keep the exact entries Quarto adds automatically.
+/.quarto/
+**/.quarto/
+**/*.quarto_ipynb
+/_*.local
+
+# Rendered output, generated course models and caches at any depth.
+**/.qrc/
+**/_generated/
+**/_site/
+**/_book/
+**/_output/
+**/site_libs/
+**/*_files/
+**/*_cache/
+
+.DS_Store
+
+# This example reconstructs its installed dependencies with quarto add.
+**/_extensions/
