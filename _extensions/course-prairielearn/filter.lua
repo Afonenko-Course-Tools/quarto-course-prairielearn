@@ -1,11 +1,13 @@
--- The initial adapter profile supports external project grading only.
+local assessment = require("./assessment")
+
 return {{Pandoc = function(doc)
   if not doc.meta.course then return doc end
   local root = assert(quarto.project.directory)
   local input = quarto.doc.input_file
   if pandoc.path.is_relative(input) then input = pandoc.path.join({root, input}) end
   local source = pandoc.path.make_relative(input, root)
-  local value = {source = source, exercises = pandoc.List()}
+  local value = {source = source, exercises = pandoc.List(),
+    assessment = assessment.collect(doc.meta)}
   doc:walk({Div = function(d)
     if d.attributes.target == "prairielearn" then
       value.exercises:insert({id = d.identifier, payload = {grading = "external"}})
