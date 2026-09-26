@@ -18,3 +18,9 @@
 
 # Demo dependencies; the authored /_extensions directory stays tracked.
 /examples/**/_extensions/
+
+# Local compilation of authored Java examples.
+/examples/**/*.class
+/examples/**/build/
+/examples/**/.gradle/
+/examples/**/out/

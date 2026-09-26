@@ -11,6 +11,8 @@ import "list"
 	}
 }
 
+// Canonical payload after merging opted-in defaults and resolving assignment.
+// Source assignment.mode is normalized to student-label by assessment.lua.
 #PrairieLearnAssessment: {
 	attempts: int & >=1
 	pass: {"at-least": int & >=1}
