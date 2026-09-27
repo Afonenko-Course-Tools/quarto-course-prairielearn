@@ -1,5 +1,7 @@
 project:
   type: book
+  pre-render: _extensions/course-core/entrypoints/pre.ts
+  post-render: _extensions/course-core/entrypoints/post.ts
   output-dir: _book/student
   resources:
     - "!projects/**"
@@ -17,6 +19,7 @@ lang: ru
 course:
   id: demo-prairielearn
   validate: true
+  adapters: [prairielearn]
   view: student
 filters:
   - course-core

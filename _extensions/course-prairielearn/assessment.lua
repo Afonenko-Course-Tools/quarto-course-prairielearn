@@ -1,3 +1,6 @@
+local contract = require("./contract")
+local vocabulary = contract.vocabulary
+local assignmentModes = contract.set(vocabulary.assignment_modes)
 local M = {}
 
 -- Сохраняем неизвестные поля: закрытая схема CUE должна отклонить опечатки.
@@ -43,13 +46,13 @@ function M.collect(meta)
   if type(value.pass) == "table" then value.pass["at-least"] = number(value.pass["at-least"]) end
   local assignment = value.assignment
   if type(assignment) == "table" and assignment.mode ~= nil then
-    assert(assignment.mode == "assessment-id", "Неподдерживаемый режим assignment.mode: допустим только assessment-id")
+    assert(assignmentModes[assignment.mode], "Неподдерживаемый режим assignment.mode; допустимы: " .. table.concat(vocabulary.assignment_modes, ", "))
     assert(assignment["student-label"] == nil, "Нельзя одновременно задавать assignment.mode и assignment.student-label")
     local id = meta["course-assessment-id"] and pandoc.utils.stringify(meta["course-assessment-id"])
-    assert(id and id ~= "", "Для вычисления метки требуется идентификатор контрольной от Course Core")
+    assert(id and id ~= "", "Для вычисления метки требуется идентификатор контрольной от ядра курса")
     local course = pandoc.utils.stringify(meta.course.id)
     assignment.mode = nil
-    assignment["student-label"] = "pl-" .. pandoc.utils.sha1(course .. "\0" .. id)
+    assignment["student-label"] = vocabulary.assignment_label_prefix .. pandoc.utils.sha1(course .. "\0" .. id)
   end
   return value
 end
