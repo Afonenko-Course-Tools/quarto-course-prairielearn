@@ -1,0 +1,50 @@
+---
+assessment:
+  kind: test
+  prairielearn: {}
+---
+
+# Контракты числовых диапазонов {#sec-essay-ranges}
+
+Исследуйте включённость границ числового диапазона и обработку ошибочных
+границ. Обоснуйте примеры, различающие корректные и ошибочные реализации.
+
+::::: {.when-full}
+
+:::: {#exr-range-experiment target="prairielearn" project="/projects/clamp"}
+## Граничные случаи ограничения диапазона
+
+Для `Clamp.clamp(value, lower, upper)` укажите по одному вызову, в котором
+результат равен нижней границе, верхней границе и исходному значению внутри
+диапазона. Все три вызова должны использовать `lower < upper`. Для каждого
+запишите тройку аргументов и ожидаемый результат.
+
+::: {.grading-notes}
+Первый пример должен удовлетворять `value < lower`, второй — `value > upper`,
+третий — `lower < value < upper`. Числа выбирает студент.
+:::
+::::
+
+:::: {#exr-range-tests target="prairielearn" project="/projects/clamp"}
+## Проверка ошибочных границ
+
+Дополните набор проверок одним тестом, подтверждающим, что `Clamp.clamp`
+выбрасывает `IllegalArgumentException` при `lower > upper`. Текст сообщения
+исключения не проверяйте.
+::::
+
+:::: {#exr-range-implementation target="prairielearn" project="/projects/clamp"}
+## Реализация ограничения диапазона
+
+Реализуйте `Clamp.clamp(value, lower, upper)`: верните ближайшую границу,
+если `value` находится вне включительного диапазона, и само `value` иначе.
+При `lower > upper` выбросьте `IllegalArgumentException`.
+::::
+
+::: {.assessment-items}
+1. @exr-range-experiment
+2. @exr-range-tests
+3. @exr-range-implementation
+:::
+
+:::::

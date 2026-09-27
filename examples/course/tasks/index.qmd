@@ -5,3 +5,10 @@
 
 Реализуйте `Clamp.clamp(value, lower, upper)`. При `lower > upper` выбросьте `IllegalArgumentException`. Проверьте обе границы диапазона.
 ::::
+
+:::: {#exr-clamp-demo target="manual" project="/projects/clamp"}
+## Открытая демонстрация
+
+Проследите обработку граничных значений в авторском решении `Clamp`.
+Это упражнение не публикуется в PrairieLearn.
+::::

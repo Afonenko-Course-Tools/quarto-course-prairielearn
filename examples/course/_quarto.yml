@@ -1,6 +1,6 @@
 project:
   type: book
-  output-dir: _book
+  output-dir: _book/student
   resources:
     - "!projects/**"
 book:
@@ -9,14 +9,25 @@ book:
     - index.qmd
     - tasks/index.qmd
     - labs/01.qmd
+    - controls/ranges.qmd
 format:
   html:
     theme: cosmo
 lang: ru
 course:
-  schema: "1.0"
   id: demo-prairielearn
   validate: true
+  view: student
 filters:
   - course-core
   - course-prairielearn
+profile:
+  default: student
+  group: [[student, full]]
+prairielearn:
+  assessment-defaults:
+    attempts: 3
+    pass:
+      at-least: 2
+    assignment:
+      mode: assessment-id

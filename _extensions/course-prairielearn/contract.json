@@ -1,8 +1,5 @@
 {
   "name": "prairielearn",
-  "version": "1.0.0",
-  "requires_core": "1.0",
-  "quarto": ">=1.10.0",
   "rules": "spec/prairielearn.cue",
   "extension": ".",
   "compiler_family": "PrairieLearn course compiler",
