@@ -1,10 +1,10 @@
-# Quarto local state. Keep the exact entries Quarto adds automatically.
+# Локальное состояние Quarto; стандартные записи сохраняются без изменений.
 /.quarto/
 **/.quarto/
 **/*.quarto_ipynb
 /_*.local
 
-# Rendered output, generated course models and caches at any depth.
+# Результаты сборки, сгенерированные модели курса и кеши во всех каталогах.
 **/.qrc/
 **/_generated/
 **/_site/
@@ -16,11 +16,14 @@
 
 .DS_Store
 
-# Demo dependencies; the authored /_extensions directory stays tracked.
+# Установленные зависимости примеров; исходники в /_extensions хранятся в Git.
 /examples/**/_extensions/
 
-# Local compilation of authored Java examples.
+# Результаты локальной компиляции примеров на Java.
 /examples/**/*.class
 /examples/**/build/
 /examples/**/.gradle/
 /examples/**/out/
+
+# Зависимости, которые получает CI.
+/.ci-deps/

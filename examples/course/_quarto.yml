@@ -15,7 +15,6 @@ format:
     theme: cosmo
 lang: ru
 course:
-  schema: "1.0"
   id: demo-prairielearn
   validate: true
   view: student

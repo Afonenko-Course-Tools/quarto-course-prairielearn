@@ -1,4 +1,4 @@
-# Java compilation and build-tool caches.
+# Результаты компиляции Java и кеши инструментов сборки.
 /build/
 /target/
 /.gradle/
