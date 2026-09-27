@@ -2,6 +2,15 @@
   "name": "prairielearn",
   "rules": "spec/prairielearn.cue",
   "extension": ".",
-  "compiler_family": "PrairieLearn course compiler",
-  "export_implemented": false
+  "export_implemented": false,
+  "vocabulary": {
+    "grading": [
+      "external"
+    ],
+    "assignment_modes": [
+      "assessment-id"
+    ],
+    "assignment_label_prefix": "pl-",
+    "assignment_label_pattern": "^[a-z][a-z0-9-]*$"
+  }
 }

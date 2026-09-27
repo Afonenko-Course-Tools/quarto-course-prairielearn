@@ -68,12 +68,15 @@ try {
   await Deno.mkdir(join(directory, "projects/example"), { recursive: true });
   await Deno.writeTextFile(join(directory, "_quarto.yml"), `project:
   type: default
+  pre-render: _extensions/course-core/entrypoints/pre.ts
+  post-render: _extensions/course-core/entrypoints/post.ts
   render: [index.qmd]
 format: html
 lang: ru
 course:
   id: policy-test
   validate: true
+  adapters: [prairielearn]
 filters: [course-core, course-prairielearn]
 `);
 
@@ -91,6 +94,14 @@ filters: [course-core, course-prairielearn]
     JSON.stringify(e.extensions) === JSON.stringify({ prairielearn: { grading: "external" } })),
     "Задания PrairieLearn должны содержать параметры внешней проверки");
   console.log("ПРОЙДЕНО извлечение QMD: 3 задания, 2 для зачёта, 3 попытки");
+
+  const orderConfigPath = join(directory, "_quarto.yml");
+  const orderConfig = await Deno.readTextFile(orderConfigPath);
+  await Deno.writeTextFile(orderConfigPath, orderConfig.replace("filters: [course-core, course-prairielearn]", "filters: [course-prairielearn, course-core]"));
+  result = await command(quarto, ["render", "--fail-if-warnings"]);
+  assert(!result.ok && result.text.includes("course-core должен предшествовать"), "Неверный порядок фильтров должен отклоняться до извлечения");
+  await Deno.writeTextFile(orderConfigPath, orderConfig);
+  console.log("ПРОЙДЕНО: неверный порядок фильтров отклонён до извлечения закрытых данных");
 
   const cases: [string, (model: typeof valid) => void][] = [
     ["ноль попыток", m => { m.assessments[0].extensions.prairielearn.attempts = 0; }],
@@ -253,14 +264,14 @@ filters: [course-core, course-prairielearn]
     "Демонстрация с ручной проверкой не должна получать данные адаптера PrairieLearn");
   console.log("ПРОЙДЕНО представления full/student, отделение закрытых заметок и исключение демонстрации из PrairieLearn");
 
-  // Обычное занятие Core может включать ручную проверку. Общая метка
+  // Обычное занятие ядра может включать ручную проверку. Общая метка
   // допустима для основной контрольной и пересдачи.
   const plain = structuredClone(withoutPolicy);
   plain.exercises[0].target = "manual";
   plain.exercises[0].extensions = {};
   const retake = structuredClone(valid);
   retake.assessments.push({ ...structuredClone(retake.assessments[0]), id: "sec-retake" });
-  for (const [name, model] of [["обычное занятие Core", plain], ["общая метка для пересдачи", retake]]) {
+  for (const [name, model] of [["обычное занятие ядра", plain], ["общая метка для пересдачи", retake]]) {
     await Deno.writeTextFile(join(directory, "candidate.json"), JSON.stringify(model));
     result = await command(cue, ["vet", join(core, "spec/core.cue"),
       join(adapter, "spec/prairielearn.cue"), "candidate.json", "-d", "#Course", "-c"]);

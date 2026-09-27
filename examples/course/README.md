@@ -1,9 +1,9 @@
 # Пример курса
 
-Нужны актуальные Quarto, CUE и ядро Course Core. CI проверяет каналы Quarto `release` и `pre-release`.
+Нужны актуальные Quarto, CUE и ядро курса. CI проверяет каналы Quarto `release` и `pre-release`.
 
 ```sh
-quarto add AfonenkoA/programming-course-core-specification
+quarto add ../../../quarto-course
 quarto add ../..
 quarto render --profile student
 quarto render --profile full
