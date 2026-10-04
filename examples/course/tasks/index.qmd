@@ -1,12 +1,14 @@
 # Задания {#sec-tasks}
 
-:::: {#exr-clamp target="prairielearn" project="/projects/clamp"}
+## Ограничение диапазона {#sec-clamp-topic}
+
+:::: {#exr-clamp course-role="independent-study" difficulty="introductory" target="prairielearn" project="/projects/clamp"}
 ## Ограничение диапазона
 
 Реализуйте `Clamp.clamp(value, lower, upper)`. При `lower > upper` выбросьте `IllegalArgumentException`. Проверьте обе границы диапазона.
 ::::
 
-:::: {#exr-clamp-demo target="manual" project="/projects/clamp"}
+:::: {#exr-clamp-demo course-role="demonstration" difficulty="introductory" target="manual" project="/projects/clamp"}
 ## Открытая демонстрация
 
 Проследите обработку граничных значений в авторском решении `Clamp`.
