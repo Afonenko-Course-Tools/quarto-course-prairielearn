@@ -223,6 +223,7 @@ profile:
   console.log("ПРОЙДЕНО общие настройки не применяются к неподключённым занятиям");
 
   await Deno.mkdir(join(directory, "nested"));
+  await Deno.rename(join(directory, "index.qmd"), join(directory, "nested/moved.qmd"));
   await Deno.writeTextFile(join(directory, "nested/moved.qmd"),
     document("  prairielearn: {}\n").replace("# Контрольная", "# Новое название"));
   await Deno.writeTextFile(join(directory, "_quarto.yml"),
@@ -231,6 +232,8 @@ profile:
   assert(result.ok, `Перемещённый QMD должен собираться:\n${result.text}`);
   assert(JSON.parse(await Deno.readTextFile(modelPath())).assessments[0].extensions.prairielearn.assignment["student-label"] === label,
     "Перемещение страницы и изменение заголовка не должны менять метку");
+  await Deno.rename(join(directory, "nested/moved.qmd"), join(directory, "index.qmd"));
+  await Deno.remove(join(directory, "nested"));
   await Deno.writeTextFile(join(directory, "_quarto.yml"), config + defaults);
   console.log("ПРОЙДЕНО метка сохраняется после перемещения QMD и изменения заголовка");
 
