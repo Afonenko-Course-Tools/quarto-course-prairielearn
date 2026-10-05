@@ -5,6 +5,9 @@ return {{Pandoc = function(doc)
   if not doc.meta.course then return doc end
   assert(doc.meta["course-core-processed"] == true,
     "Фильтр course-core должен предшествовать course-prairielearn: видимость обрабатывается до извлечения данных")
+  -- Core emits this handoff only after validated private source capture.
+  -- Keep the ordering assertion above: an authored marker alone grants nothing.
+  if doc.meta["course-core-capture"] == true then return doc end
   local root = assert(quarto.project.directory)
   local input = quarto.doc.input_file
   if pandoc.path.is_relative(input) then input = pandoc.path.join({root, input}) end
