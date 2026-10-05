@@ -2,7 +2,6 @@ project:
   type: book
   pre-render:
     - _extensions/course-core/entrypoints/pre.ts
-    - _extensions/course-core/entrypoints/owner-freeze.ts
   post-render: _extensions/course-core/entrypoints/post.ts
   output-dir: _book/student
   resources:

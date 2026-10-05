@@ -5,8 +5,8 @@
 переключения версий схемы. Экспорт в PrairieLearn не реализован.
 Канонические `exr-*` задают `course-role`, явную `difficulty` и ближайшую
 авторскую тему `sec-*`. Назначение контрольных — `control`; открытой
-демонстрации — `demonstration`. HTML и модель получают через установленный
-owner API Core, как показано в README и `examples/course/render.ts`.
+демонстрации — `demonstration`. HTML и модель получают через явно подключённый
+native маршрута Quarto, как показано в README и `examples/course/render.ts`.
 
 ## Область ответственности
 

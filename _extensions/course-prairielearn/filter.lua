@@ -1,27 +1,13 @@
-local assessment = require("./assessment")
-local contract = require("./contract")
-
+local native = require("./native")
 return {{Pandoc = function(doc)
   if not doc.meta.course then return doc end
   assert(doc.meta["course-core-processed"] == true,
     "Фильтр course-core должен предшествовать course-prairielearn: видимость обрабатывается до извлечения данных")
-  -- Core emits this handoff only after validated private source capture.
-  -- Keep the ordering assertion above: an authored marker alone grants nothing.
-  if doc.meta["course-core-capture"] == true then return doc end
-  local root = assert(quarto.project.directory)
-  local input = quarto.doc.input_file
-  if pandoc.path.is_relative(input) then input = pandoc.path.join({root, input}) end
-  local source = pandoc.path.make_relative(input, root)
-  local value = {source = source, exercises = pandoc.List(),
-    assessment = assessment.collect(doc.meta)}
-  doc:walk({Div = function(d)
-    if d.attributes.target == contract.name then
-      value.exercises:insert({id = d.identifier, payload = {grading = contract.vocabulary.grading[1]}})
-    end
-  end})
-  local directory = root .. "/_generated/course-spec/" .. contract.name
-  pandoc.system.make_directory(directory, true)
-  local file = assert(io.open(directory .. "/" .. pandoc.utils.sha1(source) .. ".json", "w"))
-  file:write(pandoc.json.encode(value)); file:close()
+  local active = false
+  for _, name in ipairs(doc.meta.course.adapters or {}) do
+    if pandoc.utils.stringify(name) == "prairielearn" then active = true end
+  end
+  if not active then return doc end
+  native.write(doc, native.read(doc))
   return doc
 end}}
