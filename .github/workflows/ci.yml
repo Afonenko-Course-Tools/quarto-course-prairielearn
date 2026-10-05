@@ -33,7 +33,7 @@ jobs:
         with:
           repository: Afonenko-Course-Tools/quarto-course
           # Согласованный коммит миграции ядра; обновляется вместе с адаптером.
-          ref: 3bfe4e6082b3be0584512b21c3e8134b26ccea30
+          ref: 992759e12924a3117ac92163ec51d62d59bb3267
           path: .ci-deps/core
           persist-credentials: false
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
