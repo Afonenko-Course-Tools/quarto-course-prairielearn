@@ -85,7 +85,7 @@ ${
     ).join("\n\n")
   }
 
-::: {.assessment-items}
+::: {.task-items}
 1. @exr-experiment
 2. @exr-tests
 3. @exr-implementation
@@ -476,7 +476,7 @@ profile:
   const privateDocument = document("  prairielearn: {}\n")
     .replace(
       ":::: {#exr-experiment",
-      ":::::: {.when-full}\n\n:::: {#exr-experiment",
+      ":::::: {.content-visible when-profile=\"full\"}\n\n:::: {#exr-experiment",
     )
     .replace(
       "Описание задания.\n::::",

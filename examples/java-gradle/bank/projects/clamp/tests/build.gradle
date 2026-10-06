@@ -1,0 +1,14 @@
+def solution = providers.gradleProperty('solution').orElse('../reference')
+def compiled = layout.buildDirectory.dir('classes')
+tasks.register('compileChecks', JavaCompile) {
+    source fileTree(solution.get()) { include '*.java' }, fileTree('.') { include '*.java' }
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+    classpath = files()
+    destinationDirectory = compiled
+}
+tasks.register('test', JavaExec) {
+    dependsOn 'compileChecks'
+    classpath = files(compiled)
+    mainClass = 'ClampChecks'
+}

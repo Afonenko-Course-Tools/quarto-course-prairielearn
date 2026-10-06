@@ -2,7 +2,7 @@
   "name": "prairielearn",
   "rules": "spec/prairielearn.cue",
   "extension": ".",
-  "export_implemented": false,
+  "export_implemented": true,
   "vocabulary": {
     "grading": [
       "external"

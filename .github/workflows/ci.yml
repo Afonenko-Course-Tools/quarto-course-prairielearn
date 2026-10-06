@@ -33,7 +33,7 @@ jobs:
         with:
           repository: Afonenko-Course-Tools/quarto-course
           # Опубликованный релиз bundle Core/Presentation/Navigation.
-          ref: v2.1.0
+          ref: v3.0.0
           path: .ci-deps/core
           persist-credentials: false
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
@@ -44,9 +44,43 @@ jobs:
           version: v0.17.1
       - name: Проверка единого словаря контракта
         run: quarto run tools/sync-contract.ts --check
+      - run: quarto run tests/native-model.ts .ci-deps/core
+      - run: quarto run tests/native-ordinary.ts .ci-deps/core
+      - run: quarto run tests/identity.ts .ci-deps/core
       - name: Версии инструментов
         run: |
           quarto --version
           cue version
       - name: Проверка правил PrairieLearn и сборка примера student/full
         run: quarto run tests/check.ts .ci-deps/core
+
+  java-delivery:
+    name: Installed native questions and Java/Gradle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-course
+          ref: v3.0.0
+          path: .ci-deps/core
+          persist-credentials: false
+      - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
+        with:
+          version: 1.11.5
+      - uses: cue-lang/setup-cue@b0e30e540a2dae47304ebf16586a5b2db023b61c
+        with:
+          version: v0.17.1
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.7.14
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
+        with:
+          gradle-version: '9.1.0'
+      - run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts
+      - run: CORE="$PWD/.ci-deps/core" bash tools/check-java.sh

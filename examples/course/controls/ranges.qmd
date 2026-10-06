@@ -11,7 +11,7 @@ assessment:
 
 ## Исследование диапазонов {#sec-ranges-topic}
 
-::::: {.when-full}
+::::: {.content-visible when-profile="full"}
 
 :::: {#exr-range-experiment course-role="control" difficulty="introductory" target="prairielearn" project="/projects/clamp"}
 ## Граничные случаи ограничения диапазона
@@ -43,7 +43,7 @@ assessment:
 При `lower > upper` выбросьте `IllegalArgumentException`.
 ::::
 
-::: {.assessment-items}
+::: {.task-items}
 1. @exr-range-experiment
 2. @exr-range-tests
 3. @exr-range-implementation

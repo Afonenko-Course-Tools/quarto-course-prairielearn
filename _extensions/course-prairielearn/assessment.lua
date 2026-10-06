@@ -50,9 +50,12 @@ function M.collect(meta)
     assert(assignment["student-label"] == nil, "Нельзя одновременно задавать assignment.mode и assignment.student-label")
     local id = meta["course-assessment-id"] and pandoc.utils.stringify(meta["course-assessment-id"])
     assert(id and id ~= "", "Для вычисления метки требуется идентификатор контрольной от ядра курса")
-    local course = pandoc.utils.stringify(meta.course.id)
-    assignment.mode = nil
-    assignment["student-label"] = vocabulary.assignment_label_prefix .. pandoc.utils.sha1(course .. "\0" .. id)
+    local course = meta.course and meta.course.id and pandoc.utils.stringify(meta.course.id)
+    -- Nested native books keep the authored mode until explicit root export supplies identity.
+    if course and course ~= "" then
+      assignment.mode = nil
+      assignment["student-label"] = vocabulary.assignment_label_prefix .. pandoc.utils.sha1(course .. "\0" .. id)
+    end
   end
   return value
 end

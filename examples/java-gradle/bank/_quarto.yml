@@ -1,0 +1,16 @@
+project:
+  type: book
+  pre-render: _extensions/Afonenko-Course-Tools/course-core/entrypoints/pre.ts
+  post-render: _extensions/Afonenko-Course-Tools/course-core/entrypoints/post.ts
+  resources: ["!projects/**"]
+book:
+  title: Shared Java tasks
+  chapters: [index.qmd, tasks.qmd, control.qmd, variant-a.qmd, variant-b.qmd]
+format: html
+filters: [course-core, course-prairielearn]
+course:
+  adapters: [prairielearn]
+bibliography: ../references.bib
+profile:
+  default: full
+  group: [[student, full]]

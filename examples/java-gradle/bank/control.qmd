@@ -1,0 +1,11 @@
+# Shared control tasks {#sec-java-control}
+
+:::: {#exr-control target="prairielearn" project="/projects/clamp" course-role="control"}
+## Control: interval boundary cases
+
+CONTROL_CONDITION: Implement the same interval contract and describe its boundary cases.
+
+::: {.grading-notes}
+CONTROL_GRADING: Private edge cases must all pass.
+:::
+::::

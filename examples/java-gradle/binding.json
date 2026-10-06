@@ -1,0 +1,34 @@
+{
+  "questions": {
+    "exr-clamp": {
+      "topic": "Java",
+      "files": [
+        "Clamp.java"
+      ],
+      "externalGradingOptions": {
+        "image": "docker.io/library/gradle:9.1.0-jdk25",
+        "entrypoint": [
+          "sh",
+          "/grade/tests/grade.sh"
+        ],
+        "timeout": 60,
+        "enableNetworking": false
+      }
+    },
+    "exr-control": {
+      "topic": "Java",
+      "files": [
+        "Clamp.java"
+      ],
+      "externalGradingOptions": {
+        "image": "docker.io/library/gradle:9.1.0-jdk25",
+        "entrypoint": [
+          "sh",
+          "/grade/tests/grade.sh"
+        ],
+        "timeout": 60,
+        "enableNetworking": false
+      }
+    }
+  }
+}
