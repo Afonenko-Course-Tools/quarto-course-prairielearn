@@ -16,13 +16,13 @@ quarto add "$repo" --no-prompt
 cd "$stage"
 quarto run build.ts
 quarto run bank/_extensions/course-prairielearn/entrypoints/export.ts --profile feature -- . bank sec-variant-a binding.json "$stage/cli-delivery"
-rg -q FUNCTIONAL_PROFILE_CONDITION "$stage/cli-delivery/questions/demo-java-gradle/exr-clamp/question.html"
 [[ -f "$stage/cli-delivery/questions/demo-java-gradle/exr-clamp/info.json" ]]
 [[ ! -e "$stage/cli-delivery/questions/demo-java-gradle/exr-control" ]]
 python3 - "$stage" <<'PY'
 import json,sys
 from pathlib import Path
 root=Path(sys.argv[1]);site=root/'_site'
+assert 'FUNCTIONAL_PROFILE_CONDITION' in (root/'cli-delivery/questions/demo-java-gradle/exr-clamp/question.html').read_text()
 assert (site/'index.html').is_file() and (site/'BUILD.json').is_file()
 for variant,exercise in [('a','exr-clamp'),('b','exr-control')]:
  q=site/'artifacts'/f'variant-{variant}'/'questions'/'demo-java-gradle'/exercise

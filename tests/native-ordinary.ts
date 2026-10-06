@@ -1,6 +1,7 @@
 import { join } from "node:path";
-const core = Deno.args[0];
-if (!core) throw Error("usage: native-ordinary.ts CORE");
+const coreArgument = Deno.args[0];
+if (!coreArgument) throw Error("usage: native-ordinary.ts CORE");
+const core = await Deno.realPath(coreArgument);
 const repo = Deno.cwd(),
   root = await Deno.makeTempDir({ prefix: "native-ordinary-" });
 const adapter = "prairielearn";

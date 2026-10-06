@@ -1,7 +1,8 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-const core = Deno.args[0];
-if (!core) throw Error("usage: identity.ts CORE");
+const coreArgument = Deno.args[0];
+if (!coreArgument) throw Error("usage: identity.ts CORE");
+const core = await Deno.realPath(coreArgument);
 const repo = Deno.cwd(),
   root = await Deno.makeTempDir({ prefix: "pl-root-identity-" }),
   bank = join(root, "bank");
