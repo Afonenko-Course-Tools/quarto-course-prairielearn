@@ -1,0 +1,16 @@
+---
+assessment:
+  kind: test
+  prairielearn:
+    attempts: 3
+    pass:
+      at-least: 1
+    assignment:
+      mode: assessment-id
+---
+
+# Variant B {#sec-variant-b}
+
+::: {.task-items}
+1. @exr-control
+:::

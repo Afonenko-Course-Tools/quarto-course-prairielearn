@@ -3,7 +3,7 @@ project:
   pre-render:
     - _extensions/course-core/entrypoints/pre.ts
   post-render: _extensions/course-core/entrypoints/post.ts
-  output-dir: _book/student
+  output-dir: _book/full
   resources:
     - "!projects/**"
 book:
@@ -21,12 +21,12 @@ course:
   id: demo-prairielearn
   validate: true
   adapters: [prairielearn]
-  view: student
+  view: full
 filters:
   - course-core
   - course-prairielearn
 profile:
-  default: student
+  default: full
   group: [[student, full]]
 prairielearn:
   assessment-defaults:

@@ -1,0 +1,16 @@
+# Public tasks {#sec-java-tasks}
+
+:::: {#exr-clamp target="prairielearn" project="/projects/clamp"}
+## Clamp a value
+
+Implement `Clamp.clamp(value, lower, upper)` so the result belongs to the
+inclusive interval. Reject reversed bounds with `IllegalArgumentException`.
+
+::: {.content-visible when-profile="feature"}
+FUNCTIONAL_PROFILE_CONDITION
+:::
+
+::: {.grading-notes}
+Private tests cover equality, negative numbers and reversed bounds.
+:::
+::::

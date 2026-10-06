@@ -21,7 +21,7 @@ function M.validate(doc)
     native.vet(policy, "#PrairieLearnAssessment")
     local members = 0
     doc:walk({Div = function(div)
-      if div.classes:includes("assessment-items") then
+      if div.classes:includes("task-items") then
         for _, block in ipairs(div.content) do
           if block.t == "BulletList" or block.t == "OrderedList" then
             members = members + #block.content

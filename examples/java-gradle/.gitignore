@@ -1,0 +1,9 @@
+_site/
+artifacts/
+.quarto/
+bank/_extensions/
+bank/_book/
+bank/_generated/
+bank/.quarto/
+bank/projects/clamp/tests/build/
+bank/projects/clamp/tests/.gradle/

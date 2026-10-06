@@ -10,6 +10,7 @@ const union = (values: string[]) => values.map(quote).join(" | ");
 const definitions = {
   PrairieLearnTarget: quote(contract.name),
   PrairieLearnGrading: union(vocabulary.grading),
+  PrairieLearnAssignmentMode: union(vocabulary.assignment_modes),
   PrairieLearnLabel: `string & =~${quote(vocabulary.assignment_label_pattern)}`,
 };
 const marker = "// BEGIN GENERATED VOCABULARY";

@@ -1,0 +1,27 @@
+---
+code-links:
+  - text: Source example folder
+    icon: github
+    href: https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/tree/v2.1.0/examples/java-gradle
+---
+
+# Java and Gradle
+
+A shared bank feeds two fixed variants. Control source is omitted from the
+student site and still supplies a public question to selected export.
+
+The delivery has native PrairieLearn questions, public Java starter files and
+private grader tests. Local Gradle tests execute the author reference and reject
+the incomplete starter. Container execution and real PrairieLearn import require
+separate verification. Attempts and pass criteria stay platform specific.
+
+## Native delivery files
+
+[Variant A descriptor](artifacts/variant-a/delivery.json),
+[question info](artifacts/variant-a/questions/demo-java-gradle/exr-clamp/info.json),
+[Java starter](artifacts/variant-a/questions/demo-java-gradle/exr-clamp/clientFilesQuestion/Clamp.java)
+and [private checks](artifacts/variant-a/questions/demo-java-gradle/exr-clamp/tests/ClampChecks.java).
+
+[Variant B descriptor](artifacts/variant-b/delivery.json) shows the separately
+selected control question. These are instructor delivery artifacts for a demo;
+full demonstration tests are deliberately public here.
