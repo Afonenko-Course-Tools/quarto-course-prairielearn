@@ -14,10 +14,13 @@ cd ..
 quarto run build.ts
 ```
 
-The shown tags are release candidates until published. Requires Quarto, CUE,
+The group pins these releases. Requires Quarto, CUE,
 Java and Gradle. No Maven/JUnit download: the Gradle JavaCompile/JavaExec tasks
 run six actual assertions. `binding.json` is explicit PrairieLearn configuration.
 The container image/entrypoint must be verified on the target PL installation;
 local Gradle execution does not establish live container/server compatibility.
 Each selected delivery uses only its question binding. Export no assessment
 activity and do not translate the pass rule into a generic grading formula.
+
+The ready artifact is published separately in immutable release `demo-20261007`
+from the same merged revision. `BUILD.json` records the exact commit and dependencies.
