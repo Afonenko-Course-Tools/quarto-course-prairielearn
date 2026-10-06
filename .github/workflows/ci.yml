@@ -32,8 +32,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          # Согласованный коммит миграции ядра; обновляется вместе с адаптером.
-          ref: 27d7c437d386f5489c8a0a4c09ed1afeb07c7967
+          # Опубликованный релиз bundle Core/Presentation/Navigation.
+          ref: v2.1.0
           path: .ci-deps/core
           persist-credentials: false
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
