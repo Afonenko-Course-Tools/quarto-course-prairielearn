@@ -1,0 +1,87 @@
+{
+  "type": "provenance",
+  "component": "course-prairielearn",
+  "status": "historical",
+  "sources": [
+    {
+      "source": "/home/tolya/course-tools/specs/course-change-plan.md",
+      "snapshot": "docs/history/2026-10-08/snapshots/root/specs/course-change-plan.md",
+      "sha256": "8bafe4c4b7a9b693ad6c64712558d71a6a719722bcc99e1d0bf357965b24218e",
+      "bytes": 85567,
+      "modified": "2026-10-07T23:29:03.078283+00:00",
+      "scope": "PrairieLearn: selected question closure, CUE/native bindings, client/tests/reference, actual Java/Gradle delivery."
+    },
+    {
+      "source": "/home/tolya/course-tools/specs/course-examples-release-plan.md",
+      "snapshot": "docs/history/2026-10-08/snapshots/root/specs/course-examples-release-plan.md",
+      "sha256": "7ff128a08b4d88923e409c203405d644dd91c50ad017a9f628373c47973666fc",
+      "bytes": 25245,
+      "modified": "2026-10-07T23:29:03.079071+00:00",
+      "scope": "PrairieLearn: selected question closure, CUE/native bindings, client/tests/reference, actual Java/Gradle delivery."
+    },
+    {
+      "source": "/home/tolya/course-tools/specs/2026-10-04-refactoring-analysis.md",
+      "snapshot": "docs/history/2026-10-08/snapshots/root/specs/2026-10-04-refactoring-analysis.md",
+      "sha256": "c7c04d58d8174d4e3e33b1c70174b7c5009be71af3e9f8ea361eaec24276fb61",
+      "bytes": 32724,
+      "modified": "2026-10-07T23:29:03.076114+00:00",
+      "scope": "PrairieLearn: selected question closure, CUE/native bindings, client/tests/reference, actual Java/Gradle delivery."
+    },
+    {
+      "source": "/home/tolya/course-tools/specs/quarto-tools-plan.md",
+      "snapshot": "docs/history/2026-10-08/snapshots/root/specs/quarto-tools-plan.md",
+      "sha256": "2485df3eba93b328de3098ef9640e8af11347660c607aa409fb09a103a31fca8",
+      "bytes": 434313,
+      "modified": "2026-10-07T23:29:03.082535+00:00",
+      "scope": "PrairieLearn: selected question closure, CUE/native bindings, client/tests/reference, actual Java/Gradle delivery."
+    },
+    {
+      "source": "/home/tolya/course-tools/local-evidence/refactoring-research-2026-10-07/RESULT.md",
+      "snapshot": "docs/history/2026-10-08/snapshots/root/local-evidence/refactoring-research-2026-10-07/RESULT.md",
+      "sha256": "74e402c0a146067515884940d7c1a9a00f1f1e292ac90e3f2ca7074fbede8c2c",
+      "bytes": 8451,
+      "modified": "2026-10-07T09:51:06.130674+00:00",
+      "scope": "PrairieLearn: selected question closure, CUE/native bindings, client/tests/reference, actual Java/Gradle delivery."
+    },
+    {
+      "source": "/home/tolya/course-tools/local-evidence/refactoring-research-2026-10-07/plan-validation.json",
+      "snapshot": "docs/history/2026-10-08/snapshots/root/local-evidence/refactoring-research-2026-10-07/plan-validation.json",
+      "sha256": "b77a17b858a9c21347f0f697e067f309c257700256265c09f9a6503ae55d1a18",
+      "bytes": 162,
+      "modified": "2026-10-07T09:49:10.313059+00:00",
+      "scope": "PrairieLearn: selected question closure, CUE/native bindings, client/tests/reference, actual Java/Gradle delivery."
+    },
+    {
+      "source": "/home/tolya/course-tools/local-evidence/implementation-2026-10-06/RESULT.md",
+      "snapshot": "docs/history/2026-10-08/snapshots/root/local-evidence/implementation-2026-10-06/RESULT.md",
+      "sha256": "bd9e6ceb8cf2cb54fb7a12ce292c15d4b21e5d8c45019ca56a0c91de9f474e25",
+      "bytes": 5985,
+      "modified": "2026-10-07T00:06:19.005344+00:00",
+      "scope": "PrairieLearn: selected question closure, CUE/native bindings, client/tests/reference, actual Java/Gradle delivery."
+    },
+    {
+      "source": "/home/tolya/course-tools/local-evidence/2026-10-06-adapter-architecture.md",
+      "snapshot": "docs/history/2026-10-08/snapshots/root/local-evidence/2026-10-06-adapter-architecture.md",
+      "sha256": "761cf1e85f206cd2a005620a0caf18fe2b6fe7a6de0b43ca32fda0ce9756f5a7",
+      "bytes": 8576,
+      "modified": "2026-10-06T22:25:30.694998+00:00",
+      "scope": "PrairieLearn: selected question closure, CUE/native bindings, client/tests/reference, actual Java/Gradle delivery."
+    },
+    {
+      "source": "/home/tolya/course-tools/local-evidence/implementation-2026-10-06/releases/quarto-course-prairielearn/v2.1.0/notes.md",
+      "snapshot": "docs/history/2026-10-08/snapshots/root/local-evidence/implementation-2026-10-06/releases/quarto-course-prairielearn/v2.1.0/notes.md",
+      "sha256": "0dfdea82325dddd7a16eec2b40b7378ed53733c15140677c976d9b11be2e4a9a",
+      "bytes": 423,
+      "modified": "2026-10-06T22:31:29.498868+00:00",
+      "scope": "PrairieLearn: selected question closure, CUE/native bindings, client/tests/reference, actual Java/Gradle delivery."
+    },
+    {
+      "source": "/home/tolya/course-tools/local-evidence/implementation-2026-10-06/releases/quarto-course-prairielearn/demo-20261007/notes.md",
+      "snapshot": "docs/history/2026-10-08/snapshots/root/local-evidence/implementation-2026-10-06/releases/quarto-course-prairielearn/demo-20261007/notes.md",
+      "sha256": "550f3bcaa5121cfcc201cafe75dfe885dc56b4bf9c607716a9ece8c4f1c7e7ca",
+      "bytes": 373,
+      "modified": "2026-10-06T22:36:34.550238+00:00",
+      "scope": "PrairieLearn: selected question closure, CUE/native bindings, client/tests/reference, actual Java/Gradle delivery."
+    }
+  ]
+}

@@ -1,0 +1,154 @@
+{
+  "type": "inventory",
+  "component": "course-prairielearn",
+  "status": "historical",
+  "captured_at": "2026-10-07T23:40:37.192193+00:00",
+  "initial_checkout_branch": "main",
+  "preservation_branch": "feat/authoring-model-20261008",
+  "initial_head": "c65550182121c4ba3e3795c5d05d7c97e15ddd7c",
+  "fetched_origin_main": "ff4797947fc0d802ef1c5f7cef8cde2a41918884",
+  "refs": [
+    {
+      "ref": "refs/heads/feat/authoring-model-20261008",
+      "sha": "c65550182121c4ba3e3795c5d05d7c97e15ddd7c",
+      "upstream": null,
+      "main_only": 9,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/heads/feat/course-contract-20261006",
+      "sha": "87fb70019ddfa683ac3e803396fc3e1fe3e787c0",
+      "upstream": "origin/feat/course-contract-20261006",
+      "main_only": 10,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/heads/main",
+      "sha": "c65550182121c4ba3e3795c5d05d7c97e15ddd7c",
+      "upstream": "origin/main",
+      "main_only": 9,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/heads/master",
+      "sha": "e56027f141dbf0be954cb9bb47f0b076799fca9d",
+      "upstream": "origin/master",
+      "main_only": 26,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/remotes/origin/HEAD",
+      "sha": "ff4797947fc0d802ef1c5f7cef8cde2a41918884",
+      "upstream": null,
+      "main_only": 0,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/remotes/origin/feat/course-contract-20261006",
+      "sha": "87fb70019ddfa683ac3e803396fc3e1fe3e787c0",
+      "upstream": null,
+      "main_only": 10,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/remotes/origin/feat/course-system-final",
+      "sha": "8b2e98a2ef136befb4e91325fe9f35e386fb2db7",
+      "upstream": null,
+      "main_only": 22,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/remotes/origin/feat/versioned-releases",
+      "sha": "d4faae53558e8c50348a3eca981d27be16a7c0af",
+      "upstream": null,
+      "main_only": 14,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/remotes/origin/main",
+      "sha": "ff4797947fc0d802ef1c5f7cef8cde2a41918884",
+      "upstream": null,
+      "main_only": 0,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/remotes/origin/refactor/native-quarto-20261005",
+      "sha": "78e0bf25853ea8232a87c3bf5df5d3d9fd970769",
+      "upstream": null,
+      "main_only": 17,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/tags/demo-20261007",
+      "sha": "c65550182121c4ba3e3795c5d05d7c97e15ddd7c",
+      "upstream": null,
+      "main_only": 9,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/tags/demo-20261007-ru1",
+      "sha": "ff4797947fc0d802ef1c5f7cef8cde2a41918884",
+      "upstream": null,
+      "main_only": 0,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/tags/v2.0.1",
+      "sha": "d6dbd0d5374a7c279bb1c995625a28ae1629cb1e",
+      "upstream": null,
+      "main_only": 13,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/tags/v2.1.0",
+      "sha": "c65550182121c4ba3e3795c5d05d7c97e15ddd7c",
+      "upstream": null,
+      "main_only": 9,
+      "ref_only": 0
+    },
+    {
+      "ref": "refs/tags/v2.1.1",
+      "sha": "916fe55cbedcf9e9f49ecefd2ba908add2d346b5",
+      "upstream": null,
+      "main_only": 2,
+      "ref_only": 0
+    }
+  ],
+  "worktrees": [
+    {
+      "path": "/home/tolya/course-tools/quarto-course-prairielearn",
+      "porcelain": "worktree /home/tolya/course-tools/quarto-course-prairielearn\nHEAD c65550182121c4ba3e3795c5d05d7c97e15ddd7c\nbranch refs/heads/feat/authoring-model-20261008",
+      "status": "?? docs/history/\n?? docs/plans/\n",
+      "untracked": [
+        "docs/history/2026-10-08/snapshots/root/local-evidence/2026-10-06-adapter-architecture.md",
+        "docs/history/2026-10-08/snapshots/root/local-evidence/implementation-2026-10-06/RESULT.md",
+        "docs/history/2026-10-08/snapshots/root/local-evidence/implementation-2026-10-06/releases/quarto-course-prairielearn/demo-20261007/notes.md",
+        "docs/history/2026-10-08/snapshots/root/local-evidence/implementation-2026-10-06/releases/quarto-course-prairielearn/v2.1.0/notes.md",
+        "docs/history/2026-10-08/snapshots/root/local-evidence/refactoring-research-2026-10-07/RESULT.md",
+        "docs/history/2026-10-08/snapshots/root/local-evidence/refactoring-research-2026-10-07/plan-validation.json",
+        "docs/history/2026-10-08/snapshots/root/specs/2026-10-04-refactoring-analysis.md",
+        "docs/history/2026-10-08/snapshots/root/specs/course-change-plan.md",
+        "docs/history/2026-10-08/snapshots/root/specs/course-examples-release-plan.md",
+        "docs/history/2026-10-08/snapshots/root/specs/quarto-tools-plan.md",
+        "docs/plans/2026-10-08-implementation.md",
+        "docs/plans/diagnostics-refactoring-plan.md"
+      ]
+    }
+  ],
+  "ignored_count": 159,
+  "ignored_categories": {
+    "cache: retained locally, reproducible": 20,
+    "generated result: retained locally": 70,
+    "installed dependency: retained locally": 69
+  },
+  "ignored_reviewed_separately": [],
+  "ignored_receipts": [
+    {
+      "path": "examples/java-gradle/_site/BUILD.json",
+      "bytes": 348,
+      "sha256": "d7737c3661d80a2494d7901a7cf96e5f8e21edaee6fdbb38ece76dfd6333763c",
+      "disposition": "retained in existing checkout; no cleanup in steps 1–2"
+    }
+  ],
+  "remote_note": "Fetched tags and origin refs on 2026-10-08; stale tracking refs retained for preservation. remote-heads.txt records live heads; old evidence does not establish present CI."
+}
