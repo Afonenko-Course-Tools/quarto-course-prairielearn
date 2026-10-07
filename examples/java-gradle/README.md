@@ -7,8 +7,8 @@
 
 ```sh
 cd bank
-quarto add Afonenko-Course-Tools/quarto-course@v3.0.0 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v2.1.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v3.0.2 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v2.1.1 --no-prompt
 cd ..
 quarto run build.ts
 ```
@@ -36,7 +36,7 @@ quarto run build.ts
 entrypoint, импорт в PrairieLearn и серверное исполнение проверяются отдельно
 на целевой установке. `build.ts` не подтверждает эту совместимость.
 
-Готовый результат публикуется отдельно в неизменяемом выпуске `demo-20261007`
+Готовый результат публикуется отдельно в неизменяемом выпуске `demo-20261007-ru1`
 из той же принятой ревизии. `BUILD.json` сохраняет точный commit и зависимости.
 
 См. [диагностику](../../docs/diagnostics.md) и [правила авторства](../../docs/authoring.md).

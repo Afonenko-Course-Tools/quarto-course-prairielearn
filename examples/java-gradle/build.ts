@@ -97,8 +97,8 @@ await Deno.writeTextFile(
           ? new TextDecoder().decode(revision.stdout).trim()
           : ""),
       sourceDirty: Deno.env.get("DEMO_SOURCE_DIRTY") === "true",
-      extensionVersion: "2.1.0",
-      dependencies: { "quarto-course": "3.0.0" },
+      extensionVersion: "2.1.1",
+      dependencies: { "quarto-course": "3.0.2" },
       projection: "full",
       verification: "local installed native build",
       livePlatformVerified: false,

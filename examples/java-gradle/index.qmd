@@ -2,7 +2,7 @@
 code-links:
   - text: Исходники группы
     icon: github
-    href: https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/tree/v2.1.0/examples/java-gradle
+    href: https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/tree/demo-20261007-ru1/examples/java-gradle
 ---
 
 # Java и Gradle
