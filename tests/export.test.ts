@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 const assert = (v: unknown, m: string) => {
   if (!v) throw Error(m);
@@ -364,6 +365,8 @@ const cli = new URL(
 ).pathname;
 async function runCli(args: string[]) {
   const result = await new Deno.Command(Deno.execPath(), {
+    // Exercise the coloured Deno error rendering used by CI.
+    env: { FORCE_COLOR: "1" },
     args: [
       "run",
       "--no-config",
@@ -377,7 +380,11 @@ async function runCli(args: string[]) {
     stdout: "piped",
     stderr: "piped",
   }).output();
-  return { ...result, text: new TextDecoder().decode(result.stderr) };
+  return {
+    ...result,
+    // Preserve stderr bytes and compare the terminal-visible text.
+    text: stripVTControlCharacters(new TextDecoder().decode(result.stderr)),
+  };
 }
 Deno.test("CLI formats known input refusal once without stack", async () => {
   const result = await runCli([]);
