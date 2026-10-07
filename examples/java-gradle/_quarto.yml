@@ -4,11 +4,12 @@ project:
   render: [index.qmd]
   resources: [artifacts/**]
 website:
-  title: PrairieLearn Java and Gradle
+  title: "PrairieLearn: Java и Gradle"
   repo-url: https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn
   repo-subdir: examples/java-gradle
   repo-actions: [source]
-  repo-branch: v2.1.0
+  repo-branch: demo-20261007-ru1
+lang: ru
 format: html
 course:
   id: demo-java-gradle

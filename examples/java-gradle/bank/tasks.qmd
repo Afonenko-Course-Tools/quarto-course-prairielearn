@@ -1,16 +1,17 @@
-# Public tasks {#sec-java-tasks}
+# Публичные задания {#sec-java-tasks}
 
 :::: {#exr-clamp target="prairielearn" project="/projects/clamp"}
-## Clamp a value
+## Ограничение значения интервалом
 
-Implement `Clamp.clamp(value, lower, upper)` so the result belongs to the
-inclusive interval. Reject reversed bounds with `IllegalArgumentException`.
+Реализуйте `Clamp.clamp(value, lower, upper)`: результат должен принадлежать
+замкнутому интервалу. Если границы заданы в обратном порядке, метод должен
+выбросить `IllegalArgumentException`.
 
 ::: {.content-visible when-profile="feature"}
-FUNCTIONAL_PROFILE_CONDITION
+Проверьте равные границы, отрицательные числа и предельные значения `int`.
 :::
 
 ::: {.grading-notes}
-Private tests cover equality, negative numbers and reversed bounds.
+Закрытые тесты проверяют равные границы, отрицательные числа и обратный порядок границ.
 :::
 ::::

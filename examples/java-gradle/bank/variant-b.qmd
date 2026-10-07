@@ -9,7 +9,7 @@ assessment:
       mode: assessment-id
 ---
 
-# Variant B {#sec-variant-b}
+# Вариант B {#sec-variant-b}
 
 ::: {.task-items}
 1. @exr-control

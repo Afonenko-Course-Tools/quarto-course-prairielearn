@@ -3,12 +3,12 @@
 Расширение извлекает платформенные параметры заданий и работ, проверяет их CUE
 и явно экспортирует выбранные вопросы в нативные каталоги PrairieLearn.
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
-оценки принадлежат PrairieLearn. Старый авторский синтаксис не поддерживается.
+оценки принадлежат PrairieLearn.
 
 ```sh
 cd bank
-quarto add Afonenko-Course-Tools/quarto-course@v3.0.0 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v2.1.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v3.0.2 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v2.1.1 --no-prompt
 ```
 
 ```yaml
@@ -38,7 +38,7 @@ filters: [course-core, course-prairielearn]
 ::::
 ````
 
-Страница работы имеет собственный стабильный ID (`[a-z][a-z0-9-]*`) и общий список:
+Страница работы имеет собственный стабильный ID (`[a-z][a-z0-9-]*`) и список заданий:
 
 ````qmd
 ---
@@ -62,7 +62,7 @@ assessment:
 `prairielearn.assessment-defaults` применяется только к явно подключившей
 его `assessment.prairielearn`; локальная assignment заменяет общую целиком.
 Правила оценки дополнительных заданий задаются на платформе: они не должны
-компенсировать невыполнение обязательных. Подробности — [authoring](docs/authoring.md).
+компенсировать невыполнение обязательных. Подробности — [правила авторства](docs/authoring.md).
 
 ## Явный экспорт вопросов
 
@@ -123,7 +123,11 @@ deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/e
 [external grading](https://docs.prairielearn.com/externalGrading/) и
 [client/server files](https://docs.prairielearn.com/clientServerFiles/).
 
-A nested native book can keep `assignment.mode: assessment-id` without a local
-`course.id`. Explicit root export resolves its stable platform label from the root
-course ID and selected work ID. Functional profiles supplied with Quarto `--profile`
-are retained by the root exporter.
+Вложенная native-книга сохраняет `assignment.mode: assessment-id` без локального
+`course.id`. Явный экспорт из корня разрешает устойчивую метку платформы по ID
+корневого курса и выбранной работы. Функциональные профили, переданные через
+Quarto `--profile`, сохраняются при экспорте.
+
+Собственные сообщения содержат ID, русский смысл и доступные source, ID работы
+или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
+См. [справочник диагностики](docs/diagnostics.md).
