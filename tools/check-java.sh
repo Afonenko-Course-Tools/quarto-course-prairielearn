@@ -23,9 +23,7 @@ if quarto run bank/_extensions/course-prairielearn/entrypoints/export.ts -- . ba
   exit 1
 fi
 [[ ! -e "$stage/failed-delivery" ]]
-cd "$stage/bank"
-quarto render --profile full --fail-if-warnings
-quarto run _extensions/Afonenko-Course-Tools/course-core/entrypoints/check.ts . full
+bash "$repo/tools/check-java-profiles.sh" "$stage/bank"
 cd "$stage"
 python3 - "$stage" <<'PY'
 import json,sys
@@ -35,7 +33,7 @@ assert 'Проверьте равные границы, отрицательны
 assert (site/'index.html').is_file() and (site/'BUILD.json').is_file()
 assert 'lang="ru"' in (site/'index.html').read_text()
 assert 'Файлы поставки' in (site/'index.html').read_text()
-bank=(root/'bank/_book/index.html').read_text()
+bank=(root/'bank/_book/full/index.html').read_text()
 assert 'lang="ru"' in bank and 'Общий банк заданий Java' in bank
 failure=(root/'failed-cli.stderr').read_text()
 assert failure.count('BODY.WORK_MISSING')==1 and 'sec-missing' in failure

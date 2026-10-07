@@ -1,6 +1,4 @@
 course:
   view: student
-book:
-  chapters: [index.qmd, tasks.qmd]
 project:
-  render: [index.qmd, tasks.qmd]
+  output-dir: _book/student
