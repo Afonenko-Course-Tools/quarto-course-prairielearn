@@ -1,10 +1,9 @@
-# Java and Gradle demonstration group
+# Демонстрационная группа Java и Gradle
 
-This folder is the whole reproducible course, with root course identity, bank,
-control sources, two works, starter, reference and private checks. Install
-Core and PrairieLearn in `bank` using concrete published versions, then run
-`quarto run build.ts`. For local candidates run `CORE=/absolute/path/to/quarto-course bash tools/check-java.sh`
-from the producer repository root.
+Этот каталог содержит воспроизводимый курс: корневой ID, общий банк,
+контрольные исходники, две работы, стартовую заготовку, авторское решение и
+проверяющие тесты. Установите конкретные совместимые выпуски Core и PrairieLearn
+в `bank`, затем запустите сборку из корня группы:
 
 ```sh
 cd bank
@@ -14,13 +13,30 @@ cd ..
 quarto run build.ts
 ```
 
-The group pins these releases. Requires Quarto, CUE,
-Java and Gradle. No Maven/JUnit download: the Gradle JavaCompile/JavaExec tasks
-run six actual assertions. `binding.json` is explicit PrairieLearn configuration.
-The container image/entrypoint must be verified on the target PL installation;
-local Gradle execution does not establish live container/server compatibility.
-Each selected delivery uses only its question binding. Export no assessment
-activity and do not translate the pass rule into a generic grading formula.
+Группа закрепляет эти выпуски. Для проверки локального кандидата выполните
+`CORE=/absolute/path/to/quarto-course bash tools/check-java.sh` из репозитория
+адаптера. Нужны Quarto, CUE, Java и Gradle. Загрузка Maven/JUnit не требуется:
+задачи Gradle JavaCompile/JavaExec выполняют шесть настоящих проверок.
+Авторское решение должно пройти их, незавершённая заготовка студента — получить
+отказ. Исходный вывод Java/Gradle сохраняется.
 
-The ready artifact is published separately in immutable release `demo-20261007`
-from the same merged revision. `BUILD.json` records the exact commit and dependencies.
+`binding.json` явно задаёт параметры PrairieLearn. Каждая поставка использует
+привязку только выбранного вопроса. Экспорт создаёт вопросы и файлы;
+оцениваемую работу и правила попыток, порога и назначения преподаватель
+настраивает на платформе. Обязательность заданий не подменяется общей формулой
+суммы баллов.
+
+Русский язык задан отдельно в корне сайта и в банке. HTML сайта представляет
+описание группы и ссылки на поставки; обычный HTML банка и явный экспорт —
+отдельные операции. Выбранная контрольная доступна экспорту из полного исходника,
+даже когда student-профиль исключает её из HTML. Функциональный профиль `feature`
+добавляет в публичное условие рекомендации по граничным значениям.
+
+Локальный Gradle подтверждает выполнение Java-проверок. Образ контейнера,
+entrypoint, импорт в PrairieLearn и серверное исполнение проверяются отдельно
+на целевой установке. `build.ts` не подтверждает эту совместимость.
+
+Готовый результат публикуется отдельно в неизменяемом выпуске `demo-20261007`
+из той же принятой ревизии. `BUILD.json` сохраняет точный commit и зависимости.
+
+См. [диагностику](../../docs/diagnostics.md) и [правила авторства](../../docs/authoring.md).

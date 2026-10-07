@@ -4,8 +4,9 @@ project:
   post-render: _extensions/Afonenko-Course-Tools/course-core/entrypoints/post.ts
   resources: ["!projects/**"]
 book:
-  title: Shared Java tasks
+  title: Общий банк заданий Java
   chapters: [index.qmd, tasks.qmd, control.qmd, variant-a.qmd, variant-b.qmd]
+lang: ru
 format: html
 filters: [course-core, course-prairielearn]
 course:

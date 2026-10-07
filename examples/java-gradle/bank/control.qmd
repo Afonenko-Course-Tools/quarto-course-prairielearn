@@ -1,11 +1,11 @@
-# Shared control tasks {#sec-java-control}
+# Общие контрольные задания {#sec-java-control}
 
 :::: {#exr-control target="prairielearn" project="/projects/clamp" course-role="control"}
-## Control: interval boundary cases
+## Контрольная: граничные случаи интервала
 
-CONTROL_CONDITION: Implement the same interval contract and describe its boundary cases.
+Реализуйте тот же контракт интервала и объясните поведение на его границах.
 
 ::: {.grading-notes}
-CONTROL_GRADING: Private edge cases must all pass.
+Все закрытые проверки граничных случаев должны пройти.
 :::
 ::::
