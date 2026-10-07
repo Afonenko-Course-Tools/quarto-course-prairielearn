@@ -83,5 +83,7 @@
       "modified": "2026-10-06T22:36:34.550238+00:00",
       "scope": "PrairieLearn: selected question closure, CUE/native bindings, client/tests/reference, actual Java/Gradle delivery."
     }
-  ]
+  ],
+  "preservation_commit": "be5b1327b4610121291384c65172dd7d7e10ac8a",
+  "active_checkout": "snapshots removed after exact Git-byte verification; source paths are historical paths within preservation_commit"
 }

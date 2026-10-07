@@ -1,4 +1,13 @@
+---
+type: documentation
+component: course-prairielearn
+status: current
+updated: 2026-10-08
+---
+
 # Задания курса в PrairieLearn
+
+[Индекс спецификаций](spec/index.md) различает действующий контракт, согласованную следующую модель и историю. Версия на выбранном ref читается из `_extensions/course-prairielearn/_extension.yml`; `main` после последнего выпуска — **unreleased**.
 
 Расширение извлекает платформенные параметры заданий и работ, проверяет их CUE
 и явно экспортирует выбранные вопросы в нативные каталоги PrairieLearn.
