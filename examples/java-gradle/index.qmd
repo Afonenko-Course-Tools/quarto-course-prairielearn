@@ -1,27 +1,29 @@
 ---
 code-links:
-  - text: Source example folder
+  - text: Исходники группы
     icon: github
-    href: https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/tree/v2.1.0/examples/java-gradle
+    href: https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/tree/demo-20261007-ru1/examples/java-gradle
 ---
 
-# Java and Gradle
+# Java и Gradle
 
-A shared bank feeds two fixed variants. Control source is omitted from the
-student site and still supplies a public question to selected export.
+Общий банк используется в двух фиксированных вариантах. Контрольный исходник
+исключён из студенческого сайта, но предоставляет публичный вопрос при явном
+экспорте выбранной работы.
 
-The delivery has native PrairieLearn questions, public Java starter files and
-private grader tests. Local Gradle tests execute the author reference and reject
-the incomplete starter. Container execution and real PrairieLearn import require
-separate verification. Attempts and pass criteria stay platform specific.
+Поставка содержит нативные вопросы PrairieLearn, публичные стартовые файлы Java
+и закрытые проверяющие тесты. Локальная проверка Gradle выполняет авторское
+решение и отклоняет незавершённую заготовку студента. Контейнерное исполнение
+и импорт в PrairieLearn проверяются отдельно. Правила попыток и зачёта
+задаются на платформе.
 
-## Native delivery files
+## Файлы поставки
 
-[Variant A descriptor](artifacts/variant-a/delivery.json),
-[question info](artifacts/variant-a/questions/demo-java-gradle/exr-clamp/info.json),
-[Java starter](artifacts/variant-a/questions/demo-java-gradle/exr-clamp/clientFilesQuestion/Clamp.java)
-and [private checks](artifacts/variant-a/questions/demo-java-gradle/exr-clamp/tests/ClampChecks.java).
+[Описание варианта A](artifacts/variant-a/delivery.json),
+[параметры вопроса](artifacts/variant-a/questions/demo-java-gradle/exr-clamp/info.json),
+[стартовый файл Java](artifacts/variant-a/questions/demo-java-gradle/exr-clamp/clientFilesQuestion/Clamp.java)
+и [проверяющие тесты](artifacts/variant-a/questions/demo-java-gradle/exr-clamp/tests/ClampChecks.java).
 
-[Variant B descriptor](artifacts/variant-b/delivery.json) shows the separately
-selected control question. These are instructor delivery artifacts for a demo;
-full demonstration tests are deliberately public here.
+[Описание варианта B](artifacts/variant-b/delivery.json) показывает отдельно
+выбранный контрольный вопрос. Это демонстрационные материалы поставки для
+преподавателя: полные тесты здесь намеренно опубликованы.

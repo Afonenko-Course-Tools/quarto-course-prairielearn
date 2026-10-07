@@ -1,4 +1,5 @@
 local contract = require("./contract")
+local diagnostics = require("./diagnostics")
 local vocabulary = contract.vocabulary
 local assignmentModes = contract.set(vocabulary.assignment_modes)
 local M = {}
@@ -34,22 +35,27 @@ end
 function M.collect(meta)
   if meta.assessment == nil or meta.assessment.prairielearn == nil then return nil end
   -- Общие настройки действуют только при явном подключении адаптера.
+  local id = meta["course-assessment-id"] and pandoc.utils.stringify(meta["course-assessment-id"])
+  local function message(text, field)
+    return diagnostics.message("PL.ASSESSMENT_INVALID", text, {source = quarto.doc.input_file, id = id,
+      field = field or "assessment.prairielearn", hint = "Проверьте правила этой работы и общие настройки PrairieLearn"})
+  end
   local policy = plain(meta.assessment.prairielearn)
   if type(policy) ~= "table" then return policy end
-  assert(pandoc.utils.type(policy) ~= "List", "assessment.prairielearn должен быть YAML-картой")
+  assert(pandoc.utils.type(policy) ~= "List", message("Правила работы должны быть YAML-картой"))
   local defaults = meta.prairielearn and meta.prairielearn["assessment-defaults"]
   if defaults == nil then defaults = {} else defaults = plain(defaults) end
   assert(type(defaults) == "table" and pandoc.utils.type(defaults) ~= "List",
-    "prairielearn.assessment-defaults должен быть YAML-картой")
+    message("Общие настройки должны быть YAML-картой", "prairielearn.assessment-defaults"))
   local value = merge(defaults, policy)
   value.attempts = number(value.attempts)
   if type(value.pass) == "table" then value.pass["at-least"] = number(value.pass["at-least"]) end
   local assignment = value.assignment
   if type(assignment) == "table" and assignment.mode ~= nil then
-    assert(assignmentModes[assignment.mode], "Неподдерживаемый режим assignment.mode; допустимы: " .. table.concat(vocabulary.assignment_modes, ", "))
-    assert(assignment["student-label"] == nil, "Нельзя одновременно задавать assignment.mode и assignment.student-label")
+    assert(assignmentModes[assignment.mode], message("Неподдерживаемый режим; допустимы: " .. table.concat(vocabulary.assignment_modes, ", "), "assessment.prairielearn.assignment.mode"))
+    assert(assignment["student-label"] == nil, message("Нельзя одновременно задавать mode и student-label", "assessment.prairielearn.assignment"))
     local id = meta["course-assessment-id"] and pandoc.utils.stringify(meta["course-assessment-id"])
-    assert(id and id ~= "", "Для вычисления метки требуется идентификатор контрольной от ядра курса")
+    assert(id and id ~= "", message("Для вычисления метки требуется идентификатор работы от ядра курса", "assessment.prairielearn.assignment.mode"))
     local course = meta.course and meta.course.id and pandoc.utils.stringify(meta.course.id)
     -- Nested native books keep the authored mode until explicit root export supplies identity.
     if course and course ~= "" then

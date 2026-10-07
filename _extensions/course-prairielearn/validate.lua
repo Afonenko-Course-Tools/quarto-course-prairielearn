@@ -1,5 +1,6 @@
 local native = require("./native")
 local assessment = require("./assessment")
+local diagnostics = require("./diagnostics")
 local M = {}
 function M.validate(doc)
   -- Core calls this before projection; the unprojected assessment ID is the
@@ -16,9 +17,11 @@ function M.validate(doc)
   doc:walk({Div = function(div)
     if div.identifier:match("^exr%-") then targets[div.identifier] = div.attributes.target or "manual" end
   end})
+  local source = native.source()
+  local work = meta["course-assessment-id"] and pandoc.utils.stringify(meta["course-assessment-id"])
   local policy = assessment.collect(meta)
   if policy ~= nil then
-    native.vet(policy, "#PrairieLearnAssessment")
+    native.vet(policy, "#PrairieLearnAssessment", {source = source, id = work, field = "assessment.prairielearn", hint = "Проверьте правила работы; подробности CUE приведены ниже"})
     local members = 0
     doc:walk({Div = function(div)
       if div.classes:includes("task-items") then
@@ -28,7 +31,7 @@ function M.validate(doc)
             pandoc.Pandoc({block}):walk({Cite = function(cite)
               for _, reference in ipairs(cite.citations) do
                 if targets[reference.id] then
-                  assert(targets[reference.id] == "prairielearn", "PL001_externalAssessmentMembers: " .. reference.id)
+                  assert(targets[reference.id] == "prairielearn", diagnostics.message("PL001_externalAssessmentMembers", "В работу PrairieLearn входит задание другой платформы", {source = source, id = work, field = "task-items", related = {{source = source, id = reference.id, field = "target"}}, hint = "Включайте в эту работу задания с target=\"prairielearn\""}))
                 end
               end
             end})
@@ -36,19 +39,19 @@ function M.validate(doc)
         end
       end
     end})
-    assert(policy.pass["at-least"] <= members, "prairielearn.pass.at-least превышает число заданий")
+    assert(policy.pass["at-least"] <= members, diagnostics.message("PL.ASSESSMENT_INVALID", "Порог выполнения превышает число заданий работы", {source = source, id = work, field = "assessment.prairielearn.pass.at-least", hint = "Проверьте список task-items и порог работы"}))
   end
   local projects = pandoc.List()
   doc:walk({Div = function(div)
     if div.attributes.target == "prairielearn" then
-      assert((div.attributes.project or ""):match("^/[^.]"), "prairielearn: требуется project от корня курса")
-      projects:insert(div.attributes.project)
+      assert((div.attributes.project or ""):match("^/[^.]"), diagnostics.message("PL.PROJECT_INVALID", "Требуется project от корня выбранной книги", {source = source, id = div.identifier, field = "project", hint = "Укажите существующий каталог проекта, например /projects/clamp"}))
+      projects:insert({path = div.attributes.project, id = div.identifier})
     end
   end})
   if #projects > 0 then
     local directory = pandoc.path.directory(debug.getinfo(1, "S").source:sub(2))
-    local args = {"run", directory .. "/validate-paths.ts", quarto.project.directory}
-    for _, project in ipairs(projects) do args[#args + 1] = project end
+    local args = {"run", directory .. "/validate-paths.ts", quarto.project.directory, source}
+    for _, project in ipairs(projects) do args[#args + 1] = project.path; args[#args + 1] = project.id end
     pandoc.pipe(os.getenv("QUARTO") or "quarto", args, "")
   end
 end

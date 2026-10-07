@@ -1,6 +1,11 @@
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-const fail = (message: string): never => {
-  throw Error("ADAPTER: " + message);
+import { diagnostic, type DiagnosticContext } from "./diagnostics.ts";
+const fail = (
+  message: string,
+  context?: DiagnosticContext,
+  cause?: unknown,
+): never => {
+  throw diagnostic("ADAPTER", message, context, cause);
 };
 const record = (v: any) =>
   v !== null && typeof v === "object" && !Array.isArray(v);
@@ -14,18 +19,56 @@ export interface ProjectContext {
   projectRoot: string;
   projects: Record<string, string>;
 }
-async function command(args: string[], input: string): Promise<string> {
-  const child = new Deno.Command(Deno.env.get("QUARTO") || "quarto", {
-    args,
-    stdin: "piped",
-    stdout: "piped",
-    stderr: "piped",
-  }).spawn();
-  const writer = child.stdin.getWriter();
-  await writer.write(new TextEncoder().encode(input));
-  await writer.close();
+async function command(
+  args: string[],
+  input: string,
+  context: DiagnosticContext,
+): Promise<string> {
+  const tool = Deno.env.get("QUARTO") || "quarto";
+  const external = (cause: unknown, result?: Deno.CommandOutput) => {
+    const stdout = result ? new TextDecoder().decode(result.stdout) : "";
+    const stderr = result ? new TextDecoder().decode(result.stderr) : "";
+    const error = Object.assign(
+      new Error(
+        `course-prairielearn: внешний инструмент ${tool} не выполнил преобразование Pandoc` +
+          (result ? ` (код выхода ${result.code})` : "") +
+          `\n  source: ${context.source || ""}\n  id: ${
+            context.id || ""
+          }\n  field: condition` +
+          (stdout ? `\nstdout:\n${stdout}` : "") +
+          (stderr ? `\nstderr:\n${stderr}` : ""),
+        { cause },
+      ),
+      { tool, exitCode: result?.code, stdout, stderr },
+    );
+    error.name = "ExternalToolFailure";
+    return error;
+  };
+  let child: Deno.ChildProcess;
+  try {
+    child = new Deno.Command(tool, {
+      args,
+      stdin: "piped",
+      stdout: "piped",
+      stderr: "piped",
+    }).spawn();
+  } catch (cause) {
+    throw external(cause);
+  }
+  let writingFailure: unknown;
+  try {
+    const writer = child.stdin.getWriter();
+    try {
+      await writer.write(new TextEncoder().encode(input));
+    } finally {
+      await writer.close();
+    }
+  } catch (cause) {
+    writingFailure = cause;
+  }
   const result = await child.output();
-  if (!result.success) fail(new TextDecoder().decode(result.stderr));
+  if (!result.success) throw external(result, result);
+  if (writingFailure) throw external(writingFailure, result);
   return new TextDecoder().decode(result.stdout);
 }
 async function uuid(key: string): Promise<string> {
@@ -69,15 +112,16 @@ async function uuid(key: string): Promise<string> {
 }
 async function files(
   root: string,
+  context: DiagnosticContext,
 ): Promise<{ name: string; data: Uint8Array }[]> {
   const collected: { name: string; data: Uint8Array }[] = [];
   async function walk(directory: string) {
     if ((await Deno.lstat(directory)).isSymlink) {
-      fail("symlink in project files");
+      fail("Символьная ссылка в файлах проекта", context);
     }
     for await (const entry of Deno.readDir(directory)) {
       const path = join(directory, entry.name);
-      if (entry.isSymlink) fail("symlink in project files");
+      if (entry.isSymlink) fail("Символьная ссылка в файлах проекта", context);
       if (
         entry.name.startsWith(".") ||
         ["build", "node_modules", "_generated", "_extensions"].includes(
@@ -90,7 +134,7 @@ async function files(
           name: relative(root, path).replaceAll("\\", "/"),
           data: await Deno.readFile(path),
         });
-      } else fail("special project file");
+      } else fail("В проекте присутствует файл особого типа", context);
     }
   }
   await walk(root);
@@ -102,6 +146,15 @@ export async function exportPrairieLearn(
   binding: any,
   output: string,
 ): Promise<void> {
+  const work = Array.isArray(p?.works) ? p.works[0] : undefined;
+  const workContext: DiagnosticContext = {
+    source: work?.source,
+    id: work?.id,
+    field: "works",
+    hint: "Экспортируйте одну выбранную работу через установленный Core",
+  };
+  const refuse = (message: string, field: string): never =>
+    fail(message, { ...workContext, field });
   if (
     !fields(p, [
       "schema",
@@ -115,15 +168,30 @@ export async function exportPrairieLearn(
     !/^([a-z][a-z0-9-]*)$/.test(p.owner) || !Array.isArray(p.questions) ||
     !p.questions.length || !Array.isArray(p.resources) ||
     !Array.isArray(p.apiVersion)
-  ) fail("current selected public body package required");
+  ) {
+    refuse(
+      "Требуется актуальный публичный Body-пакет выбранной работы",
+      "body-package",
+    );
+  }
   if (
     !fields(binding, ["questions"]) || !record(binding.questions) ||
     Object.keys(binding.questions).length !== p.questions.length
-  ) fail("explicit per-question PL binding required");
+  ) {
+    refuse(
+      "Требуется явная привязка PrairieLearn для каждого выбранного вопроса",
+      "binding.questions",
+    );
+  }
   const root = await Deno.realPath(context.projectRoot), out = resolve(output);
   try {
     await Deno.lstat(out);
-    fail("output already exists; use a fresh delivery directory");
+    fail("Каталог результата уже существует", {
+      ...workContext,
+      source: out,
+      field: "output",
+      hint: "Выберите новый каталог поставки",
+    });
   } catch (e) {
     if (!(e instanceof Deno.errors.NotFound)) throw e;
   }
@@ -133,12 +201,28 @@ export async function exportPrairieLearn(
     new Set(p.works[0].items).size !== p.works[0].items.length ||
     p.works[0].items.length !== p.questions.length ||
     p.questions.some((q: any) => !p.works[0].items.includes(q.key))
-  ) fail("selected work question closure required");
+  ) {
+    refuse(
+      "Вопросы должны совпадать с составом одной выбранной работы",
+      "works.items",
+    );
+  }
   const prepared: { name: string; data: Uint8Array }[] = [];
   const text = (name: string, data: string) =>
     prepared.push({ name, data: new TextEncoder().encode(data) });
   const keys = new Set<string>();
   for (const q of p.questions) {
+    const questionContext: DiagnosticContext = {
+      source: q?.source,
+      id: q?.id,
+      related: work ? [{ source: work.source, id: work.id }] : [],
+      hint: "Проверьте условие, проект и явную привязку этого вопроса",
+    };
+    const questionFail = (
+      message: string,
+      field: string,
+      cause?: unknown,
+    ): never => fail(message, { ...questionContext, field }, cause);
     if (
       !fields(q, [
         "owner",
@@ -153,7 +237,7 @@ export async function exportPrairieLearn(
       !/^exr-[a-z0-9][a-z0-9-]*$/.test(q.id) || keys.has(q.key) ||
       q.visibility !== "public" || q.answerType !== "manual" ||
       !Array.isArray(q.condition) || !Array.isArray(q.publicAnswer)
-    ) fail("invalid public question");
+    ) questionFail("Неверный публичный вопрос", "questions");
     keys.add(q.key);
     const b = binding.questions[q.id];
     if (
@@ -163,7 +247,12 @@ export async function exportPrairieLearn(
       new Set(b.files).size !== b.files.length || b.files.some((f: unknown) =>
         !safe(f) || /[",<>]/.test(String(f))
       )
-    ) fail("explicit topic, submission files and external grader required");
+    ) {
+      questionFail(
+        "Требуются topic, принимаемые файлы и внешний проверяющий инструмент",
+        "binding.questions." + q.id,
+      );
+    }
     const grading = b.externalGradingOptions;
     if (
       !fields(grading, ["image"], [
@@ -184,23 +273,52 @@ export async function exportPrairieLearn(
       grading.environment !== undefined &&
         (!record(grading.environment) ||
           Object.values(grading.environment).some((x) => typeof x !== "string"))
-    ) fail("invalid external grader binding");
+    ) {
+      questionFail(
+        "Неверная привязка внешнего проверяющего инструмента",
+        "binding.questions." + q.id + ".externalGradingOptions",
+      );
+    }
     const project = context.projects[q.id];
     if (
       typeof project !== "string" || !project.startsWith("/") ||
       !safe(project.slice(1))
-    ) fail("project path required");
+    ) {
+      questionFail(
+        "Требуется путь проекта от корня выбранной книги",
+        "project",
+      );
+    }
     const source = resolve(root, project.slice(1));
     let walk = root;
     for (const part of project.slice(1).split("/")) {
       walk = join(walk, part);
-      if ((await Deno.lstat(walk)).isSymlink) fail("symlink in project path");
+      if ((await Deno.lstat(walk)).isSymlink) {
+        questionFail(
+          "Символьная ссылка в пути проекта",
+          "project",
+        );
+      }
     }
-    if ((await Deno.realPath(source)) !== source) fail("project escapes bank");
-    const student = await files(join(source, "student")),
-      tests = await files(join(source, "tests"));
+    if ((await Deno.realPath(source)) !== source) {
+      questionFail(
+        "Проект выходит за пределы выбранной книги",
+        "project",
+      );
+    }
+    const student = await files(join(source, "student"), {
+        ...questionContext,
+        field: "project.student",
+      }),
+      tests = await files(join(source, "tests"), {
+        ...questionContext,
+        field: "project.tests",
+      });
     if (!student.length || !tests.length) {
-      fail("student and tests project files required");
+      questionFail(
+        "Требуются стартовые файлы student и проверяющие файлы tests",
+        "project",
+      );
     }
     const base = "questions/" + q.key;
     for (const f of student) {
@@ -217,7 +335,7 @@ export async function exportPrairieLearn(
     const map = (node: any) => {
       if (!node || typeof node !== "object") return;
       if (["RawBlock", "RawInline", "Cite", "Note"].includes(node.t)) {
-        fail("unsupported native node " + node.t);
+        questionFail("Неподдерживаемый узел условия: " + node.t, "condition");
       }
       if (node.t === "Header") node.c[1][0] = "";
       if (
@@ -226,7 +344,7 @@ export async function exportPrairieLearn(
           ["answer", "answer-spec", "correct", "solution", "grading-notes"]
             .includes(c)
         )
-      ) fail("private marker in public condition");
+      ) questionFail("Закрытая отметка в публичном условии", "condition");
       if (node.t === "Image" || node.t === "Link") {
         const href = node.c[2][0],
           resource = p.resources.find((r: any) => r.target === href);
@@ -235,11 +353,19 @@ export async function exportPrairieLearn(
             !safe(resource.target) || resource.owner !== p.owner ||
             resource.visibility !== "public" ||
             typeof resource.data !== "string"
-          ) fail("invalid resource");
+          ) {
+            questionFail(
+              "Неверный публичный ресурс: " + href,
+              "condition.resource",
+            );
+          }
           resources.set(resource.target, resource);
           node.c[2][0] = "PL_CLIENT_FILE_URL_TOKEN/" + resource.target;
         } else if (!(node.t === "Link" && /^https?:\/\//.test(href))) {
-          fail("unmapped condition resource");
+          questionFail(
+            "Ресурс условия отсутствует в публичной поставке: " + href,
+            "condition.resource",
+          );
         }
       }
       Object.values(node).forEach((value) => {
@@ -252,8 +378,12 @@ export async function exportPrairieLearn(
       let bytes: Uint8Array;
       try {
         bytes = Uint8Array.from(atob(r.data), (c) => c.charCodeAt(0));
-      } catch {
-        fail("resource encoding");
+      } catch (cause) {
+        questionFail(
+          "Неверная кодировка ресурса: " + r.target,
+          "resources.data",
+          cause,
+        );
       }
       const hash = Array.from(
         new Uint8Array(
@@ -261,7 +391,12 @@ export async function exportPrairieLearn(
         ),
         (x) => x.toString(16).padStart(2, "0"),
       ).join("");
-      if (hash !== r.sha256) fail("resource hash mismatch");
+      if (hash !== r.sha256) {
+        questionFail(
+          "Контрольная сумма ресурса не совпадает: " + r.target,
+          "resources.sha256",
+        );
+      }
       prepared.push({
         name: base + "/clientFilesQuestion/" + r.target,
         data: bytes!,
@@ -270,6 +405,7 @@ export async function exportPrairieLearn(
     const authoredHtml = await command(
       ["pandoc", "--from=json", "--to=html5", "--mathml"],
       JSON.stringify({ "pandoc-api-version": p.apiVersion, meta: {}, blocks }),
+      questionContext,
     );
     const html = authoredHtml.replaceAll("{{", "&#123;&#123;").replaceAll(
       "}}",
@@ -312,7 +448,7 @@ export async function exportPrairieLearn(
     );
   }
   if (new Set(prepared.map((f) => f.name)).size !== prepared.length) {
-    fail("delivery file collision");
+    refuse("Файлы поставки имеют совпадающие пути", "output");
   }
   const stage = await Deno.makeTempDir({
     dir: dirname(out),

@@ -9,7 +9,7 @@ assessment:
       mode: assessment-id
 ---
 
-# Variant A {#sec-variant-a}
+# Вариант A {#sec-variant-a}
 
 ::: {.task-items}
 1. @exr-clamp
