@@ -476,7 +476,7 @@ profile:
   const privateDocument = document("  prairielearn: {}\n")
     .replace(
       ":::: {#exr-experiment",
-      ":::::: {.content-visible when-profile=\"full\"}\n\n:::: {#exr-experiment",
+      ':::::: {.content-visible when-profile="full"}\n\n:::: {#exr-experiment',
     )
     .replace(
       "Описание задания.\n::::",
@@ -509,12 +509,30 @@ profile:
     "--fail-if-warnings",
   ]);
   assert(
-    !result.ok && result.text.includes("attempts"),
-    "Скрытая неверная политика PrairieLearn должна отклоняться до student projection",
+    !result.ok && result.text.includes("attempts") &&
+      result.text.includes("index.qmd") && result.text.includes("sec-policy") &&
+      result.text.includes("assessment.prairielearn"),
+    "Скрытая неверная политика PrairieLearn должна отклоняться до student projection: " +
+      result.text,
   );
-  await Deno.writeTextFile(join(directory, "index.qmd"), privateDocument.replace('target="prairielearn"', 'target="manual"'));
-  result = await command(quarto, ["render", "--profile", "student", "--fail-if-warnings"]);
-  assert(!result.ok && result.text.includes("PL001_externalAssessmentMembers"), "Скрытый локальный member с manual target должен отклоняться до projection");
+  await Deno.writeTextFile(
+    join(directory, "index.qmd"),
+    privateDocument.replace('target="prairielearn"', 'target="manual"'),
+  );
+  result = await command(quarto, [
+    "render",
+    "--profile",
+    "student",
+    "--fail-if-warnings",
+  ]);
+  assert(
+    !result.ok && result.text.includes("PL001_externalAssessmentMembers") &&
+      result.text.includes("index.qmd") && result.text.includes("sec-policy") &&
+      result.text.includes("exr-experiment") &&
+      result.text.includes("task-items"),
+    "Скрытый member должен сохранять ID правила, исходник, работу, вопрос и поле: " +
+      result.text,
+  );
   await Deno.writeTextFile(
     join(directory, "index.qmd"),
     privateDocument.replaceAll("/projects/example", "/projects/missing"),
@@ -526,8 +544,13 @@ profile:
     "--fail-if-warnings",
   ]);
   assert(
-    !result.ok && result.text.includes("missing"),
-    "Скрытый отсутствующий проект должен отклоняться до student projection",
+    !result.ok && result.text.includes("missing") &&
+      result.text.includes("PL.PROJECT_INVALID") &&
+      result.text.includes("index.qmd") &&
+      result.text.includes("exr-experiment") &&
+      result.text.includes("field: project"),
+    "Скрытый отсутствующий проект должен отклоняться с контекстом до student projection: " +
+      result.text,
   );
   await Deno.writeTextFile(join(directory, "index.qmd"), privateDocument);
   result = await command(quarto, [
