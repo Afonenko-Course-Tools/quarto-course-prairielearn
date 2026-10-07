@@ -33,7 +33,7 @@ function M.vet(value, definition, context)
     local tool = os.getenv("CUE") or "cue"
     local ok, cause = pcall(pandoc.pipe, tool, {"vet", directory .. "/" .. contract.rules, source, json, "-d", definition, "-c", "--all-errors"}, "")
     if not ok then
-      assert(false, diagnostics.message(nil, "Внешняя проверка CUE (" .. tool .. ") отклонила " .. definition, context) .. "\n" .. tostring(cause))
+      assert(false, diagnostics.message(nil, "Не удалось выполнить внешнюю проверку CUE (" .. tool .. ") для " .. definition, context) .. "\n" .. tostring(cause))
     end
   end)
 end

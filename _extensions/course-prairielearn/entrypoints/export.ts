@@ -130,7 +130,7 @@ try {
       ["ExtensionDiagnostic", "ExternalToolFailure"].includes(cause.name)
         ? cause.message
         : cause.stack || cause.message;
-    if (!shown.includes(cause.message)) {
+    if (!shown.includes(message)) {
       console.error(message);
       shown += "\n" + message;
     }

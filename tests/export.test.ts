@@ -478,3 +478,43 @@ Deno.test("ADAPTER invalid resource encoding keeps original cause and resource f
     await Deno.remove(root, { recursive: true });
   }
 });
+Deno.test("CLI retains unknown cause stack when known wrapper quotes its message", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const core = root + "/bank/_extensions/course-core/body-export";
+    await Deno.mkdir(core, { recursive: true });
+    await Deno.writeTextFile(
+      core + "/producer.ts",
+      "export function buildBodies() {}\n",
+    );
+    await Deno.writeTextFile(
+      core + "/collect.ts",
+      `export function collectExport() {
+  const cause = new SyntaxError("QUOTED_UNKNOWN_CAUSE");
+  const wrapper = new Error("CORE.SELECTED_WORK: " + cause.message, {cause});
+  wrapper.name = "ExtensionDiagnostic";
+  throw wrapper;
+}
+`,
+    );
+    const result = await runCli([
+      root,
+      "bank",
+      "sec-lab",
+      "binding.json",
+      root + "/out",
+    ]);
+    assert(
+      !result.success && result.text.split("CORE.SELECTED_WORK").length === 2,
+      "known wrapper was lost, duplicated or returned success",
+    );
+    assert(
+      result.text.includes("SyntaxError: QUOTED_UNKNOWN_CAUSE") &&
+        result.text.includes("collect.ts:"),
+      "quoted unknown cause lost its type or original stack: " + result.text,
+    );
+    await noDelivery(root);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
