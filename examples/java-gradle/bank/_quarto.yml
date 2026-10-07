@@ -5,7 +5,7 @@ project:
   resources: ["!projects/**"]
 book:
   title: Общий банк заданий Java
-  chapters: [index.qmd, tasks.qmd, control.qmd, variant-a.qmd, variant-b.qmd]
+  chapters: [index.qmd, tasks.qmd]
 lang: ru
 format: html
 filters: [course-core, course-prairielearn]

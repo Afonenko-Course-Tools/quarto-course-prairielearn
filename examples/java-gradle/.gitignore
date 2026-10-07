@@ -1,6 +1,8 @@
 _site/
 artifacts/
 .quarto/
+/.quarto/
+**/*.quarto_ipynb
 bank/_extensions/
 bank/_book/
 bank/_generated/
