@@ -33,7 +33,7 @@ jobs:
         with:
           repository: Afonenko-Course-Tools/quarto-course
           # Опубликованный релиз bundle Core/Presentation/Navigation.
-          ref: v3.0.2
+          ref: v4.0.0
           path: .ci-deps/core
           persist-credentials: false
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: v3.0.2
+          ref: v4.0.0
           path: .ci-deps/core
           persist-credentials: false
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
