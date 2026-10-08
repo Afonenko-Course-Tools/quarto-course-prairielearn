@@ -17,9 +17,9 @@ updated: 2026-10-08
 
 Согласовать `_extensions/course-prairielearn/application/export.ts`, `_extensions/course-prairielearn/{assessment,validate,native,contract}.lua`, `_extensions/course-prairielearn/validate-paths.ts`, `_extensions/course-prairielearn/entrypoints/export.ts`, при необходимости filter, с новым Core bank/assignment/body shape. Нынешний guard `q.visibility !== public` защищает participant payload, его не ослаблять. Добавить отдельное statementVisibility из банка: restricted назначенное условие экспортируется в safe participant payload без закрытых partitions и page preview. Сохранить выбранную work question closure, exact native resource slots, per-question binding и разделение client/tests/reference. Не вводить ручное оценивание, новые platform activities или общий grading backend.
 
-Создать небольшой `_extensions/course-prairielearn/application/diagnostics.ts`; native.vet получает optional known context input/exercise/work/field, CUE predicates остаются в `_extensions/course-prairielearn/spec/prairielearn.cue`. Сохранить PL001_externalAssessmentMembers/Core/ADAPTER IDs и исходный CUE/Pandoc/Gradle output, добавить контекст и узкую CLI границу; PL.INPUT_INVALID только input guards. Проверить cleanup staging и отсутствие конечной delivery после отказа. При изменении словаря обновить `_extensions/course-prairielearn/contract.json`, CUE, `tools/sync-contract.ts`, fixtures и `docs/authoring.md` совместно.
+Свежий main уже содержит `_extensions/course-prairielearn/application/diagnostics.ts`, CLI и cleanup staging; сверить существующий optional known context input/exercise/work/field в native.vet, CUE predicates остаются в `_extensions/course-prairielearn/spec/prairielearn.cue`. Сохранить PL001_externalAssessmentMembers/Core/ADAPTER IDs и исходный CUE/Pandoc/Gradle output, добавить контекст и узкую CLI границу; PL.INPUT_INVALID только input guards. Проверить cleanup staging и отсутствие конечной delivery после отказа. При изменении словаря обновить `_extensions/course-prairielearn/contract.json`, CUE, `tools/sync-contract.ts`, fixtures и `docs/authoring.md` совместно.
 
-Обновить `README.md`, создать `docs/diagnostics.md`, owner plan, `tests/{check,identity,native-model,native-ordinary}.ts`, `tests/export.test.ts`, `examples/java-gradle` configs/QMD/build.ts/bindings. Own bank difficulty/time обязательны; ordinary document tests остаются отдельной проверкой вне opt-in. Native lang/source links не меняют Java identifiers/API.
+Обновить `README.md`, уточнить существующий `docs/diagnostics.md`, owner plan, `tests/{check,identity,native-model,native-ordinary}.ts`, `tests/export.test.ts`, `examples/java-gradle` configs/QMD/build.ts/bindings. Own bank difficulty/time обязательны; ordinary document tests остаются отдельной проверкой вне opt-in. Native lang/source links не меняют Java identifiers/API.
 
 Проверки: `quarto run tools/sync-contract.ts --check`; `quarto run tests/native-model.ts /home/tolya/course-tools/quarto-course`, аналогично `native-ordinary`, `identity`, `check`; `deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts`; `CORE=/home/tolya/course-tools/quarto-course bash tools/check-java.sh`. Последняя проверка включает installed CLI и настоящие Java/Gradle assertions. В repo нет `tools/check.sh`; не писать в плане несуществующую команду.
 
@@ -52,3 +52,39 @@ main + служебная gh-pages, если используется, + heads O
 Сохранение истории завершено до cleanup: исходные тексты восстанавливаются по preservation/merge SHA, а active docs/spec содержат действующие документы и dated owner-план. Root источники, runtime, generated результаты и пользовательские worktrees не удалялись.
 
 Ограничение исполнителя: текущий агент наследует настройку родителя; отдельное включение ultra для этой документационной подзадачи через доступные инструменты не выполнялось. Блокеров шагов 1–2 нет; реализация следующего контракта, проверки, новые pins/releases и публикация ожидают последовательных шагов 10/12–18.
+
+
+## Подготовка документации пункта 10 — 8 октября 2026
+
+Документационный исполнитель работает по принятым Core решениям; модель не
+менялась. Добавлена [подготовка авторства](../authoring-next.md) `accepted-next`,
+ссылки из README и индекса. Существующие current API/контракты не объявлены
+мигрированными до проверки runtime. Примеры на этой ветке предназначены для
+следующей модели; native ordinary Quarto сохранён вне bank opt-in.
+
+- Свежая проверка: `git diff --check`; 34 локальных Markdown-ссылок
+  README/spec/docs/плана/README примеров существуют; 10 авторских YAML
+  файлов успешно прочитаны. Проверка исключает generated/dependency деревья.
+- Активные примеры не содержат старых kinds exam/handout, solution `for`,
+  fixture sentinel/literal текста и Quarto 1.10.x. Русский lang сохраняется,
+  публичные native проекты задают `fail-if-warnings: true`.
+- Машинные descriptors/workflows и runtime/tests не изменялись этим исполнителем.
+  Старые выпущенные dependency/demo/source pins сохранены как baseline;
+  **новые release pins ожидают решения о версиях и фактических Releases**.
+
+- Статически сверены банковские области: `examples/java-gradle/bank` — 3 задач / 2 работ, `examples/course` — 5 задач / 2 работ. Для каждой задачи собственные difficulty/time и эффективная open/restricted policy; ID состава существуют, не повторяются, test/practical назначают только restricted. Это проверка разметки, не native AST/render.
+
+Full dependent suites/CI/render против меняющегося Core здесь не запускались.
+Следующий runtime исполнитель выполняет команды выше, проверяет текущие
+student/full outputs и выбранный экспорт, после чего документальная подготовка
+переносится в current README/контракт. Merge/push/release/публикация не выполнены.
+
+Дополнительно: `deno fmt --check examples/java-gradle/build.ts` — прошёл. Переведены только два сообщения авторского build script; Java API/имена не менялись.
+
+Координация runtime: главы работы и контрольного банка теперь входят в shared
+native состав student/full. Student должен показывать title/assessment-preview,
+но не restricted body/ссылки назначений/их ресурсы/search. Старые demo-profile
+assertions отсутствия самой страницы работы требуется заменить проверкой этой
+проекции. Добавленный открытый разбор не входит в выбранную delivery/PDF/XML.
+
+Ruling: process/diagnostics/CLI/cleanup уже существуют в свежем main; старое указание создать их заменено сверкой фактической границы.

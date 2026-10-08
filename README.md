@@ -37,6 +37,8 @@ filters: [course-core, course-prairielearn]
 
 ````qmd
 :::: {#exr-clamp target="prairielearn" project="/projects/clamp"}
+[Подготовка следующего authoring-контракта](docs/authoring-next.md) содержит правила нового банка и назначения. Они остаются `accepted-next` до проверки совместного runtime; опубликованные pins ниже пока сохраняются.
+
 ## Ограничение значения
 
 Реализуйте метод для включительного интервала.

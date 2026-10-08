@@ -1,6 +1,6 @@
 # Общие контрольные задания {#sec-java-control}
 
-:::: {#exr-control target="prairielearn" project="/projects/clamp" course-role="control"}
+:::: {#exr-control difficulty="intermediate" time="40" statement-visibility="restricted" target="prairielearn" project="/projects/clamp" course-role="control"}
 ## Контрольная: граничные случаи интервала
 
 Реализуйте тот же контракт интервала и объясните поведение на его границах.

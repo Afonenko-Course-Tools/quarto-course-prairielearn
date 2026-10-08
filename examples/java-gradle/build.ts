@@ -10,7 +10,7 @@ async function extension(name: string) {
       if (!(e instanceof Deno.errors.NotFound)) throw e;
     }
   }
-  throw Error("Install " + name + " in bank");
+  throw Error("Установите " + name + " в bank");
 }
 const home = await Deno.makeTempDir({ prefix: "gradle-java-" });
 try {
@@ -28,7 +28,9 @@ try {
       stderr: "inherit",
     }).output();
     if (checked.success !== success) {
-      throw Error("Gradle result disagrees for " + solution);
+      throw Error(
+        "Результат Gradle не соответствует ожидаемому для " + solution,
+      );
     }
   }
 } finally {

@@ -1,3 +1,6 @@
+exercise-bank: true
+exercise-statement-visibility: open
+fail-if-warnings: true
 project:
   type: book
   pre-render: _extensions/Afonenko-Course-Tools/course-core/entrypoints/pre.ts
@@ -5,9 +8,11 @@ project:
   resources: ["!projects/**"]
 book:
   title: Общий банк заданий Java
-  chapters: [index.qmd, tasks.qmd]
+  chapters: [index.qmd, tasks.qmd, control.qmd, variant-a.qmd, variant-b.qmd]
 lang: ru
-format: html
+format:
+  html:
+    code-tools: false
 filters: [course-core, course-prairielearn]
 course:
   adapters: [prairielearn]

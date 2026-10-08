@@ -13,6 +13,7 @@ updated: 2026-10-08
 
 | Документ | type | component | status | Нормативный владелец и область |
 | --- | --- | --- | --- | --- |
+| [Подготовка авторства](../docs/authoring-next.md) | authoring-guide | course-prairielearn | accepted-next | Миграция примеров и граница consumer следующего выпуска |
 | [PrairieLearn: действующий контракт](../docs/authoring.md) | specification | course-prairielearn | current | native/CUE binding и selected participant delivery; client/tests/reference |
 | [Диагностика](../docs/diagnostics.md) | reference | course-prairielearn | current | Собственные ID и внешние причины этого адаптера |
 | [Body Core](../../quarto-course/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
