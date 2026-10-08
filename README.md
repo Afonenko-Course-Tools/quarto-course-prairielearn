@@ -105,6 +105,16 @@ student HTML. Полный HTML перед экспортом не требуе�
 необязательные `entrypoint`, `timeout`, `enableNetworking`, `environment`).
 Экспортёр не выбирает image и не переводит общие формулы оценки в LMS.
 
+Для простого ввода кода задайте `"submission":{"mode":"editor","aceMode":"ace/mode/java"}`
+в привязке вопроса. Экспортёр создаёт стандартный `pl-file-editor` с заготовкой
+из каждого принятого `student/<file>`. В этом режиме другие файлы локального
+проекта не копируются в публичную поставку и не появляются download/upload
+элементы. Введённый текст PL сам передаёт external grader как файл; отдельный
+workspace или VSCode не требуется. `aceMode` необязателен. По умолчанию либо
+при `"submission":{"mode":"upload"}` сохраняется загрузка файлов.
+Полные проекты и их ZIP для автономной работы обслуживает `project-download`.
+
+
 ```json
 {"questions":{"exr-clamp":{"topic":"Java","files":["Clamp.java"],
 "externalGradingOptions":{"image":"docker.io/library/gradle:9.1.0-jdk25",
@@ -112,7 +122,7 @@ student HTML. Полный HTML перед экспортом не требуе�
 ```
 
 Результат: `questions/<course-id>/<exr-id>/info.json`, `question.html`,
-`clientFilesQuestion` из `<project>/student` и приватные `tests` из
+В режиме upload — `clientFilesQuestion` из `<project>/student` и приватные `tests` из
 `<project>/tests`. Корневой `student/.gitignore` доставляется как обычный файл starter; прочие
 скрытые файлы и вложенные `.gitignore` исключены. `.gitignore` в приватных tests
 не доставляется. Соседний `reference` не публикуется. UUID определяется

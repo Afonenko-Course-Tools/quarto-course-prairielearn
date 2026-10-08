@@ -162,6 +162,37 @@ Body work содержит qualified `items` и обязательные `assign
 В поставку входят выбранные условия, поля ответа и проверенные ресурсы;
 внутренние заголовки условия сохраняются. Preview, внешние заголовки работы,
 окружающая проза и неназначенные задачи исключены producer Core.
-`clientFilesQuestion` получает `<project>/student`, `tests` остаются приватными,
+В режиме upload `clientFilesQuestion` получает `<project>/student`, `tests` остаются приватными,
 `reference` не поставляется. `delivery.json` сохраняет общий состав назначений;
 attempts/pass/assignment и права доступа задаются отдельно на платформе.
+
+## Ввод решения в браузере
+
+В binding вопроса необязательное поле `submission` явно выбирает способ сдачи:
+
+```json
+{"submission":{"mode":"editor","aceMode":"ace/mode/java"}}
+```
+
+`mode: editor` использует штатный `pl-file-editor`. Для каждого имени из `files`
+требуется одноимённый текстовый starter UTF-8 без NUL из `<project>/student`,
+размером не больше 1 MiB. Его содержимое становится начальным текстом поля;
+HTML и literal Mustache braces экранируются, Unicode сохраняется. `aceMode`
+необязателен и имеет форму `ace/mode/<name>`. Остальные student-файлы не
+публикуются, download/upload элементы не создаются. Ресурсы самого условия
+по-прежнему поставляются по публичному Body-контракту. Приватные tests и
+external grading options сохраняются; PL преобразует ввод в `_files` и
+`/grade/student/<file>` без отдельного `server.py`.
+
+Без поля `submission` действует `mode: upload` для совместимости существующих
+курсов. У upload нет `aceMode`. Неизвестные поля/режимы, отсутствующая заготовка
+или двоичные данные отклоняются до публикации результата.
+
+Для Core Java обычный сценарий — одно поле с заготовкой класса/метода. Полная
+сборка, Examples, README и .gitignore нужны автору для локальной проверки либо
+студенту для автономного выполнения. Поставка ZIP является отдельным сценарием
+`project-download`; проект с VSCode/workspace требует отдельной настройки PL.
+
+Контракт сверён с официальными [pl-file-editor](https://docs.prairielearn.com/elements/pl-file-editor/)
+и [external grading](https://docs.prairielearn.com/externalGrading/) и исходниками
+закреплённого PL `92584fe426ececb84bc2d09de9975c7056c0c5f6`.

@@ -1,5 +1,5 @@
 title: Задания курса в PrairieLearn
-version: 3.0.1
+version: 3.1.0
 quarto-required: ">=1.11.5"
 contributes:
   filters:

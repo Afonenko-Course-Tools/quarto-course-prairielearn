@@ -812,3 +812,148 @@ Deno.test("PL restricted conditions retain closed-marker and resource safety gua
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("editor delivery exposes only inline accepted starter code and keeps the external grader contract", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    for (const dir of ["student", "tests", "reference"]) {
+      await Deno.mkdir(root + "/project/" + dir, { recursive: true });
+    }
+    await Deno.writeTextFile(
+      root + "/project/student/Clamp.java",
+      "public class Clamp { // <>& {{literal}}\n // Пример 😀\n}\n",
+    );
+    await Deno.writeTextFile(
+      root + "/project/student/README.md",
+      "LOCAL_PROJECT_GUIDE",
+    );
+    await Deno.writeTextFile(
+      root + "/project/student/.gitignore",
+      "LOCAL_IGNORE",
+    );
+    await Deno.writeTextFile(
+      root + "/project/tests/grade.sh",
+      "PRIVATE_CHECKS",
+    );
+    await Deno.writeTextFile(
+      root + "/project/reference/Clamp.java",
+      "PRIVATE_REFERENCE",
+    );
+    const b = structuredClone(binding) as any;
+    b.questions["exr-clamp"].submission = {
+      mode: "editor",
+      aceMode: "ace/mode/java",
+    };
+    const context = {
+      projectRoot: root,
+      projects: { "exr-clamp": "/project" },
+    };
+    await exportPrairieLearn(p(), context, b, root + "/out");
+    const q = root + "/out/questions/demo/exr-clamp";
+    const html = await Deno.readTextFile(q + "/question.html");
+    assert(
+      html.includes(
+        '<pl-file-editor file-name="Clamp.java" ace-mode="ace/mode/java"',
+      ),
+      "native editor missing",
+    );
+    assert(
+      html.includes("public class Clamp") && html.includes("Пример 😀"),
+      "starter Unicode missing",
+    );
+    assert(
+      html.includes("&lt;&gt;&amp;") && !html.includes("{{literal}}"),
+      "starter escaped incorrectly",
+    );
+    assert(
+      !html.includes("pl-file-upload") && !html.includes("pl-file-download"),
+      "project controls leaked into editor UI",
+    );
+    assert(
+      !html.includes("LOCAL_") && !html.includes("PRIVATE_"),
+      "non-editor files became public",
+    );
+    let absent = false;
+    try {
+      await Deno.stat(q + "/clientFilesQuestion");
+    } catch (e) {
+      absent = e instanceof Deno.errors.NotFound;
+    }
+    assert(absent, "editor copied local project files to public delivery");
+    assert(
+      await Deno.readTextFile(q + "/tests/grade.sh") === "PRIVATE_CHECKS",
+      "checks missing",
+    );
+    const uploadInfo = JSON.parse(await Deno.readTextFile(q + "/info.json"));
+    assert(uploadInfo.gradingMethod === "External", "grader contract changed");
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("editor refuses unknown mode, unsafe mode, missing or non-text starter before publication", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    for (const dir of ["student", "tests"]) {
+      await Deno.mkdir(root + "/project/" + dir, { recursive: true });
+    }
+    await Deno.writeTextFile(
+      root + "/project/student/Clamp.java",
+      "public class Clamp {}",
+    );
+    await Deno.writeTextFile(root + "/project/tests/grade.sh", "checks");
+    const context = {
+      projectRoot: root,
+      projects: { "exr-clamp": "/project" },
+    };
+    for (
+      const submission of [{ mode: "unknown" }, {
+        mode: "editor",
+        aceMode: 'ace/mode/java" onclick="bad',
+      }, { mode: "editor", unexpected: true }]
+    ) {
+      const b = structuredClone(binding) as any;
+      b.questions["exr-clamp"].submission = submission;
+      let refused = false;
+      try {
+        await exportPrairieLearn(p(), context, b, root + "/out");
+      } catch (e) {
+        refused = String(e).includes("submission");
+      }
+      assert(refused, "bad submission contract accepted");
+    }
+    const b = structuredClone(binding) as any;
+    b.questions["exr-clamp"].submission = { mode: "editor" };
+    await Deno.remove(root + "/project/student/Clamp.java");
+    await Deno.writeTextFile(
+      root + "/project/student/README.md",
+      "local guide",
+    );
+    let refused = false;
+    try {
+      await exportPrairieLearn(p(), context, b, root + "/out");
+    } catch (e) {
+      refused = String(e).includes("starter");
+    }
+    assert(refused, "missing editor source accepted");
+    await Deno.writeFile(
+      root + "/project/student/Clamp.java",
+      new Uint8Array([0xff, 0xfe, 0]),
+    );
+    refused = false;
+    try {
+      await exportPrairieLearn(p(), context, b, root + "/out");
+    } catch (e) {
+      refused = String(e).includes("UTF-8");
+    }
+    assert(refused, "binary editor source accepted");
+    try {
+      await Deno.stat(root + "/out");
+      assert(false, "failed editor published output");
+    } catch (e) {
+      if (!(e instanceof Deno.errors.NotFound)) throw e;
+    }
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});

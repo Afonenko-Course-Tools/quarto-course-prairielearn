@@ -324,7 +324,9 @@ export async function exportPrairieLearn(
     keys.add(q.key);
     const b = binding.questions[q.id];
     if (
-      !fields(b, ["topic", "files", "externalGradingOptions"]) ||
+      !fields(b, ["topic", "files", "externalGradingOptions"], [
+        "submission",
+      ]) ||
       typeof b.topic !== "string" || !b.topic.trim() ||
       !Array.isArray(b.files) || !b.files.length ||
       new Set(b.files).size !== b.files.length || b.files.some((f: unknown) =>
@@ -334,6 +336,20 @@ export async function exportPrairieLearn(
       questionFail(
         "Требуются topic, принимаемые файлы и внешний проверяющий инструмент",
         "binding.questions." + q.id,
+      );
+    }
+    const submission = b.submission ?? { mode: "upload" };
+    if (
+      !fields(submission, ["mode"], ["aceMode"]) ||
+      !["upload", "editor"].includes(submission.mode) ||
+      submission.aceMode !== undefined &&
+        (submission.mode !== "editor" ||
+          typeof submission.aceMode !== "string" ||
+          !/^ace\/mode\/[a-z][a-z0-9_]*$/.test(submission.aceMode))
+    ) {
+      questionFail(
+        "Неверный режим submission: upload либо editor с необязательным aceMode",
+        "binding.questions." + q.id + ".submission",
       );
     }
     const grading = b.externalGradingOptions;
@@ -404,7 +420,7 @@ export async function exportPrairieLearn(
       );
     }
     const base = "questions/" + q.key;
-    for (const f of student) {
+    for (const f of submission.mode === "editor" ? [] : student) {
       prepared.push({
         name: base + "/clientFilesQuestion/" + f.name,
         data: f.data,
@@ -502,14 +518,49 @@ export async function exportPrairieLearn(
         "<",
         "&lt;",
       ).replaceAll(">", "&gt;");
-    const downloads = student.map((f) =>
-      '<pl-file-download file-name="' + escape(f.name) + '"></pl-file-download>'
-    ).join("\n");
+    let controls: string;
+    if (submission.mode === "editor") {
+      controls = b.files.map((name: string) => {
+        const starter = student.find((file) => file.name === name);
+        if (!starter || starter.data.length > 1024 * 1024) {
+          questionFail(
+            "Требуется UTF-8 starter для каждого editor файла",
+            "project.student." + name,
+          );
+        }
+        let source: string;
+        try {
+          source = new TextDecoder("utf-8", { fatal: true }).decode(
+            starter!.data,
+          );
+          if (source.includes("\0")) throw new Error("NUL in source");
+        } catch (cause) {
+          questionFail(
+            "Editor starter должен быть текстом UTF-8",
+            "project.student." + name,
+            cause,
+          );
+        }
+        const code = escape(source!).replaceAll("{{", "&#123;&#123;")
+          .replaceAll("}}", "&#125;&#125;");
+        return '<pl-file-editor file-name="' + escape(name) + '"' +
+          (submission.aceMode
+            ? ' ace-mode="' + escape(submission.aceMode) + '"'
+            : "") +
+          ' normalize-to-ascii="false">' + code + "</pl-file-editor>";
+      }).join("\n");
+    } else {
+      const downloads = student.map((f) =>
+        '<pl-file-download file-name="' + escape(f.name) +
+        '"></pl-file-download>'
+      ).join("\n");
+      controls = downloads + '\n<pl-file-upload file-names="' +
+        escape(b.files.join(",")) + '"></pl-file-upload>';
+    }
     text(
       base + "/question.html",
-      "<pl-question-panel>\n" + html + "\n" + downloads +
-        '\n<pl-file-upload file-names="' + escape(b.files.join(",")) +
-        '"></pl-file-upload>\n</pl-question-panel>\n<pl-submission-panel><pl-external-grader-results></pl-external-grader-results></pl-submission-panel>\n',
+      "<pl-question-panel>\n" + html + "\n" + controls +
+        "\n</pl-question-panel>\n<pl-submission-panel><pl-external-grader-results></pl-external-grader-results></pl-submission-panel>\n",
     );
     text(
       base + "/info.json",
