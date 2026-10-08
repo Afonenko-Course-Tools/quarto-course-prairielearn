@@ -207,6 +207,58 @@ async function noDelivery(root: string) {
     );
   }
 }
+Deno.test("PL delivers only the named student .gitignore while keeping hidden service files private", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const context = await projectFixture(root);
+    const student = root + "/projects/clamp/student";
+    await Deno.writeTextFile(student + "/.gitignore", "*.class\nbuild/\n");
+    await Deno.writeTextFile(student + "/.env", "SECRET_ENV");
+    await Deno.mkdir(student + "/.git");
+    await Deno.writeTextFile(student + "/.git/config", "PRIVATE_GIT");
+    await Deno.mkdir(student + "/nested");
+    await Deno.writeTextFile(student + "/nested/.gitignore", "NESTED_HIDDEN");
+    await Deno.writeTextFile(
+      root + "/projects/clamp/tests/.gitignore",
+      "PRIVATE_TEST_IGNORE",
+    );
+    await exportPrairieLearn(p(), context, binding, root + "/out");
+    const question = root + "/out/questions/demo/exr-clamp";
+    let delivered: string;
+    try {
+      delivered = await Deno.readTextFile(
+        question + "/clientFilesQuestion/.gitignore",
+      );
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        throw new Error("Student .gitignore was omitted from native delivery");
+      }
+      throw error;
+    }
+    assert(
+      delivered === "*.class\nbuild/\n",
+      "student .gitignore contents changed",
+    );
+    for (
+      const path of [
+        "/clientFilesQuestion/.env",
+        "/clientFilesQuestion/.git/config",
+        "/clientFilesQuestion/nested/.gitignore",
+        "/tests/.gitignore",
+      ]
+    ) {
+      let absent = false;
+      try {
+        await Deno.stat(question + path);
+      } catch (error) {
+        absent = error instanceof Deno.errors.NotFound;
+      }
+      assert(absent, "hidden service file escaped into delivery: " + path);
+    }
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
 Deno.test("ADAPTER binding refusal identifies component, authored question and related work", async () => {
   const root = await Deno.makeTempDir();
   try {

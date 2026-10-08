@@ -113,6 +113,7 @@ async function uuid(key: string): Promise<string> {
 async function files(
   root: string,
   context: DiagnosticContext,
+  allowStudentGitignore = false,
 ): Promise<{ name: string; data: Uint8Array }[]> {
   const collected: { name: string; data: Uint8Array }[] = [];
   async function walk(directory: string) {
@@ -123,7 +124,9 @@ async function files(
       const path = join(directory, entry.name);
       if (entry.isSymlink) fail("Символьная ссылка в файлах проекта", context);
       if (
-        entry.name.startsWith(".") ||
+        (entry.name.startsWith(".") &&
+          !(allowStudentGitignore && directory === root &&
+            entry.name === ".gitignore" && entry.isFile)) ||
         ["build", "node_modules", "_generated", "_extensions"].includes(
           entry.name,
         )
@@ -389,7 +392,7 @@ export async function exportPrairieLearn(
     const student = await files(join(source, "student"), {
         ...questionContext,
         field: "project.student",
-      }),
+      }, true),
       tests = await files(join(source, "tests"), {
         ...questionContext,
         field: "project.tests",
