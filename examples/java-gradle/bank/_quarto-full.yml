@@ -1,6 +1,4 @@
 course:
   view: full
-book:
-  chapters: [control.qmd, variant-a.qmd, variant-b.qmd]
 project:
   output-dir: _book/full

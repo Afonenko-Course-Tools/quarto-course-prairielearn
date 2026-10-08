@@ -197,15 +197,67 @@ export async function exportPrairieLearn(
   }
   if (
     !Array.isArray(p.works) || p.works.length !== 1 ||
-    !Array.isArray(p.works[0].items) || !p.works[0].items.length ||
+    !Array.isArray(work?.items) || !p.works[0].items.length ||
     new Set(p.works[0].items).size !== p.works[0].items.length ||
     p.works[0].items.length !== p.questions.length ||
-    p.questions.some((q: any) => !p.works[0].items.includes(q.key))
+    p.questions.some((q: any) => !p.works[0].items.includes(q?.key))
   ) {
     refuse(
       "Вопросы должны совпадать с составом одной выбранной работы",
       "works.items",
     );
+  }
+  if (
+    !fields(work, [
+      "owner",
+      "id",
+      "key",
+      "source",
+      "kind",
+      "title",
+      "items",
+      "assignments",
+    ], ["theoryTime"]) ||
+    work.owner !== p.owner || typeof work.id !== "string" ||
+    !/^[a-z][a-z0-9-]*$/.test(work.id) ||
+    work.key !== p.owner + "/" + work.id || typeof work.source !== "string" ||
+    !work.source ||
+    typeof work.title !== "string" || !work.title.trim() ||
+    !["lab", "seminar", "practical", "test"].includes(work.kind) ||
+    !record(work.assignments) ||
+    Object.keys(work.assignments).length !== work.items.length ||
+    work.items.some((key: unknown) =>
+      typeof key !== "string" || !key.startsWith(p.owner + "/") ||
+      !Object.hasOwn(work.assignments, key)
+    ) ||
+    Object.keys(work.assignments).some((key) => !work.items.includes(key)) ||
+    work.theoryTime !== undefined &&
+      (typeof work.theoryTime !== "number" ||
+        !Number.isFinite(work.theoryTime) || work.theoryTime <= 0)
+  ) {
+    refuse(
+      "Неверные метаданные выбранной работы или карта назначений",
+      "works",
+    );
+  }
+  for (
+    const [key, assignment] of Object.entries(work.assignments) as [
+      string,
+      any,
+    ][]
+  ) {
+    if (
+      !fields(assignment, ["requirement", "workMode"], ["stage"]) ||
+      !["required", "optional"].includes(assignment.requirement) ||
+      !["individual", "pair", "group"].includes(assignment.workMode) ||
+      assignment.stage !== undefined &&
+        !["demonstration", "classroom", "homework"].includes(assignment.stage)
+    ) {
+      refuse(
+        "Неверные поля назначения задания " + key,
+        "works.assignments." + key,
+      );
+    }
   }
   const prepared: { name: string; data: Uint8Array }[] = [];
   const text = (name: string, data: string) =>
@@ -230,14 +282,42 @@ export async function exportPrairieLearn(
         "key",
         "source",
         "visibility",
+        "statementVisibility",
+        "hasPublicSolution",
         "answerType",
         "condition",
         "publicAnswer",
-      ]) || q.owner !== p.owner || q.key !== p.owner + "/" + q.id ||
+      ], ["purpose"]) || q.owner !== p.owner ||
+      q.key !== p.owner + "/" + q.id ||
       !/^exr-[a-z0-9][a-z0-9-]*$/.test(q.id) || keys.has(q.key) ||
-      q.visibility !== "public" || q.answerType !== "manual" ||
+      q.visibility !== "public" ||
+      !["open", "restricted"].includes(q.statementVisibility) ||
+      typeof q.hasPublicSolution !== "boolean" ||
+      q.purpose !== undefined &&
+        !["demonstration", "discussion", "independent-study", "control"]
+          .includes(q.purpose) ||
+      q.answerType !== "manual" ||
       !Array.isArray(q.condition) || !Array.isArray(q.publicAnswer)
     ) questionFail("Неверный публичный вопрос", "questions");
+    if (
+      ["test", "practical"].includes(work.kind) &&
+      q.statementVisibility !== "restricted"
+    ) {
+      questionFail(
+        "В контрольной и практической работе требуется закрытое условие",
+        "statementVisibility",
+      );
+    }
+    if (
+      work.assignments[q.key].stage === "demonstration" &&
+      (q.statementVisibility !== "open" || q.purpose !== "demonstration" ||
+        !q.hasPublicSolution)
+    ) {
+      questionFail(
+        "Демонстрация требует открытого условия, роли demonstration и публичного решения",
+        "works.assignments." + q.key + ".stage",
+      );
+    }
     keys.add(q.key);
     const b = binding.questions[q.id];
     if (

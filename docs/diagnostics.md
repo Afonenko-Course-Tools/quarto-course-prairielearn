@@ -1,3 +1,10 @@
+---
+type: reference
+component: course-prairielearn
+status: current
+updated: 2026-10-08
+---
+
 # Диагностика PrairieLearn
 
 Собственные сообщения расширения содержат ID, компонент `course-prairielearn`,

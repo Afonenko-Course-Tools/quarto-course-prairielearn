@@ -6,14 +6,14 @@ assessment:
 
 # Контракты числовых диапазонов {#sec-essay-ranges}
 
-Исследуйте включённость границ числового диапазона и обработку ошибочных
-границ. Обоснуйте примеры, различающие корректные и ошибочные реализации.
+::: {.assessment-preview}
+Перед контролем изучите открытый разбор @exr-clamp-demo.
+Проверяются включённость границ и обработка ошибочного порядка границ.
+:::
 
 ## Исследование диапазонов {#sec-ranges-topic}
 
-::::: {.content-visible when-profile="full"}
-
-:::: {#exr-range-experiment course-role="control" difficulty="introductory" target="prairielearn" project="/projects/clamp"}
+:::: {#exr-range-experiment course-role="control" difficulty="introductory" time="15" target="prairielearn" project="/projects/clamp"}
 ## Граничные случаи ограничения диапазона
 
 Для `Clamp.clamp(value, lower, upper)` укажите по одному вызову, в котором
@@ -27,7 +27,7 @@ assessment:
 :::
 ::::
 
-:::: {#exr-range-tests course-role="control" difficulty="introductory" target="prairielearn" project="/projects/clamp"}
+:::: {#exr-range-tests course-role="control" difficulty="introductory" time="15" target="prairielearn" project="/projects/clamp"}
 ## Проверка ошибочных границ
 
 Дополните набор проверок одним тестом, подтверждающим, что `Clamp.clamp`
@@ -35,7 +35,7 @@ assessment:
 исключения не проверяйте.
 ::::
 
-:::: {#exr-range-implementation course-role="control" difficulty="introductory" target="prairielearn" project="/projects/clamp"}
+:::: {#exr-range-implementation course-role="control" difficulty="introductory" time="15" target="prairielearn" project="/projects/clamp"}
 ## Реализация ограничения диапазона
 
 Реализуйте `Clamp.clamp(value, lower, upper)`: верните ближайшую границу,
@@ -48,5 +48,3 @@ assessment:
 2. @exr-range-tests
 3. @exr-range-implementation
 :::
-
-:::::

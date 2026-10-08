@@ -39,7 +39,7 @@ try {
   await Deno.writeTextFile(join(bank, "index.qmd"), "# Bank\n");
   await Deno.writeTextFile(
     join(bank, "tasks.qmd"),
-    '# Tasks\n\n::: {#exr-program target="prairielearn" project="/projects/program"}\n## Program\n\nNative programming condition.\n:::\n',
+    '---\nexercise-bank: true\nexercise-statement-visibility: restricted\n---\n\n# Tasks\n\n::: {#exr-program difficulty="introductory" time="10" target="prairielearn" project="/projects/program"}\n## Program\n\nNative programming condition.\n:::\n',
   );
   await Deno.writeTextFile(
     join(bank, "work.qmd"),

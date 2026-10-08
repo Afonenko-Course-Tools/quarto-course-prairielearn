@@ -9,8 +9,13 @@ assessment:
       mode: assessment-id
 ---
 
-# Вариант B {#sec-variant-b}
+# Вариант Б {#sec-variant-b}
 
-::: {.task-items}
+::: {.assessment-preview}
+Перед работой изучите открытый разбор @exr-clamp-demo.
+Вариант выполняется индивидуально; оценивается объяснение выбранного подхода.
+:::
+
+::: {.task-items stage="classroom"}
 1. @exr-control
 :::

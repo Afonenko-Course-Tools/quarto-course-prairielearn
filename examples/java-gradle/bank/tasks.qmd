@@ -1,6 +1,6 @@
-# Публичные задания {#sec-java-tasks}
+# Задания Java {#sec-java-tasks}
 
-:::: {#exr-clamp target="prairielearn" project="/projects/clamp"}
+:::: {#exr-clamp difficulty="introductory" time="30" statement-visibility="restricted" target="prairielearn" project="/projects/clamp"}
 ## Ограничение значения интервалом
 
 Реализуйте `Clamp.clamp(value, lower, upper)`: результат должен принадлежать
@@ -13,5 +13,16 @@
 
 ::: {.grading-notes}
 Закрытые тесты проверяют равные границы, отрицательные числа и обратный порядок границ.
+:::
+::::
+
+:::: {#exr-clamp-demo difficulty="introductory" time="10" course-role="demonstration"}
+## Открытый разбор ограничения значения
+
+Объясните, как ограничить число 12 интервалом от 0 до 10.
+
+::: {.solution}
+Число больше верхней границы, поэтому результат — 10. Общий алгоритм сначала
+проверяет порядок границ, затем сравнивает число с нижней и верхней границами.
 :::
 ::::

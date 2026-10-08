@@ -1,4 +1,16 @@
+---
+type: documentation
+component: course-prairielearn
+status: current
+updated: 2026-10-08
+---
+
 # Задания курса в PrairieLearn
+
+[Индекс спецификаций](spec/index.md) описывает контракт текущего Git ref.
+Версия определяется descriptor этого ref; код и документация устанавливаемого
+выпуска читаются из одного тега. Изменения main после выпущенного тега —
+**unreleased**. Минимум — Quarto 1.11.5 и CUE 0.17.1.
 
 Расширение извлекает платформенные параметры заданий и работ, проверяет их CUE
 и явно экспортирует выбранные вопросы в нативные каталоги PrairieLearn.
@@ -7,11 +19,13 @@
 
 ```sh
 cd bank
-quarto add Afonenko-Course-Tools/quarto-course@v3.0.2 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v2.1.1 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v4.0.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v3.0.0 --no-prompt
 ```
 
 ```yaml
+lang: ru
+fail-if-warnings: true
 project:
   pre-render: _extensions/Afonenko-Course-Tools/course-core/entrypoints/pre.ts
   post-render: _extensions/Afonenko-Course-Tools/course-core/entrypoints/post.ts
@@ -22,12 +36,21 @@ filters: [course-core, course-prairielearn]
 
 Задайте `course.id` один раз в корне логического курса. Установите Core и
 адаптер в экспортную книгу штатной командой `quarto add` с конкретными
-совместимыми релизами. Фильтр Core предшествует адаптеру. `course-role` и
-`difficulty` необязательны; заданные значения проверяются. Путь `project`
-проектного задания относится к корню выбранной книги.
+совместимыми релизами. Фильтр Core предшествует адаптеру. Канонические задачи объявляются только
+в области `exercise-bank: true`. У каждой обязательны собственные `difficulty`
+и положительное целое `time`; эффективная политика условия задаётся явно.
+`course-role` необязателен. Путь `project` относится к корню выбранной книги.
+`target` и `project` задают платформенную привязку и сами банк не включают.
+
+```yaml
+# bank/_metadata.yml
+exercise-bank: true
+exercise-statement-visibility: restricted
+```
 
 ````qmd
-:::: {#exr-clamp target="prairielearn" project="/projects/clamp"}
+:::: {#exr-clamp difficulty="introductory" time="25" target="prairielearn" project="/projects/clamp"}
+
 ## Ограничение значения
 
 Реализуйте метод для включительного интервала.
@@ -52,7 +75,7 @@ assessment:
 
 # Вариант A {#sec-variant-a}
 
-::: {.task-items}
+::: {.task-items stage="classroom"}
 1. @exr-clamp
 :::
 ````
@@ -131,3 +154,10 @@ Quarto `--profile`, сохраняются при экспорте.
 Собственные сообщения содержат ID, русский смысл и доступные source, ID работы
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
+
+Установка использует PrairieLearn `v3.0.0`, Core `v4.0.0`, Quarto 1.11.5
+и CUE 0.17.1. Body использует отдельную
+`statementVisibility` и обязательные qualified `assignments`; binding продолжает
+использовать локальные ID. Restricted условия допустимы в выбранной participant
+поставке, закрытые ключи и решения запрещены. Код и документация выпуска читаются
+из одного immutable tag; установленные `_extensions` сохраняются в Git курса.

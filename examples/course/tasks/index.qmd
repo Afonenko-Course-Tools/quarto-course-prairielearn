@@ -2,15 +2,20 @@
 
 ## Ограничение диапазона {#sec-clamp-topic}
 
-:::: {#exr-clamp course-role="independent-study" difficulty="introductory" target="prairielearn" project="/projects/clamp"}
+:::: {#exr-clamp course-role="independent-study" difficulty="introductory" time="30" target="prairielearn" project="/projects/clamp"}
 ## Ограничение диапазона
 
 Реализуйте `Clamp.clamp(value, lower, upper)`. При `lower > upper` выбросьте `IllegalArgumentException`. Проверьте обе границы диапазона.
 ::::
 
-:::: {#exr-clamp-demo course-role="demonstration" difficulty="introductory" target="manual" project="/projects/clamp"}
+:::: {#exr-clamp-demo course-role="demonstration" difficulty="introductory" time="10" target="manual" project="/projects/clamp"}
 ## Открытая демонстрация
 
 Проследите обработку граничных значений в авторском решении `Clamp`.
 Это упражнение не публикуется в PrairieLearn.
+
+::: {.solution}
+Сначала проверяем порядок границ. Значение ниже нижней границы заменяем нижней,
+значение выше верхней — верхней; значение внутри интервала сохраняем.
+:::
 ::::

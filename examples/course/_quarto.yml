@@ -1,3 +1,4 @@
+fail-if-warnings: true
 project:
   type: book
   pre-render:
@@ -7,6 +8,10 @@ project:
   resources:
     - "!projects/**"
 book:
+  repo-url: https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn
+  repo-branch: v3.0.0
+  repo-subdir: examples/course
+  repo-actions: [source]
   title: Задание с внешней проверкой
   chapters:
     - index.qmd
@@ -16,6 +21,7 @@ book:
 format:
   html:
     theme: cosmo
+    code-tools: false
 lang: ru
 course:
   id: demo-prairielearn
