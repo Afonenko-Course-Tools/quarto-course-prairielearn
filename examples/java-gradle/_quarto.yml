@@ -9,7 +9,7 @@ website:
   repo-url: https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn
   repo-subdir: examples/java-gradle
   repo-actions: [source]
-  repo-branch: demo-20261007-ru1
+  repo-branch: v3.0.0
 lang: ru
 format: html
 course:

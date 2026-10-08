@@ -7,6 +7,10 @@ project:
   post-render: _extensions/Afonenko-Course-Tools/course-core/entrypoints/post.ts
   resources: ["!projects/**"]
 book:
+  repo-url: https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn
+  repo-branch: v3.0.0
+  repo-subdir: examples/java-gradle/bank
+  repo-actions: [source]
   title: Общий банк заданий Java
   chapters: [index.qmd, tasks.qmd, control.qmd, variant-a.qmd, variant-b.qmd]
 lang: ru

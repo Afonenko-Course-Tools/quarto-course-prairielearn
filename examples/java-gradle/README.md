@@ -1,9 +1,9 @@
 # Демонстрационная группа Java и Gradle
 
-Подготовка следующего выпуска (`accepted-next`). Эти исходники показывают
-согласованный новый банк; совместный runtime/render ещё проверяется по
-[плану владельца](../../docs/plans/2026-10-08-implementation.md).
-Минимум — Quarto 1.11.5 и CUE 0.17.1. [Правила миграции](../../docs/authoring-next.md).
+Авторская разметка текущего Git ref для `v3.0.0`.
+Общая модель принадлежит Core `v4.0.0`; минимум — Quarto 1.11.5 и CUE 0.17.1.
+[План владельца](../../docs/plans/2026-10-08-implementation.md) фиксирует
+фактические проверки и дальнейший выпуск.
 
 Для локального кандидата из корня репозитория PrairieLearn:
 
@@ -11,13 +11,22 @@
 CORE=/absolute/path/to/quarto-course bash tools/check-java.sh
 ```
 
-Последняя опубликованная группа закреплена на Core `v3.0.2`, PrairieLearn `v2.1.1`
-и [demo-20261007-ru1](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/tree/demo-20261007-ru1/examples/java-gradle).
-Эти refs описывают прежнюю готовую группу; pins новых исходников будут заменены
-точными опубликованными тегами после проверки. Новый demo URL пока не объявлен.
-`BUILD.json` готового результата должен сохранить точный producer commit,
-фактические зависимости и профиль. Готовый HTML использует внешние native
-GitHub source-ссылки, без копирования закрытых QMD в student output.
+Установка закреплённых выпусков из каталога этой группы:
+
+```sh
+cd bank
+quarto add Afonenko-Course-Tools/quarto-course@v4.0.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v3.0.0 --no-prompt
+cd ..
+quarto run build.ts
+```
+
+Native source-ссылки ведут к tool tag `v3.0.0` того же producer commit.
+Готовая группа выпускается в отдельном immutable Release `demo-20261008`.
+`BUILD.json` фиксирует точный commit,
+зависимости, профиль и `sourceDirty: false` для готового asset. Tool tag и demo tag
+должны указывать на одну clean ревизию. HTML использует внешнее native действие
+GitHub source, без source modal и копирования закрытых QMD в student output.
 
 ## Java и выбранная поставка
 
