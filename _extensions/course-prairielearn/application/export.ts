@@ -517,7 +517,10 @@ export async function exportPrairieLearn(
       v.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll(
         "<",
         "&lt;",
-      ).replaceAll(">", "&gt;");
+      ).replaceAll(">", "&gt;").replaceAll("{{", "&#123;&#123;").replaceAll(
+        "}}",
+        "&#125;&#125;",
+      );
     let controls: string;
     if (submission.mode === "editor") {
       controls = b.files.map((name: string) => {

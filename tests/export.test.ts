@@ -957,3 +957,35 @@ Deno.test("editor refuses unknown mode, unsafe mode, missing or non-text starter
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("literal Mustache in editor filenames is escaped in native attributes", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    await Deno.mkdir(root + "/project/student", { recursive: true });
+    await Deno.mkdir(root + "/project/tests");
+    await Deno.writeTextFile(root + "/project/student/{{literal}}.txt", "text");
+    await Deno.writeTextFile(root + "/project/tests/grade.sh", "checks");
+    const b = structuredClone(binding) as any;
+    b.questions["exr-clamp"].files = ["{{literal}}.txt"];
+    b.questions["exr-clamp"].submission = { mode: "editor" };
+    await exportPrairieLearn(
+      p(),
+      { projectRoot: root, projects: { "exr-clamp": "/project" } },
+      b,
+      root + "/out",
+    );
+    const html = await Deno.readTextFile(
+      root + "/out/questions/demo/exr-clamp/question.html",
+    );
+    assert(
+      !html.includes("{{literal}}"),
+      "filename interpreted as a PL template",
+    );
+    assert(
+      html.includes('file-name="&#123;&#123;literal&#125;&#125;.txt"'),
+      "literal filename not preserved safely",
+    );
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});

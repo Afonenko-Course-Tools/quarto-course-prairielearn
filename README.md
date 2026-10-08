@@ -17,9 +17,14 @@ updated: 2026-10-08
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
+Текущий ref содержит **unreleased кандидат 3.1.0** с режимом редактора.
+До публикации выпуска этот режим устанавливается целым архивом закреплённого
+Git commit. Команды ниже устанавливают выпущенный baseline 3.0.1, в котором
+сохраняется только upload; они не устанавливают unreleased editor.
+
 ```sh
 cd bank
-quarto add Afonenko-Course-Tools/quarto-course@v4.0.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v4.0.1 --no-prompt
 quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v3.0.1 --no-prompt
 ```
 
