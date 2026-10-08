@@ -20,7 +20,7 @@ updated: 2026-10-08
 ```sh
 cd bank
 quarto add Afonenko-Course-Tools/quarto-course@v4.0.0 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v3.0.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v3.0.1 --no-prompt
 ```
 
 ```yaml
@@ -113,7 +113,9 @@ student HTML. Полный HTML перед экспортом не требуе�
 
 Результат: `questions/<course-id>/<exr-id>/info.json`, `question.html`,
 `clientFilesQuestion` из `<project>/student` и приватные `tests` из
-`<project>/tests`. Соседний `reference` не публикуется. UUID определяется
+`<project>/tests`. Корневой `student/.gitignore` доставляется как обычный файл starter; прочие
+скрытые файлы и вложенные `.gitignore` исключены. `.gitignore` в приватных tests
+не доставляется. Соседний `reference` не публикуется. UUID определяется
 ключом курса/задания, а не путём QMD. Условие содержит только публичный AST;
 решения, ключи и grading notes не входят в HTML. Все проверки предшествуют
 записи результата; output должен быть новым каталогом. Символьные ссылки
@@ -155,7 +157,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Установка использует PrairieLearn `v3.0.0`, Core `v4.0.0`, Quarto 1.11.5
+Установка использует PrairieLearn `v3.0.1`, Core `v4.0.0`, Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
 `statementVisibility` и обязательные qualified `assignments`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
