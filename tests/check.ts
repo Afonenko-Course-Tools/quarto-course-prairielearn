@@ -63,6 +63,8 @@ function assert(value: unknown, message: string): asserts value {
 
 function document(policy = ""): string {
   return `---
+exercise-bank: true
+exercise-statement-visibility: restricted
 assessment:
   kind: test
 ${policy}---
@@ -71,7 +73,7 @@ ${policy}---
 
 ${
     ["experiment", "tests", "implementation"].map((id) =>
-      `:::: {#exr-${id} target="prairielearn" course-role="independent-study" difficulty="introductory" project="/projects/example"}
+      `:::: {#exr-${id} target="prairielearn" course-role="independent-study" difficulty="introductory" time="10" project="/projects/example"}
 ## ${
         {
           experiment: "Эксперимент",
@@ -475,10 +477,6 @@ profile:
   }
   const privateDocument = document("  prairielearn: {}\n")
     .replace(
-      ":::: {#exr-experiment",
-      ':::::: {.content-visible when-profile="full"}\n\n:::: {#exr-experiment',
-    )
-    .replace(
       "Описание задания.\n::::",
       `Описание задания.
 
@@ -487,12 +485,14 @@ profile:
 :::
 ::::`,
     ) + `
-::::::
-
-:::: {#exr-public-demo target="manual" course-role="demonstration" difficulty="introductory" project="/projects/example"}
+:::: {#exr-public-demo target="manual" course-role="demonstration" statement-visibility="open" difficulty="introductory" time="10" project="/projects/example"}
 ## Открытая демонстрация
 
 Условие открытой демонстрации.
+
+::: {.solution}
+Публичный разбор демонстрации.
+:::
 ::::
 `;
   await Deno.writeTextFile(
@@ -566,11 +566,16 @@ profile:
   const student = JSON.parse(await Deno.readTextFile(modelPath()));
   assert(
     student.course.view === "student" && student.assessments.length === 0 &&
+      student.assessmentCompositions.length === 1 &&
       student.exercises.length === 1 &&
       student.exercises[0].target === "manual",
     "Студенческая модель должна содержать только открытую демонстрацию",
   );
-  const studentText = JSON.stringify(student) +
+  const studentText = JSON.stringify({
+    exercises: student.exercises,
+    assessments: student.assessments,
+    pedagogy: student.pedagogy,
+  }) +
     await Deno.readTextFile(join(renderedRoot, "_book/student/index.html"));
   assert(
     !studentText.includes("ЗАКРЫТЫЙ-КРИТЕРИЙ-ПРОВЕРКИ") &&
@@ -707,7 +712,8 @@ profile:
       `Неверный состав заданий примера в представлении ${view}`,
     );
     assert(
-      model.assessments.length === (view === "student" ? 1 : 2),
+      model.assessments.length === (view === "student" ? 1 : 2) &&
+        model.assessmentCompositions.length === 2,
       `Неверный состав занятий примера в представлении ${view}`,
     );
     if (view === "full") {

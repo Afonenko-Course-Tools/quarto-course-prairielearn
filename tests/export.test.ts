@@ -14,6 +14,8 @@ const p = () => ({
     key: "demo/exr-clamp",
     source: "tasks.qmd",
     visibility: "public",
+    statementVisibility: "restricted",
+    hasPublicSolution: false,
     answerType: "manual",
     condition: [{ t: "Para", c: [{ t: "Str", c: "PUBLIC_CONDITION" }] }],
     publicAnswer: [],
@@ -26,7 +28,9 @@ const p = () => ({
     kind: "lab",
     title: "Lab",
     items: ["demo/exr-clamp"],
-    requirements: { "exr-clamp": "required" },
+    assignments: {
+      "demo/exr-clamp": { requirement: "required", workMode: "individual" },
+    },
   }],
   resources: [],
 });
@@ -521,6 +525,237 @@ Deno.test("CLI retains unknown cause stack when known wrapper quotes its message
       "quoted unknown cause lost its type or original stack: " + result.text,
     );
     await noDelivery(root);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("PL accepts restricted participant-safe statements and new assignment metadata", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const context = await projectFixture(root);
+    for (const kind of ["lab", "seminar", "practical", "test"]) {
+      const candidate: any = p();
+      candidate.works[0].kind = kind;
+      candidate.works[0].theoryTime = 2.5;
+      candidate.works[0].assignments["demo/exr-clamp"] = {
+        stage: "homework",
+        requirement: "optional",
+        workMode: "pair",
+      };
+      await exportPrairieLearn(candidate, context, binding, root + "/" + kind);
+      const delivery = JSON.parse(
+        await Deno.readTextFile(root + "/" + kind + "/delivery.json"),
+      );
+      assert(
+        delivery.works[0].theoryTime === 2.5 &&
+          delivery.works[0].assignments["demo/exr-clamp"].workMode === "pair",
+        "assignment metadata lost",
+      );
+    }
+    const demonstration: any = p();
+    demonstration.questions[0].statementVisibility = "open";
+    demonstration.questions[0].purpose = "demonstration";
+    demonstration.questions[0].hasPublicSolution = true;
+    demonstration.works[0].assignments["demo/exr-clamp"].stage =
+      "demonstration";
+    await exportPrairieLearn(
+      demonstration,
+      context,
+      binding,
+      root + "/demonstration",
+    );
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+Deno.test("PL standalone guards reject invalid work, assignment and statement policies before delivery", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const context = await projectFixture(root);
+    const cases: [string, (p: any) => void][] = [
+      ["null work", (p) => p.works[0] = null],
+      ["null question", (p) => p.questions[0] = null],
+      ["missing assignments", (p) => delete p.works[0].assignments],
+      [
+        "legacy requirements",
+        (p) => p.works[0].requirements = { "exr-clamp": "required" },
+      ],
+      [
+        "bare assignment key",
+        (p) =>
+          p.works[0].assignments = {
+            "exr-clamp": { requirement: "required", workMode: "individual" },
+          },
+      ],
+      [
+        "extra assignment key",
+        (p) =>
+          p.works[0].assignments["demo/exr-other"] = {
+            requirement: "required",
+            workMode: "individual",
+          },
+      ],
+      ["missing assignment", (p) => p.works[0].assignments = {}],
+      [
+        "missing requirement",
+        (p) => delete p.works[0].assignments["demo/exr-clamp"].requirement,
+      ],
+      [
+        "missing workMode",
+        (p) => delete p.works[0].assignments["demo/exr-clamp"].workMode,
+      ],
+      [
+        "unknown assignment field",
+        (p) => p.works[0].assignments["demo/exr-clamp"].extra = true,
+      ],
+      [
+        "invalid stage",
+        (p) => p.works[0].assignments["demo/exr-clamp"].stage = "lecture",
+      ],
+      [
+        "invalid requirement",
+        (p) =>
+          p.works[0].assignments["demo/exr-clamp"].requirement = "mandatory",
+      ],
+      [
+        "invalid work mode",
+        (p) => p.works[0].assignments["demo/exr-clamp"].workMode = "team",
+      ],
+      ["legacy kind", (p) => p.works[0].kind = "handout"],
+      ["foreign owner", (p) => p.works[0].owner = "other"],
+      ["invalid work key", (p) => p.works[0].key = "demo/other"],
+      ["missing title", (p) => delete p.works[0].title],
+      ["empty source", (p) => p.works[0].source = ""],
+      ["unknown work field", (p) => p.works[0].preview = "hidden"],
+      ["zero theory time", (p) => p.works[0].theoryTime = 0],
+      ["infinite theory time", (p) => p.works[0].theoryTime = Infinity],
+      [
+        "missing statement policy",
+        (p) => delete p.questions[0].statementVisibility,
+      ],
+      [
+        "invalid statement policy",
+        (p) => p.questions[0].statementVisibility = "public",
+      ],
+      [
+        "missing solution witness",
+        (p) => delete p.questions[0].hasPublicSolution,
+      ],
+      ["invalid witness", (p) => p.questions[0].hasPublicSolution = 1],
+      ["invalid purpose", (p) => p.questions[0].purpose = "reading"],
+      ["test open condition", (p) => {
+        p.works[0].kind = "test";
+        p.questions[0].statementVisibility = "open";
+      }],
+      ["practical open condition", (p) => {
+        p.works[0].kind = "practical";
+        p.questions[0].statementVisibility = "open";
+      }],
+      ["restricted demonstration", (p) => {
+        p.works[0].assignments["demo/exr-clamp"].stage = "demonstration";
+        p.questions[0].purpose = "demonstration";
+        p.questions[0].hasPublicSolution = true;
+      }],
+      ["demonstration without purpose", (p) => {
+        p.works[0].assignments["demo/exr-clamp"].stage = "demonstration";
+        p.questions[0].statementVisibility = "open";
+        p.questions[0].hasPublicSolution = true;
+      }],
+      ["demonstration without public solution", (p) => {
+        p.works[0].assignments["demo/exr-clamp"].stage = "demonstration";
+        p.questions[0].statementVisibility = "open";
+        p.questions[0].purpose = "demonstration";
+      }],
+      [
+        "private participant payload",
+        (p) => p.questions[0].visibility = "private",
+      ],
+      ...["solution", "closedKey", "gradingNotes"].map((field) =>
+        [field, (p: any) => p.questions[0][field] = []] as [
+          string,
+          (p: any) => void,
+        ]
+      ),
+    ];
+    for (const [name, mutate] of cases) {
+      const candidate: any = p();
+      mutate(candidate);
+      let error: any;
+      try {
+        await exportPrairieLearn(candidate, context, binding, root + "/out");
+      } catch (e) {
+        error = e;
+      }
+      assert(error?.code === "ADAPTER", "accepted invalid " + name);
+      await noDelivery(root);
+    }
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("PL restricted conditions retain closed-marker and resource safety guards", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const context = await projectFixture(root);
+    for (
+      const marker of [
+        "answer",
+        "answer-spec",
+        "correct",
+        "solution",
+        "grading-notes",
+      ]
+    ) {
+      const candidate: any = p();
+      candidate.questions[0].condition = [{
+        t: "Div",
+        c: [["", [marker], []], []],
+      }];
+      let error: any;
+      try {
+        await exportPrairieLearn(candidate, context, binding, root + "/out");
+      } catch (e) {
+        error = e;
+      }
+      assert(
+        error?.code === "ADAPTER" && error.message.includes("condition"),
+        "restricted closed marker escaped: " + marker,
+      );
+      await noDelivery(root);
+    }
+    for (
+      const [name, target, visibility, hash] of [
+        ["private resource", "image.png", "private", "unused"],
+        ["resource path traversal", "../image.png", "public", "unused"],
+        ["resource hash mismatch", "image.png", "public", "incorrect"],
+      ]
+    ) {
+      const candidate: any = p();
+      candidate.questions[0].condition = [{
+        t: "Para",
+        c: [{ t: "Image", c: [["", [], []], [], [target, ""]] }],
+      }];
+      candidate.resources = [{
+        owner: "demo",
+        target,
+        visibility,
+        data: btoa("image"),
+        sha256: hash,
+      }];
+      let error: any;
+      try {
+        await exportPrairieLearn(candidate, context, binding, root + "/out");
+      } catch (e) {
+        error = e;
+      }
+      assert(
+        error?.code === "ADAPTER" && error.message.includes("resource"),
+        "restricted unsafe resource escaped: " + name,
+      );
+      await noDelivery(root);
+    }
   } finally {
     await Deno.remove(root, { recursive: true });
   }

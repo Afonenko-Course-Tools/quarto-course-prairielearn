@@ -9,6 +9,11 @@ try {
     registeredTargets: ["manual", adapter],
     exercises: [{
       id: "exr-native",
+      difficulty: "introductory",
+      time: 10,
+      statementVisibility: "restricted",
+      hasSolution: false,
+      hasPublicSolution: false,
       project: "",
       head: { kind: "Div", level: 0, title: "" },
       body: { "pandoc-api-version": [1, 23, 1], meta: {}, blocks: [] },
@@ -45,7 +50,9 @@ try {
     kind: "test",
     source: "work.qmd",
     items: ["exr-native"],
-    requirements: { "exr-native": "required" },
+    assignments: {
+      "exr-native": { requirement: "required", workMode: "individual" },
+    },
     title: "Работа",
     memberContainers: 1,
     memberKinds: ["OrderedList"],
@@ -86,7 +93,7 @@ try {
     );
   }
   console.log(
-    "Native exercise without owner, target, role, difficulty or source topic is valid with " +
+    "Bank exercise with own difficulty, time and statement policy is valid without owner, target, role or source topic with " +
       adapter,
   );
 } finally {
