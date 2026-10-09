@@ -14,6 +14,8 @@ local function plain(value)
   return result
 end
 
+M.plain = plain
+
 local function merge(base, override)
   local result = {}
   for key, value in pairs(base) do result[key] = value end

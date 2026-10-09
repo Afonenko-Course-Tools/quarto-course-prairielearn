@@ -196,3 +196,47 @@ external grading options сохраняются; PL преобразует вв�
 Контракт сверён с официальными [pl-file-editor](https://docs.prairielearn.com/elements/pl-file-editor/)
 и [external grading](https://docs.prairielearn.com/externalGrading/) и исходниками
 закреплённого PL `92584fe426ececb84bc2d09de9975c7056c0c5f6`.
+
+## Полная native-поставка
+
+`export-course.ts` создаёт весь native course из свежей модели Core и закрытых
+metadata `prairielearn.delivery`, `question-defaults` и `assessment-defaults`.
+Пример полного формата находится в `examples/native-course/tasks/_quarto.yml`.
+Состав выбранных работ определяется только `.task-items`; каждый участник должен
+иметь эффективный target PrairieLearn и именованный `project-check`.
+
+```sh
+quarto run tasks/_extensions/course-prairielearn/entrypoints/export-course.ts COURSE_ROOT NATIVE --instance pilot --checks-output PRIVATE/checks.json --runtime-registry PLATFORM/runtime-profiles.json
+```
+
+Для namespace-установки путь включает `Afonenko-Course-Tools/`. `--book` по умолчанию
+равен `tasks`; `delivery.book` должен совпадать. Registry можно также задать через
+`PRAIRIELEARN_RUNTIME_REGISTRY`; последний стандартный путь —
+`COURSE_ROOT/prairielearn/runtime-profiles.json`. Production требует опубликованный
+OCI digest. Private testing допускает явный `--candidate-image sha256:IMAGE_ID`,
+который CLI проверяет через локальный Docker; delivery помечается `candidate`.
+
+Question defaults задают только topic/submission. Редкие атрибуты
+`prairielearn-topic` и `prairielearn-submission="editor|upload"` переопределяют
+платформенные поля. Runtime и источники выбирает общий project-check. Unknown
+metadata/attributes, missing inputs, symlinks, binary/NUL/oversize и изменение
+snapshot отклоняются до публикации. Package paths сохраняются от source root;
+выбранные `.java` — единственные submission files. В student-tests оцениваемая
+suite остаётся отдельной от trusted variant fixtures.
+
+Доставка содержит `infoCourse.json`, выбранную instance, assessments, questions,
+server-side tests и closed `tests/grading-job.json`. Starter UTF-8 встроен в editor;
+server-side `serverFilesQuestion/starter` сохраняет его точный snapshot для проверки
+паритета. Reference, verification tests, contract fixtures, Gradle и README не
+входят в этот payload. Частный checks manifest записывается отдельно и включает
+все явно подключённые проекты, в том числе demonstrations без native export.
+
+Pinned upstream schemas (`spec/upstream/provenance.json`) проверяют native JSON
+перед atomic rename свежего каталога. `delivery.json` хранит sourceSnapshotHash,
+неизменный Core inventoryHash, file→SHA256 inventory и deliveryHash SHA256 от
+canonical sorted-key JSON без deliveryHash. Inventory исключает сам delivery.json.
+Question UUID сохраняет прежний exporter algorithm. Course UUID — UUIDv5 DNS
+`course/<courseId>`, instance/assessment — UUIDv5 в namespace курса. Instance и
+assessment имеют явный `allowAccess: []`; выдачу разрешений выполняет серверная
+интеграция. `selfEnrollment.enabled`, попытки `triesPerVariant`, порог `maxPoints`
+и исходная policy в delivery вычисляются из деклараций.

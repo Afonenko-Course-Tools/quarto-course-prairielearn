@@ -9,4 +9,6 @@ contributes:
     course-prairielearn:
       package-contract: course-body-package-v1
       entrypoint: entrypoints/export.ts
+      native-entrypoint: entrypoints/export-course.ts
+      native-contract: course-native-delivery-v1
       activation: explicit-script-only

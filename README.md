@@ -178,3 +178,8 @@ Quarto `--profile`, сохраняются при экспорте.
 использовать локальные ID. Restricted условия допустимы в выбранной participant
 поставке, закрытые ключи и решения запрещены. Код и документация выпуска читаются
 из одного immutable tag; установленные `_extensions` сохраняются в Git курса.
+
+Полная native-поставка курса доступна через `entrypoints/export-course.ts`:
+[пример](examples/native-course/README.md), [контракт автора](docs/authoring.md#полная-native-поставка).
+Она не требует binding, export.json или ручного native shell; registry должен
+содержать настоящий production digest либо явно выбранный private local candidate.

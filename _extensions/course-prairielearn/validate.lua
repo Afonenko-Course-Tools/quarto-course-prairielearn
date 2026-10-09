@@ -2,7 +2,8 @@ local native = require("./native")
 local assessment = require("./assessment")
 local diagnostics = require("./diagnostics")
 local M = {}
-function M.validate(doc)
+function M.validate(doc, effective)
+  effective = effective or {}
   -- Core calls this before projection; the unprojected assessment ID is the
   -- authored Course heading, including an assessment hidden from students.
   local meta = doc.meta
@@ -15,9 +16,12 @@ function M.validate(doc)
   end
   local targets = {}
   doc:walk({Div = function(div)
-    if div.identifier:match("^exr%-") then targets[div.identifier] = div.attributes.target or "manual" end
+    if div.identifier:match("^exr%-") then targets[div.identifier] = native.target(effective, div) or "manual" end
   end})
   local source = native.source()
+  if meta.prairielearn and meta.prairielearn.delivery then
+    native.vet(assessment.plain(meta.prairielearn), "#PrairieLearnDeclarations", {source = source, field = "prairielearn"})
+  end
   local work = meta["course-assessment-id"] and pandoc.utils.stringify(meta["course-assessment-id"])
   local policy = assessment.collect(meta)
   if policy ~= nil then
@@ -43,7 +47,18 @@ function M.validate(doc)
   end
   local projects = pandoc.List()
   doc:walk({Div = function(div)
-    if div.attributes.target == "prairielearn" then
+    if div.identifier:match("^exr%-") then
+      for key, value in pairs(div.attributes) do
+        if key:match("^prairielearn%-") then
+          assert(key == "prairielearn-topic" or key == "prairielearn-submission", diagnostics.message("PL.DECLARATION_INVALID", "Неизвестное поле адаптера", {source = source, id = div.identifier, field = key}))
+          if key == "prairielearn-submission" then assert(value == "editor" or value == "upload", "PL invalid submission override") end
+          if key == "prairielearn-topic" then assert(value ~= "", "PL empty topic override") end
+        end
+      end
+    end
+  end})
+  doc:walk({Div = function(div)
+    if native.target(effective, div) == "prairielearn" then
       assert((div.attributes.project or ""):match("^/[^.]"), diagnostics.message("PL.PROJECT_INVALID", "Требуется project от корня выбранной книги", {source = source, id = div.identifier, field = "project", hint = "Укажите существующий каталог проекта, например /projects/clamp"}))
       projects:insert({path = div.attributes.project, id = div.identifier})
     end

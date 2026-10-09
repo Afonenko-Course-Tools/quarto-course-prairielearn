@@ -9,7 +9,12 @@ function M.source()
   if pandoc.path.is_relative(input) then input = pandoc.path.join({root, input}) end
   return pandoc.path.make_relative(input, root)
 end
-function M.read(doc)
+function M.target(effective, div)
+  if effective and effective[div.identifier] then return effective[div.identifier].target end
+  return div.attributes.target
+end
+function M.read(doc, effective)
+  effective = effective or (doc.meta["course-effective-exercise-facts"] and pandoc.json.decode(pandoc.utils.stringify(doc.meta["course-effective-exercise-facts"]))) or {}
   local source = M.source()
   local value = {source = source, exercises = pandoc.List(),
     assessment = assessment.collect(doc.meta)}
@@ -18,8 +23,20 @@ function M.read(doc)
     -- It is service transport, not a second authored platform exercise.
     if d.classes:includes("course-export-projection") and
       d.attributes["data-course-export-projection"] == "public" then return d, false end
-    if d.attributes.target == contract.name then
-      value.exercises:insert({id = d.identifier, payload = {grading = contract.vocabulary.grading[1]}})
+    if M.target(effective, d) == contract.name then
+      local payload = {grading = contract.vocabulary.grading[1]}
+      if doc.meta.prairielearn and doc.meta.prairielearn["question-defaults"] then
+        local defaults = doc.meta.prairielearn["question-defaults"]
+        payload.topic = pandoc.utils.stringify(defaults.topic)
+        local submission = defaults.submission
+        if submission then
+          payload.submission = {mode = pandoc.utils.stringify(submission.mode)}
+          if submission["ace-mode"] then payload.submission["ace-mode"] = pandoc.utils.stringify(submission["ace-mode"]) end
+        end
+      end
+      if d.attributes["prairielearn-topic"] then payload.topic = d.attributes["prairielearn-topic"] end
+      if d.attributes["prairielearn-submission"] then payload.submission = payload.submission or {}; payload.submission.mode = d.attributes["prairielearn-submission"]; if payload.submission.mode == "upload" then payload.submission["ace-mode"] = nil end end
+      value.exercises:insert({id = d.identifier, payload = payload})
     end
   end})
   return value
