@@ -1,8 +1,10 @@
 import { dirname, join, relative, resolve } from "node:path";
 import { verificationInventoryHash } from "./verification-inventory.ts";
+import { gradingPolicy } from "./grading-policy.ts";
 import { completionPolicy } from "./completion.ts";
 import { normalizeDiscovery } from "./grading-descriptor.ts";
 import * as validators from "./native-validators.js";
+import { validateAssessmentSemantics } from "./native-semantics.ts";
 import { exportPrairieLearn, uuid } from "./export.ts";
 import { declarations, question } from "./declarations.ts";
 import {
@@ -104,6 +106,7 @@ export async function exportCourse(
       active.add(w.relatedExercise);
     }
   }
+  for (const work of works) gradingPolicy(work);
   const stage = await Deno.makeTempDir({
       dir: dirname(out),
       prefix: ".pl-course-",
@@ -120,6 +123,7 @@ export async function exportCourse(
         "PL upstream schema " + path + ": " + JSON.stringify(validate.errors),
       );
     }
+    if (schema === "infoAssessment") validateAssessmentSemantics(v, path);
     await Deno.writeTextFile(
       join(stage, path),
       JSON.stringify(v, null, 2) + "\n",
@@ -344,16 +348,20 @@ export async function exportCourse(
       }
       const policy = work.extensions.prairielearn;
       const completion = completionPolicy(input.courseId, work);
+      const grading = gradingPolicy(work);
+      const assessmentType = ["test", "practical"].includes(work.kind)
+        ? "Exam"
+        : "Homework";
       await write(
         "courseInstances/" + input.instance + "/assessments/" + work.id +
           "/infoAssessment.json",
         {
           uuid: await identity("assessment/" + work.id, courseUuid),
-          type: ["test", "practical"].includes(work.kind) ? "Exam" : "Homework",
+          type: assessmentType,
           title: work.title,
-          set: ["test", "practical"].includes(work.kind) ? "Exam" : "Homework",
+          set: assessmentType,
           number: String(index + 1),
-          maxPoints: work.items.length,
+          ...grading.assessment,
           text:
             `Completion requires fully completing at least ${completion.atLeast} required questions. Partial scores and optional questions do not count toward completion.`,
           accessControl: work.relatedExercise
@@ -384,9 +392,7 @@ export async function exportCourse(
             title: work.title,
             questions: work.items.map((id: string) => ({
               id: input.courseId + "/" + id,
-              points: 1,
-              maxPoints: 1,
-              triesPerVariant: policy.attempts,
+              ...grading.questions[id],
               preferences: {
                 courseRequirement: work.assignments[id].requirement,
               },
@@ -413,10 +419,11 @@ export async function exportCourse(
         id: w.id,
         items: w.items,
         assignments: w.assignments,
-        policy: w.relatedExercise ? w.extensions.prairielearn : {
-          attempts: w.extensions.prairielearn.attempts,
-          pass: w.extensions.prairielearn.pass,
-        },
+        policy: Object.fromEntries(
+          Object.entries(w.extensions.prairielearn).filter(([key]) =>
+            w.relatedExercise || key !== "assignment"
+          ),
+        ),
         completion: completionPolicy(input.courseId, w),
         ...(w.relatedExercise ? { relatedExercise: w.relatedExercise } : {}),
       })),

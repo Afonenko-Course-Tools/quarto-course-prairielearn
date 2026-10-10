@@ -41,6 +41,8 @@ project-checks:
       source-profile: main
       tests: ['tests/junit/**/*.java']
 prairielearn:
+  assessment-defaults:
+    question-points: 1
   delivery:
     book: tasks
     course:

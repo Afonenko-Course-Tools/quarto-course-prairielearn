@@ -11,7 +11,7 @@ updated: 2026-10-10
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
-переключения версий схемы. Контракты этого ref: адаптер 4.0.0 и Core 5.0.0; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
+переключения версий схемы. Контракты этого ref: адаптер 5.0.0 и Core 5.0.0; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
 Канонические `#exr-*` имеют уникальные ID внутри явной области
 `exercise-bank: true`, собственные обязательные `difficulty` и положительное
 целое `time`. Эффективная `statement-visibility` берётся из атрибута задачи либо
@@ -317,3 +317,94 @@ question `info.json.preferences.courseRequirement` объявляет встро
 92584 проверяет assessment override по этой question schema при sync. Она не
 заменяет authoritative completion predicate, который использует закрытую
 политику delivery. Отдельный `preferences.schema.json` этим upstream не читается.
+
+
+## Авторские баллы и повторные попытки (exporter 5.0.0)
+
+Версия 5.0.0 меняет контракт полного native экспорта: каждый вопрос выбранной
+работы требует явно объявленных баллов. Выпущенный 4.0.0 сохраняет свой контракт;
+обновляйте курсы после публикации 5.0.0 и объявления новых метаданных. Эти документы
+не подтверждают публикацию тегов или OCI image.
+
+Настройки задаются в metadata курса/книги, `_quarto.yml`, `_metadata.yml`,
+подключённом через native `metadata-files` файле `_*.yaml` либо front matter
+документа. Quarto определяет порядок слияния; адаптер нормализует только известные
+числовые поля. Списки баллов заменяются целиком. Например, общий авторский default:
+
+```yaml
+prairielearn:
+  assessment-defaults:
+    attempts: 3
+    question-points: 1
+    pass: {at-least: 2}
+    # Необязательные author-controlled параметры:
+    grade-rate-minutes: 0
+    advance-score-perc: 0
+    allow-multiple-instances: false
+```
+
+Документ может переопределить баллы/попытки и отдельных участников:
+
+```yaml
+assessment:
+  kind: test
+  prairielearn:
+    question-points: [5, 3, 1]
+    question-max-points: null
+    allow-multiple-instances: true
+    question-overrides:
+      exr-first:
+        question-points: [4, 2]
+        attempts: 2
+```
+
+`question-points` — native question `points`: неотрицательное число для Homework;
+для Exam также непустой невозрастающий список баллов за последовательные попытки.
+Required вопросы требуют строго положительных значений; нулевой знаменатель
+completion не поддерживается. Optional вопрос допускает ноль и не входит в
+required completion. Homework с нулевыми баллами не допускает положительный ceiling.
+
+`question-max-points` — необязательный Homework question `maxPoints`; Exam его
+запрещает. Явный YAML `null` очищает inherited ceiling. Поле `max-points` задаёт
+необязательный ceiling всей работы, отдельный от question ceiling и completion
+threshold. Отсутствующие/null ceilings опускаются: native PrairieLearn вычисляет
+свои значения. Экспортёр не вставляет баллы 1, maxPoints 1 или число участников.
+
+Авторский `attempts` — положительное целое, переносимое в question
+`triesPerVariant`: число graded submissions для варианта вопроса. Это не число
+экземпляров assessment. `allow-multiple-instances` — native `multipleInstance`:
+boolean разрешён для Exam, Homework допускает только false. `grade-rate-minutes`
+— native `gradeRateMinutes`, неотрицательный минимальный интервал graded submissions.
+`advance-score-perc` — question `advanceScorePerc`, число 0–100 для перехода к
+следующим вопросам. Отсутствующие optional retry controls опускаются, поведение
+определяет pinned Community. `question-overrides` задаётся по точным локальным
+ID участников и допускает points/max-points/attempts/advance-score-perc; неизвестные
+ID и поля отвергаются. `maxVariants` и другие неподдерживаемые knobs запрещены.
+Проектные runtime/limits/networking остаются закрытым отдельным project-check
+контрактом; grading metadata их не открывает.
+
+Перед созданием native файлов автор может увидеть effective значения:
+
+```sh
+quarto run tasks/_extensions/course-prairielearn/entrypoints/inspect-grading.ts . --instance pilot --output effective-grading.json
+```
+
+Отчёт содержит source, kind, разрешённую policy и точный native mapping каждого
+вопроса; production registry/image не нужны, native артефакт не создаётся. Missing
+points вызывает actionable отказ с source/work/question и местом объявления.
+Delivery сохраняет все effective grading поля и overrides; у ordinary labs
+удаляется только assignment, который им не нужен. Completion по полностью
+выполненным required вопросам остаётся отдельной закрытой политикой.
+
+Native awarded score и результат тестов различаются. Gateway берёт
+`instance_question.score_perc / 100`, а completion требует ровно 1. Pinned
+Community92584 `src/lib/question-points.ts:105` вычисляет percentage как
+awarded points / question max points; Exam начисляет приращение по стоимости
+текущей попытки (`computeInstanceQuestionPointsExam`, строки130–143). Например,
+для `[5, 3, 1]` после первой полностью неверной попытки правильный ответ на второй
+даёт 3/5 = 0.6 native credit и не завершает required вопрос, хотя тесты проходят.
+Если автор хочет сохранять полную стоимость для каждой попытки, он объявляет
+одинаковые значения (`[5, 5, 5]`) либо scalar по native правилам. Экспортёр не
+превращает diminishing credit в completion, не заменяет его JUnit score и не
+меняет подсчёт required вопросов на weighted grade. Аналогично высокий Homework
+ceiling может требовать накопления native credit до полной стоимости.

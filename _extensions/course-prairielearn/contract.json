@@ -13,6 +13,6 @@
     "assignment_label_prefix": "pl-",
     "assignment_label_pattern": "^[a-z][a-z0-9-]*$"
   },
-  "version": "4.0.0",
+  "version": "5.0.0",
   "core_version": "5.0.0"
 }
