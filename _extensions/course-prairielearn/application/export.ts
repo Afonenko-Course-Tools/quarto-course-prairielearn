@@ -329,7 +329,9 @@ export async function exportPrairieLearn(
     if (
       !fields(b, ["topic", "files", "externalGradingOptions"], [
         "submission",
+        "singleVariant",
       ]) ||
+      b.singleVariant !== undefined && typeof b.singleVariant !== "boolean" ||
       typeof b.topic !== "string" || !b.topic.trim() ||
       !Array.isArray(b.files) || !b.files.length ||
       new Set(b.files).size !== b.files.length || b.files.some((f: unknown) =>
@@ -577,7 +579,9 @@ export async function exportPrairieLearn(
           title: q.id,
           topic: b.topic,
           gradingMethod: "External",
-          singleVariant: true,
+          ...(b.singleVariant !== undefined
+            ? { singleVariant: b.singleVariant }
+            : {}),
           showCorrectAnswer: false,
           partialCredit: false,
           externalGradingOptions: grading,

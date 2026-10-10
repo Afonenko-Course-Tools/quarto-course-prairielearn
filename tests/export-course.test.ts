@@ -1,9 +1,62 @@
-import { declarations } from "../_extensions/course-prairielearn/application/declarations.ts";
+import {
+  declarations,
+  question,
+} from "../_extensions/course-prairielearn/application/declarations.ts";
 import { selectedSources } from "../_extensions/course-prairielearn/application/source-selection.ts";
 import { infoQuestion } from "../_extensions/course-prairielearn/application/native-validators.js";
+import { validateAssessmentSemantics } from "../_extensions/course-prairielearn/application/native-semantics.ts";
 const assert = (v: unknown, m: string) => {
   if (!v) throw new Error(m);
 };
+Deno.test("pinned native Exam semantics reject question ceilings including alternative pools; Homework keeps ceilings", () => {
+  for (
+    const invalid of [
+      { type: "Homework", multipleInstance: true, zones: [] },
+      { type: "Homework", zones: [{ questions: [{ points: [3, 1] }] }] },
+      {
+        type: "Homework",
+        zones: [{ questions: [{ points: 0, maxPoints: 2 }] }],
+      },
+      { type: "Exam", zones: [{ questions: [{ points: [1, 3] }] }] },
+    ]
+  ) {
+    let rejected = false;
+    try {
+      validateAssessmentSemantics(invalid, "bad/infoAssessment.json");
+    } catch (e) {
+      rejected = String(e).includes("PL upstream semantic");
+    }
+    assert(rejected, "schema-valid native semantic conflict accepted");
+  }
+  for (const field of ["maxPoints", "maxAutoPoints"]) {
+    for (const pooled of [false, true]) {
+      const member = { id: "demo/exr-a", points: 1, [field]: 1 };
+      const assessment = {
+        type: "Exam",
+        zones: [{ questions: [pooled ? { alternatives: [member] } : member] }],
+      };
+      let rejected = false;
+      try {
+        validateAssessmentSemantics(assessment, "exam/infoAssessment.json");
+      } catch (e) {
+        rejected = String(e).includes("Exam question") &&
+          String(e).includes("exam/infoAssessment.json");
+      }
+      assert(rejected, "schema-valid Exam question ceiling accepted: " + field);
+      validateAssessmentSemantics(
+        { ...assessment, type: "Homework" },
+        "homework/infoAssessment.json",
+      );
+    }
+  }
+  validateAssessmentSemantics({
+    type: "Exam",
+    maxPoints: 3,
+    zones: [{
+      questions: [{ id: "demo/exr-a", points: 1, triesPerVariant: 3 }],
+    }],
+  }, "valid/infoAssessment.json");
+});
 Deno.test("closed delivery defaults and selected instance", () => {
   const d = declarations({
     delivery: {
@@ -29,6 +82,7 @@ Deno.test("closed delivery defaults and selected instance", () => {
     "question-defaults": {
       topic: "Java",
       submission: { mode: "editor", "ace-mode": "ace/mode/java" },
+      "single-variant": false,
     },
   }, "pilot");
   for (
@@ -167,6 +221,7 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
       "question-defaults": {
         topic: "Java",
         submission: { mode: "editor", "ace-mode": "ace/mode/java" },
+        "single-variant": false,
       },
     };
     const assignment = { requirement: "required", workMode: "individual" };
@@ -180,6 +235,9 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
       extensions: {
         prairielearn: {
           attempts: 2,
+          "question-points": 2.5,
+          "question-max-points": 6,
+          "max-points": 12,
           pass: { "at-least": 1 },
           assignment: { "student-label": "test" },
         },
@@ -288,6 +346,13 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
       checksOutput: root + "/checks2.json",
     });
     assert(canonical(a) === canonical(b), "exports differ");
+    const repeatInfo = JSON.parse(
+      await Deno.readTextFile(root + "/one/questions/demo/exr-a/info.json"),
+    );
+    assert(
+      repeatInfo.singleVariant === false,
+      "course repeat false lost in full export",
+    );
     for (const [name, sha] of Object.entries(a.files)) {
       assert(
         await hash(await Deno.readFile(root + "/one/" + name)) === sha,
@@ -357,6 +422,45 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
     const ids = ["exr-a", "exr-b", "exr-c"],
       three: any = structuredClone(work),
       threeBody: any = structuredClone(body);
+    const missingPoints = structuredClone(work);
+    delete (missingPoints.extensions.prairielearn as any)["question-points"];
+    let missingDiagnostic = "", missingBodyCalled = false;
+    try {
+      await exportCourse({
+        ...input,
+        result: {
+          model: { ...input.result.model, assessments: [missingPoints] },
+        },
+        output: root + "/missing-points",
+        checksOutput: root + "/missing-points-checks.json",
+        body: async () => {
+          missingBodyCalled = true;
+          return body;
+        },
+      });
+    } catch (e) {
+      missingDiagnostic = String(e);
+    }
+    assert(
+      !missingBodyCalled &&
+        missingDiagnostic.includes("question-points (exr-a)") &&
+        missingDiagnostic.includes("assessment-defaults"),
+      "missing points did not fail actionable before native body collection",
+    );
+    for (
+      const output of [
+        root + "/missing-points",
+        root + "/missing-points-checks.json",
+      ]
+    ) {
+      let absent = false;
+      try {
+        await Deno.stat(output);
+      } catch (e) {
+        absent = e instanceof Deno.errors.NotFound;
+      }
+      assert(absent, "missing explicit points published partial output");
+    }
     three.items = ids;
     three.assignments = Object.fromEntries(
       ids.map((
@@ -416,6 +520,11 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
       !threeDelivery.works[0].policy.assignment,
       "ordinary lab delivery requires a defense assignment slot",
     );
+    assert(
+      threeDelivery.works[0].policy["question-points"] === 2.5 &&
+        threeDelivery.works[0].policy["max-points"] === 12,
+      "ordinary lab grading metadata stripped from delivery",
+    );
     const native = JSON.parse(
       await Deno.readTextFile(
         root +
@@ -429,7 +538,7 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
       "ordinary lab requires assignment label instead of joined Student access",
     );
     assert(
-      native.maxPoints === 3,
+      native.maxPoints === 12,
       "completion threshold substituted for raw native points",
     );
     assert(
@@ -470,6 +579,59 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
         threeDelivery.works[0].completion.requiredQuestionIds.length === 2,
       "authoritative required completion not sealed",
     );
+    assert(
+      native.type === "Homework" &&
+        native.zones[0].questions.every((q: any) =>
+          q.points === 2.5 && q.maxPoints === 6
+        ),
+      "Homework point ceilings changed",
+    );
+    for (const kind of ["test", "practical"]) {
+      const examWork = structuredClone(three);
+      examWork.kind = kind;
+      examWork.extensions.prairielearn["question-max-points"] = null;
+      examWork.extensions.prairielearn["question-points"] = [4, 2];
+      const exported = await exportCourse({
+        ...input,
+        result: {
+          model: {
+            assessments: [examWork],
+            exercises: ids.map((id) => ({ id, target: "prairielearn" })),
+          },
+        },
+        checks: {
+          ...input.checks,
+          projects: ids.map((id) => ({ ...fact, exerciseId: id })),
+        },
+        body: async () => threeBody,
+        output: root + "/exam-" + kind,
+        checksOutput: root + "/exam-" + kind + ".json",
+      });
+      const exam = JSON.parse(
+        await Deno.readTextFile(
+          root + "/exam-" + kind +
+            "/courseInstances/pilot/assessments/sec-lab/infoAssessment.json",
+        ),
+      );
+      assert(
+        exam.type === "Exam" && exam.maxPoints === 12,
+        "Exam assessment score changed",
+      );
+      assert(
+        exam.zones[0].questions.every((q: any) =>
+          JSON.stringify(q.points) === JSON.stringify([4, 2]) &&
+          !Object.hasOwn(q, "maxPoints") &&
+          !Object.hasOwn(q, "maxAutoPoints") &&
+          q.triesPerVariant === examWork.extensions.prairielearn.attempts
+        ),
+        "pinned native sync forbids per-question maxPoints/maxAutoPoints on Exam",
+      );
+      assert(
+        canonical(exported.works[0].completion) ===
+          canonical(threeDelivery.works[0].completion),
+        "Exam completion predicate changed",
+      );
+    }
     const defense = structuredClone(three);
     defense.relatedExercise = "exr-essay";
     const defenseDelivery = await exportCourse({
@@ -713,5 +875,34 @@ Deno.test("reference private and public test partitions cannot become implementa
     }
   } finally {
     await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("question repeat declaration is closed and typed", () => {
+  for (const value of [undefined, true, false]) {
+    const settings = question({
+      topic: "Java",
+      submission: { mode: "upload" },
+      ...(value === undefined ? {} : { "single-variant": value }),
+    });
+    assert(
+      value === undefined
+        ? !Object.hasOwn(settings, "singleVariant")
+        : settings.singleVariant === value,
+      "question normalization lost repeat value",
+    );
+  }
+  for (const value of ["false", 0, null, [], {}]) {
+    let rejected = false;
+    try {
+      question({
+        topic: "Java",
+        submission: { mode: "upload" },
+        "single-variant": value,
+      });
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, "invalid repeat scalar accepted");
   }
 });

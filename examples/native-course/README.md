@@ -1,4 +1,4 @@
-Exporter contract **4.0.0**, compatible with Core contract **5.0.0**.
+Exporter contract **5.0.0**, compatible with Core contract **5.0.0**.
 Use whole local repositories or immutable archives for development; released tags
 may be installed after owner publication. Compatibility does not prove that tags
 or the production runtime OCI digest have been published.

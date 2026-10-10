@@ -8,6 +8,7 @@ local M = {}
 local function plain(value)
   local kind = pandoc.utils.type(value)
   if kind == "Inlines" or kind == "Blocks" then return pandoc.utils.stringify(value) end
+  if type(value) == "string" and value == "" then return pandoc.json.null end
   if type(value) ~= "table" then return value end
   local result = kind == "List" and pandoc.List() or {}
   for key, child in pairs(value) do result[key] = plain(child) end
@@ -22,7 +23,7 @@ local function merge(base, override)
   for key, value in pairs(override) do
     -- Способ назначения заменяется целиком: явная метка отменяет вычисление
     -- метки из общих настроек, а не образует с ним вторую стратегию.
-    if key ~= "assignment" and type(value) == "table" and type(result[key]) == "table" then
+    if key ~= "assignment" and type(value) == "table" and pandoc.utils.type(value) ~= "List" and type(result[key]) == "table" and pandoc.utils.type(result[key]) ~= "List" then
       result[key] = merge(result[key], value)
     else result[key] = value end
   end
@@ -36,9 +37,17 @@ end
 
 -- Pandoc transports YAML scalars as Inlines. Normalize only the numeric
 -- policy fields; preserve malformed collections and unknown keys for CUE.
-local function normalize_policy(value)
+local normalize_policy
+normalize_policy = function(value)
   if type(value) ~= "table" or pandoc.utils.type(value) == "List" then return value end
-  value.attempts = number(value.attempts)
+  for _, key in ipairs({"attempts", "question-points", "question-max-points", "max-points", "grade-rate-minutes", "advance-score-perc"}) do
+    if key == "question-points" and type(value[key]) == "table" and pandoc.utils.type(value[key]) == "List" then
+      for i, point in ipairs(value[key]) do value[key][i] = number(point) end
+    else value[key] = number(value[key]) end
+  end
+  if type(value["question-overrides"]) == "table" then
+    for _, override in pairs(value["question-overrides"]) do normalize_policy(override) end
+  end
   if type(value.pass) == "table" and pandoc.utils.type(value.pass) ~= "List" then
     value.pass["at-least"] = number(value.pass["at-least"])
   end

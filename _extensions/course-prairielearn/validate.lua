@@ -50,7 +50,8 @@ function M.validate(doc, effective)
     if div.identifier:match("^exr%-") then
       for key, value in pairs(div.attributes) do
         if key:match("^prairielearn%-") then
-          assert(key == "prairielearn-topic" or key == "prairielearn-submission", diagnostics.message("PL.DECLARATION_INVALID", "Неизвестное поле адаптера", {source = source, id = div.identifier, field = key}))
+          assert(key == "prairielearn-topic" or key == "prairielearn-submission" or key == "prairielearn-single-variant", diagnostics.message("PL.DECLARATION_INVALID", "Неизвестное поле адаптера", {source = source, id = div.identifier, field = key}))
+          if key == "prairielearn-single-variant" then assert(value == "true" or value == "false", "PL single-variant override requires true/false") end
           if key == "prairielearn-submission" then assert(value == "editor" or value == "upload", "PL invalid submission override") end
           if key == "prairielearn-topic" then assert(value ~= "", "PL empty topic override") end
         end
