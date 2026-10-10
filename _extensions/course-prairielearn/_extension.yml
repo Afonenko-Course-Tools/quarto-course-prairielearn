@@ -11,6 +11,5 @@ contributes:
       entrypoint: entrypoints/export.ts
       native-entrypoint: entrypoints/export-course.ts
       native-contract: course-native-delivery-v1
-      release-status: unreleased
       core-version: 5.0.0
       activation: explicit-script-only

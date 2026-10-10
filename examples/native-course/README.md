@@ -1,5 +1,7 @@
-Unreleased exporter **4.0.0**, compatible with unreleased Core **5.0.0**.
-Use whole local repositories or immutable candidate archives until publication.
+Exporter contract **4.0.0**, compatible with Core contract **5.0.0**.
+Use whole local repositories or immutable archives for development; released tags
+may be installed after owner publication. Compatibility does not prove that tags
+or the production runtime OCI digest have been published.
 
 The complete delivery is generated from the bank, without bindings or a native shell.
 Install compatible Core and PrairieLearn extensions with `quarto add` inside `tasks`.

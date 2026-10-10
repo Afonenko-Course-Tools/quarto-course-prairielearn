@@ -33,7 +33,7 @@ jobs:
         with:
           repository: Afonenko-Course-Tools/quarto-course
           # Core 5.0.0 release target; candidate runs may override with an available immutable ref.
-          # This release remains unreleased until coordinator publishes both owner tags.
+          # Contract compatibility does not assert that either owner tag is published.
           ref: ${{ vars.COURSE_CORE_REF || 'v5.0.0' }}
           path: .ci-deps/core
           persist-credentials: false
