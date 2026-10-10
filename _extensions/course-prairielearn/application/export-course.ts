@@ -111,7 +111,7 @@ export async function exportCourse(
       dir: dirname(out),
       prefix: ".pl-course-",
     }),
-    scratch = await Deno.makeTempDir({ prefix: "pl-selected-" });
+    scratch = await Deno.makeTempDir({ dir: dirname(out), prefix: ".pl-selected-" });
   const write = async (path: string, v: any) => {
     await Deno.mkdir(dirname(join(stage, path)), { recursive: true });
     const schema = path.endsWith("/info.json")

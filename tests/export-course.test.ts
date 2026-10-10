@@ -168,8 +168,8 @@ import {
   canonical,
   hash,
 } from "../_extensions/course-prairielearn/application/source-selection.ts";
-Deno.test("full native export is deterministic, closed and atomic without binding", async () => {
-  const root = await Deno.makeTempDir();
+Deno.test("full native export is deterministic, closed and atomic across output filesystems", async () => {
+  const root = await Deno.makeTempDir(Deno.env.get("PL_EXDEV_TEST_DIR") ? {dir:Deno.env.get("PL_EXDEV_TEST_DIR")} : {});
   try {
     for (
       const dir of ["student/src/main/java/pkg", "tests/junit", "reference"]

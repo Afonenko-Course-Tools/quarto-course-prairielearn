@@ -86,4 +86,6 @@ jobs:
         with:
           gradle-version: '9.1.0'
       - run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts
+      - name: Атомарный экспорт между файловыми системами
+        run: PL_EXDEV_TEST_DIR=/dev/shm deno test --no-config -A --filter "across output filesystems" tests/export-course.test.ts
       - run: CORE="$PWD/.ci-deps/core" bash tools/check-java.sh
