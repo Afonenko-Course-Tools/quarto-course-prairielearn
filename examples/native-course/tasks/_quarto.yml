@@ -31,7 +31,6 @@ project-checks:
         optional: false
     discovery:
       min-executed: 1
-      allow-skipped: false
   source-profiles:
     main:
       mode: implementation

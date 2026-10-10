@@ -8,7 +8,7 @@ return {{Pandoc = function(doc)
   for _, name in ipairs(doc.meta.course.adapters or {}) do
     if pandoc.utils.stringify(name) == "prairielearn" then active = true end
   end
-  if not active then return doc end
+  if not active or doc.meta["course-adapters-read"] == true then return doc end
   native.write(doc, native.read(doc))
   return doc
 end}}

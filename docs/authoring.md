@@ -47,7 +47,7 @@ CUE проверяет полученную модель и отклоняет �
 | Поле | Значение |
 |---|---|
 | `attempts` | Положительное целое число оцениваемых попыток для каждого задания. |
-| `pass.at-least` | Положительное целое число полностью выполненных заданий, не больше длины `.task-items`. |
+| `pass.at-least` | Положительное целое число полностью выполненных required заданий, не больше числа required участников `.task-items`. |
 | `assignment` | Одна стратегия назначения: `mode: assessment-id` либо `student-label: <метка>`. |
 
 Локальные поля переопределяют общие; карты объединяются рекурсивно. Исключение —
@@ -106,8 +106,7 @@ student-label = "pl-" + sha1(UTF8(course.id) + byte(0) + UTF8(assessment.id))
 
 `attempts: 3` задаёт три оцениваемые попытки без снижения максимального балла.
 `pass.at-least: 2` означает две полностью выполненные задачи. Частичный балл
-за незавершённую задачу не считается выполненной задачей. Настройка оцениваемой работы на платформе должна сохранить эту семантику;
-поставка вопросов сама по себе не создаёт оцениваемую работу.
+за незавершённую задачу не считается выполненной задачей. Полная поставка сохраняет эту семантику в закрытом `works[].completion`, который применяет gateway к доверенным per-question results. Native raw grade остаётся отдельным показателем.
 API доступа, назначение пользователей и запуск внешней проверки относятся к PrairieLearn.
 Экспортёр требует явную привязку каждого вопроса к `image`; `entrypoint`,
 `timeout`, `enableNetworking`, `environment` — необязательные явные настройки. Он создаёт файлы
@@ -115,7 +114,7 @@ API доступа, назначение пользователей и запу�
 
 ## Поставка вопросов
 
-Текущий экспортёр создаёт только нативные вопросы с внешней проверкой
+Legacy `entrypoints/export.ts` создаёт только нативные вопросы с внешней проверкой
 (`gradingMethod: "External"`), публичным условием, стартовыми файлами
 в `clientFilesQuestion` и закрытыми тестами. См. README и автономную
 `examples/java-gradle` группу. Передача `attempts`, `pass`, `assignment` в метаданных
@@ -237,6 +236,50 @@ Pinned upstream schemas (`spec/upstream/provenance.json`) проверяют nat
 canonical sorted-key JSON без deliveryHash. Inventory исключает сам delivery.json.
 Question UUID сохраняет прежний exporter algorithm. Course UUID — UUIDv5 DNS
 `course/<courseId>`, instance/assessment — UUIDv5 в namespace курса. Instance и
-assessment имеют явный `allowAccess: []`; выдачу разрешений выполняет серверная
-интеграция. `selfEnrollment.enabled`, попытки `triesPerVariant`, порог `maxPoints`
-и исходная policy в delivery вычисляются из деклараций.
+assessment используют modern `accessControl`: закрытый default (release9999,
+beforeRelease.listed:false) и override по стабильному assignment.student-label
+(release1970,due:null). Instance.studentLabels объявляет эти labels со стабильными
+instance-scoped UUID. Bridge предоставляет доступ штатным enrollment/label API,
+без staff/admin роли и без правки опубликованной source policy. `selfEnrollment.enabled` и попытки
+`triesPerVariant` вычисляются из деклараций. Native `maxPoints` равен числу всех
+участников и сохраняет raw grade; он не является completion threshold.
+`works[].completion` задаёт отдельный required-only completion predicate.
+
+
+### Доверенный completion bridge
+
+`application/completion.ts` экспортирует `completionPolicy(courseId, work)` и
+`evaluateCompletion(policy, results)`. Policy в `delivery.works[].completion`:
+`schemaVersion:1`, `mode:required-question-completion`,
+`source:per-question-results-v1`, qualified `questionIds`/`requiredQuestionIds`,
+`atLeast`, `fullyCompletedScore:1`. Порог больше required pool отклоняется.
+Gateway сначала проверяет user/activity/course-instance/assessment и текущий
+`deliveryHash`, затем читает доверенный narrow bridge и применяет predicate.
+Aggregate gradebook score не поддерживается как источник completion.
+
+Results закрыты: `schemaVersion:1`, `source:per-question-results-v1`,
+`questions:[{questionId, score, status}]`; score — конечное число0..1,
+status — graded/ungraded. Нужна ровно одна строка для каждого участника, включая
+ещё не начатые optional вопросы (score0,ungraded). Неизвестные/дублирующиеся/
+отсутствующие вопросы и неверные scores отклоняются. Только graded score===1
+из required pool считается выполненным. Predicate возвращает completedRequired,
+requiredTotal,atLeast,passed и completion score0/1 для AGS, сохраняя weighted
+question scores для raw grade. Три scores0.7 при pass2 дают completedRequired0;
+полностью выполненные optional вопросы не заменяют невыполненные required.
+Native assessment text разъясняет отдельный критерий выполнения, preferences
+сохраняют courseRequirement каждого участника.
+
+`verificationInventoryHash` — SHA256 от canonical sorted списка
+`{qualifiedId,scenario,optional}`: starter, все declared reference:NAME и
+contract:ID. Это opaque обязательство полной проверки; private решения и случаи
+не попадают в native payload. Platform сверяет hash и receipt coverage.
+Discovery нормализуется одинаково: min-executed1,allow-skippedfalse, затем
+объявленные поля, в том числе partial/empty maps.
+
+
+Native label и access override UUID — UUIDv5 в namespace курса от
+`student-label/<instance>/<label>` и `access/<instance>/<workId>`. Оффлайн test
+`tests/native-acl.ts` выполняет настоящий pinned Community resolver против
+экспортированных JSON: unassigned/foreign/revoked label denied и не listed;
+assigned обычный enrollment granted/submittable. Реальный Student session,
+прямой URL и Moodle AGS проверяются отдельно до readiness.

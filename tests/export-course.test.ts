@@ -318,6 +318,64 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
       }
       assert(!exists, "partial output published");
     }
+    const ids = ["exr-a", "exr-b", "exr-c"],
+      three: any = structuredClone(work),
+      threeBody: any = structuredClone(body);
+    three.items = ids;
+    three.assignments = Object.fromEntries(
+      ids.map((
+        id,
+        i,
+      ) => [id, {
+        ...assignment,
+        requirement: i === 2 ? "optional" : "required",
+      }]),
+    );
+    three.extensions.prairielearn.pass["at-least"] = 2;
+    threeBody.questions = ids.map((id) => ({
+      ...structuredClone(body.questions[0]),
+      id,
+      key: "demo/" + id,
+    }));
+    threeBody.works[0].items = ids.map((id) => "demo/" + id);
+    threeBody.works[0].assignments = Object.fromEntries(
+      ids.map((id) => ["demo/" + id, three.assignments[id]]),
+    );
+    const threeDelivery = await exportCourse({
+      ...input,
+      result: {
+        model: {
+          assessments: [three],
+          exercises: ids.map((id) => ({ id, target: "prairielearn" })),
+        },
+      },
+      checks: {
+        ...input.checks,
+        projects: ids.map((id) => ({ ...fact, exerciseId: id })),
+      },
+      body: async () => threeBody,
+      output: root + "/three",
+      checksOutput: root + "/checks3.json",
+    });
+    const native = JSON.parse(
+      await Deno.readTextFile(
+        root +
+          "/three/courseInstances/pilot/assessments/sec-lab/infoAssessment.json",
+      ),
+    );
+    assert(
+      native.maxPoints === 3,
+      "completion threshold substituted for raw native points",
+    );
+    assert(
+      native.zones[0].questions[2].preferences.courseRequirement === "optional",
+      "native assignment fact lost",
+    );
+    assert(
+      threeDelivery.works[0].completion.atLeast === 2 &&
+        threeDelivery.works[0].completion.requiredQuestionIds.length === 2,
+      "authoritative required completion not sealed",
+    );
   } finally {
     await Deno.remove(root, { recursive: true });
   }
@@ -426,4 +484,95 @@ Deno.test("course instance assessment UUIDs use approved stable namespaces", asy
       "6cbeb308-b0c5-51fc-bc0e-0f6bcbe75a45",
     "assessment UUID drift",
   );
+});
+Deno.test("multiple_selected_defenses_for_one_essay reject before source collection", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const config = {
+      delivery: {
+        book: "tasks",
+        course: {
+          name: "JAVA",
+          title: "Java",
+          timezone: "Europe/Minsk",
+          topics: [{ name: "Java", color: "blue2", description: "Java" }],
+        },
+        instances: {
+          pilot: {
+            title: "Pilot",
+            "self-enrollment": false,
+            works: ["sec-one", "sec-two"],
+          },
+        },
+      },
+      "question-defaults": { topic: "Java", submission: { mode: "editor" } },
+    };
+    const works = ["sec-one", "sec-two"].map((id) => ({
+      id,
+      relatedExercise: "exr-essay",
+      extensions: { prairielearn: {} },
+    }));
+    let called = false;
+    let message = "";
+    try {
+      await exportCourse({
+        courseId: "demo",
+        projectRoot: root,
+        result: { model: { assessments: works } },
+        checks: {},
+        config,
+        registry: {},
+        instance: "pilot",
+        output: root + "/native",
+        checksOutput: root + "/checks.json",
+        body: async () => {
+          called = true;
+          throw new Error("unexpected body");
+        },
+      });
+    } catch (e) {
+      message = String(e);
+    }
+    assert(
+      message.includes("duplicate active defense") && !called,
+      "duplicate selected relation accepted",
+    );
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+Deno.test("reference private and public test partitions cannot become implementation submissions", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    for (
+      const sourceRoot of [
+        "reference",
+        "tests",
+        "private",
+        "student/src/test/java",
+      ]
+    ) {
+      await Deno.mkdir(root + "/" + sourceRoot, { recursive: true });
+      const text = "class A {}";
+      await Deno.writeTextFile(root + "/" + sourceRoot + "/A.java", text);
+      let rejected = false;
+      try {
+        await selectedSources(root, {
+          check: {
+            sourceProfile: { root: sourceRoot, mode: "implementation" },
+          },
+          sources: [{
+            projectRelativePath: sourceRoot + "/A.java",
+            submissionRelativePath: "A.java",
+            sha256: await hash(text),
+          }],
+        });
+      } catch {
+        rejected = true;
+      }
+      assert(rejected, "private/public test source admitted: " + sourceRoot);
+    }
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
 });

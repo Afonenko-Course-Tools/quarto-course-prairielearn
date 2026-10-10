@@ -1,4 +1,7 @@
 import { dirname, join, relative, resolve } from "node:path";
+import { verificationInventoryHash } from "./verification-inventory.ts";
+import { completionPolicy } from "./completion.ts";
+import { normalizeDiscovery } from "./grading-descriptor.ts";
 import * as validators from "./native-validators.js";
 import { exportPrairieLearn, uuid } from "./export.ts";
 import { declarations, question } from "./declarations.ts";
@@ -136,6 +139,27 @@ export async function exportCourse(
       {
         uuid: await identity("instance/" + input.instance, courseUuid),
         longName: d.instance.title,
+        studentLabels: await Promise.all(
+          [
+            ...new Set(
+              works.map((w: any) =>
+                w.extensions.prairielearn.assignment?.["student-label"]
+              ),
+            ),
+          ].map(async (name: any) => {
+            if (typeof name !== "string" || !name) {
+              throw new Error("PL resolved assignment label required");
+            }
+            return {
+              name,
+              color: "blue2",
+              uuid: await identity(
+                "student-label/" + input.instance + "/" + name,
+                courseUuid,
+              ),
+            };
+          }),
+        ),
         timezone: d.course.timezone,
         allowAccess: [],
         selfEnrollment: { enabled: d.instance["self-enrollment"] },
@@ -246,11 +270,7 @@ export async function exportCourse(
             ...c.limits,
           },
           scoring: c.scoring ?? { mode: "weighted" },
-          discovery: {
-            "min-executed": 1,
-            "allow-skipped": false,
-            ...c.discovery,
-          },
+          discovery: normalizeDiscovery(c.discovery),
           ...(c.variants ? { variants: c.variants } : {}),
         };
         await Deno.writeTextFile(
@@ -311,6 +331,7 @@ export async function exportCourse(
         }
       }
       const policy = work.extensions.prairielearn;
+      const completion = completionPolicy(input.courseId, work);
       await write(
         "courseInstances/" + input.instance + "/assessments/" + work.id +
           "/infoAssessment.json",
@@ -320,8 +341,26 @@ export async function exportCourse(
           title: work.title,
           set: ["test", "practical"].includes(work.kind) ? "Exam" : "Homework",
           number: String(index + 1),
-          maxPoints: policy.pass["at-least"],
-          allowAccess: [],
+          maxPoints: work.items.length,
+          text:
+            `Completion requires fully completing at least ${completion.atLeast} required questions. Partial scores and optional questions do not count toward completion.`,
+          accessControl: [{
+            beforeRelease: { listed: false },
+            dateControl: {
+              release: { date: "9999-12-31T00:00:00" },
+              due: { date: null },
+            },
+          }, {
+            uuid: await identity(
+              "access/" + input.instance + "/" + work.id,
+              courseUuid,
+            ),
+            labels: [policy.assignment["student-label"]],
+            dateControl: {
+              release: { date: "1970-01-01T00:00:00" },
+              due: { date: null },
+            },
+          }],
           zones: [{
             title: work.title,
             questions: work.items.map((id: string) => ({
@@ -329,6 +368,9 @@ export async function exportCourse(
               points: 1,
               maxPoints: 1,
               triesPerVariant: policy.attempts,
+              preferences: {
+                courseRequirement: work.assignments[id].requirement,
+              },
             })),
           }],
         },
@@ -341,6 +383,11 @@ export async function exportCourse(
       bookRoot: input.checks.bookRoot,
       sourceSnapshotHash: input.checks.sourceSnapshotHash,
       inventoryHash: input.checks.inventoryHash,
+      verificationInventoryHash: await verificationInventoryHash(
+        input.checks,
+        input.projectRoot,
+        Object.keys(questions),
+      ),
       questions: Object.keys(questions).sort(),
       gradingPayloads: questions,
       works: works.map((w: any) => ({
@@ -348,6 +395,7 @@ export async function exportCourse(
         items: w.items,
         assignments: w.assignments,
         policy: w.extensions.prairielearn,
+        completion: completionPolicy(input.courseId, w),
         ...(w.relatedExercise ? { relatedExercise: w.relatedExercise } : {}),
       })),
       instances: {

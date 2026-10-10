@@ -60,6 +60,16 @@ export async function selectedSources(root: string, p: any) {
   if (!p.check || !p.sources?.length) {
     throw new Error("PL selected question requires project-check and sources");
   }
+  const profile = p.check.sourceProfile;
+  if (
+    !profile || !safePath(profile.root) ||
+    (profile.root !== "student" && !profile.root.startsWith("student/")) ||
+    !["implementation", "student-tests"].includes(profile.mode)
+  ) {
+    throw new Error(
+      "PL source profile must select the student answer partition",
+    );
+  }
   const names = new Set();
   const files = [];
   for (const s of p.sources) {
@@ -67,6 +77,11 @@ export async function selectedSources(root: string, p: any) {
       !s.submissionRelativePath.endsWith(".java") ||
       names.has(s.submissionRelativePath)
     ) throw new Error("PL student build script or duplicate source denied");
+    if (
+      profile.mode === "implementation" &&
+      (s.projectRelativePath === "student/src/test" ||
+        s.projectRelativePath.startsWith("student/src/test/"))
+    ) throw new Error("PL implementation cannot submit public student tests");
     const expected = p.check.sourceProfile.root + "/" +
       s.submissionRelativePath;
     if (s.projectRelativePath !== expected) {
