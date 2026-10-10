@@ -408,11 +408,25 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
         instance.publishing.endDate === "9999-12-31T00:00:00Z",
       "explicit publishing lost: native Students require instance availability",
     );
+    assert(
+      instance.studentLabels.length === 0,
+      "ordinary lab incorrectly declares defense assignment labels",
+    );
+    assert(
+      !threeDelivery.works[0].policy.assignment,
+      "ordinary lab delivery requires a defense assignment slot",
+    );
     const native = JSON.parse(
       await Deno.readTextFile(
         root +
           "/three/courseInstances/pilot/assessments/sec-lab/infoAssessment.json",
       ),
+    );
+    assert(
+      native.accessControl.length === 1 && !native.accessControl[0].labels &&
+        native.accessControl[0].dateControl.release.date ===
+          "1970-01-01T00:00:00",
+      "ordinary lab requires assignment label instead of joined Student access",
     );
     assert(
       native.maxPoints === 3,
@@ -455,6 +469,47 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
       threeDelivery.works[0].completion.atLeast === 2 &&
         threeDelivery.works[0].completion.requiredQuestionIds.length === 2,
       "authoritative required completion not sealed",
+    );
+    const defense = structuredClone(three);
+    defense.relatedExercise = "exr-essay";
+    const defenseDelivery = await exportCourse({
+      ...input,
+      result: {
+        model: {
+          assessments: [defense],
+          exercises: ids.map((id) => ({ id, target: "prairielearn" })),
+        },
+      },
+      checks: {
+        ...input.checks,
+        projects: ids.map((id) => ({ ...fact, exerciseId: id })),
+      },
+      body: async () => threeBody,
+      output: root + "/defense",
+      checksOutput: root + "/checksDefense.json",
+    });
+    const defenseInfo = JSON.parse(
+      await Deno.readTextFile(
+        root +
+          "/defense/courseInstances/pilot/assessments/sec-lab/infoAssessment.json",
+      ),
+    );
+    const defenseInstance = JSON.parse(
+      await Deno.readTextFile(
+        root + "/defense/courseInstances/pilot/infoCourseInstance.json",
+      ),
+    );
+    assert(
+      defenseInstance.studentLabels.length === 1 &&
+        defenseInfo.accessControl.length === 2 &&
+        defenseInfo.accessControl[0].beforeRelease.listed === false &&
+        defenseInfo.accessControl[1].labels[0] === "test",
+      "explicit essay defense lost closed native label gate",
+    );
+    assert(
+      defenseDelivery.works[0].relatedExercise === "exr-essay" &&
+        defenseDelivery.works[0].policy.assignment["student-label"] === "test",
+      "defense relation or assignment policy lost",
     );
   } finally {
     await Deno.remove(root, { recursive: true });

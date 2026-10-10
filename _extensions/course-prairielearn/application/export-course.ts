@@ -142,7 +142,7 @@ export async function exportCourse(
         studentLabels: await Promise.all(
           [
             ...new Set(
-              works.map((w: any) =>
+              works.filter((w: any) => w.relatedExercise).map((w: any) =>
                 w.extensions.prairielearn.assignment?.["student-label"]
               ),
             ),
@@ -356,23 +356,30 @@ export async function exportCourse(
           maxPoints: work.items.length,
           text:
             `Completion requires fully completing at least ${completion.atLeast} required questions. Partial scores and optional questions do not count toward completion.`,
-          accessControl: [{
-            beforeRelease: { listed: false },
-            dateControl: {
-              release: { date: "9999-12-31T00:00:00" },
-              due: { date: null },
-            },
-          }, {
-            uuid: await identity(
-              "access/" + input.instance + "/" + work.id,
-              courseUuid,
-            ),
-            labels: [policy.assignment["student-label"]],
-            dateControl: {
-              release: { date: "1970-01-01T00:00:00" },
-              due: { date: null },
-            },
-          }],
+          accessControl: work.relatedExercise
+            ? [{
+              beforeRelease: { listed: false },
+              dateControl: {
+                release: { date: "9999-12-31T00:00:00" },
+                due: { date: null },
+              },
+            }, {
+              uuid: await identity(
+                "access/" + input.instance + "/" + work.id,
+                courseUuid,
+              ),
+              labels: [policy.assignment["student-label"]],
+              dateControl: {
+                release: { date: "1970-01-01T00:00:00" },
+                due: { date: null },
+              },
+            }]
+            : [{
+              dateControl: {
+                release: { date: "1970-01-01T00:00:00" },
+                due: { date: null },
+              },
+            }],
           zones: [{
             title: work.title,
             questions: work.items.map((id: string) => ({
@@ -406,7 +413,10 @@ export async function exportCourse(
         id: w.id,
         items: w.items,
         assignments: w.assignments,
-        policy: w.extensions.prairielearn,
+        policy: w.relatedExercise ? w.extensions.prairielearn : {
+          attempts: w.extensions.prairielearn.attempts,
+          pass: w.extensions.prairielearn.pass,
+        },
         completion: completionPolicy(input.courseId, w),
         ...(w.relatedExercise ? { relatedExercise: w.relatedExercise } : {}),
       })),

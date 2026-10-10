@@ -236,10 +236,14 @@ Pinned upstream schemas (`spec/upstream/provenance.json`) проверяют nat
 canonical sorted-key JSON без deliveryHash. Inventory исключает сам delivery.json.
 Question UUID сохраняет прежний exporter algorithm. Course UUID — UUIDv5 DNS
 `course/<courseId>`, instance/assessment — UUIDv5 в namespace курса. Instance и
-assessment используют modern `accessControl`: закрытый default (release9999,
-beforeRelease.listed:false) и override по стабильному assignment.student-label
-(release1970,due:null). Instance.studentLabels объявляет эти labels со стабильными
-instance-scoped UUID. Bridge предоставляет доступ штатным enrollment/label API,
+assessment используют modern `accessControl`. Только защита с явным
+`relatedExercise` получает закрытый default (release9999,beforeRelease.listed:false)
+и override по стабильному assignment.student-label (release1970,due:null).
+Instance.studentLabels объявляет только labels защит со стабильными instance-scoped
+UUID. Обычная лабораторная доступна enrolled Student в опубликованной instance
+без выбора защиты; её native default release1970/due:null и delivery policy не
+содержат assignment label. Авторские inherited assignment defaults нормализуются
+как раньше, но label применяется только к защите. Bridge предоставляет доступ штатным enrollment/label API,
 без staff/admin роли и без правки опубликованной source policy. `selfEnrollment.enabled` и попытки
 `triesPerVariant` вычисляются из деклараций. Native `maxPoints` равен числу всех
 участников и сохраняет raw grade; он не является completion threshold.

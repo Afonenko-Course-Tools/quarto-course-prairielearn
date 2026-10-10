@@ -11,6 +11,9 @@ const instance = JSON.parse(
     join(nativeRoot, "courseInstances/pilot/infoCourseInstance.json"),
   ),
 );
+const delivery = JSON.parse(
+  await Deno.readTextFile(join(nativeRoot, "delivery.json")),
+);
 for await (
   const entry of Deno.readDir(
     join(nativeRoot, "courseInstances/pilot/assessments"),
@@ -69,6 +72,30 @@ for await (
     courseInstanceRole: "None",
     prairieTestReservations: [],
   };
+  const work = delivery.works.find((w: any) => w.id === entry.name);
+  if (!work) throw new Error("native work missing from manifest");
+  if (!work.relatedExercise) {
+    if (rules.length !== 1 || work.policy.assignment) {
+      throw new Error("ordinary lab carries defense ACL");
+    }
+    for (const labels of [[], ["foreign-label"]]) {
+      const result = resolveAccessControl({
+        ...base,
+        enrollment: {
+          enrollmentId: "ordinary-student",
+          studentLabelIds: labels,
+        },
+      });
+      if (result.authorization !== "granted" || !result.submittable) {
+        throw new Error("joined ordinary Student lab denied");
+      }
+    }
+    console.log(
+      "upstream native resolver: ordinary lab available to joined Student without assignment label",
+      entry.name,
+    );
+    continue;
+  }
   for (const labels of [[], ["foreign-label"]]) {
     const r = resolveAccessControl({
       ...base,
