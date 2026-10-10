@@ -99,6 +99,12 @@ export function gradingPolicy(work: any) {
           : "expected nonnegative scalar or null",
       );
     }
+    if (ceiling === 0 && work.assignments?.[id]?.requirement !== "optional") {
+      fail(
+        `question-max-points (${id})`,
+        "required question ceiling must be positive; native zero-ceiling grading cannot complete a required question",
+      );
+    }
     if (!exam && points === 0 && ceiling != null && ceiling > 0) {
       fail(
         `question-max-points (${id})`,

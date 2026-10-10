@@ -329,7 +329,19 @@ question `info.json.preferences.courseRequirement` объявляет встро
 Настройки задаются в metadata курса/книги, `_quarto.yml`, `_metadata.yml`,
 подключённом через native `metadata-files` файле `_*.yaml` либо front matter
 документа. Quarto определяет порядок слияния; адаптер нормализует только известные
-числовые поля. Списки баллов заменяются целиком. Например, общий авторский default:
+числовые поля. Слияние одного и того же metadata path выполняет Quarto: например,
+`prairielearn.assessment-defaults.question-points` в `_quarto.yml: [9,7,5]`
+и directory `_metadata.yml: [4,2]` даёт `[9,7,5,4,2]`. Экспортёр сохраняет этот
+целиком авторский список. Если concatenation делает Exam schedule возрастающим,
+экспорт отказывается с диагностикой; проверьте результат через `inspect-grading`.
+
+Отдельное объединение адаптера применяется между разными путями: inherited
+`prairielearn.assessment-defaults`, локальная `assessment.prairielearn` и
+`question-overrides`. На этих границах списки заменяются целиком, maps сливаются,
+а явный null очищает ceiling. Это не отменяет предварительное native слияние
+Quarto по одному пути. Для предсказуемого авторства используйте scalar course
+points 1, а Exam schedule задавайте в document `assessment.prairielearn` или
+per-question override. Например, общий авторский default:
 
 ```yaml
 prairielearn:
@@ -360,7 +372,7 @@ assessment:
 
 `question-points` — native question `points`: неотрицательное число для Homework;
 для Exam также непустой невозрастающий список баллов за последовательные попытки.
-Required вопросы требуют строго положительных значений; нулевой знаменатель
+Required вопросы требуют строго положительных баллов и question ceiling (если он объявлен); native zero-ceiling не может дать полную awarded стоимость. Optional вопрос допускает нулевой ceiling. Нулевой знаменатель
 completion не поддерживается. Optional вопрос допускает ноль и не входит в
 required completion. Homework с нулевыми баллами не допускает положительный ceiling.
 

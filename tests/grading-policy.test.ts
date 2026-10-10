@@ -2,6 +2,30 @@ import { gradingPolicy } from "../_extensions/course-prairielearn/application/gr
 const assert = (v: unknown, m: string) => {
   if (!v) throw Error(m);
 };
+Deno.test("required zero-ceiling Homework fails actionable; optional zero-point zero-ceiling remains supported", () => {
+  const w = work();
+  w.assignments["exr-a"].requirement = "required";
+  w.extensions.prairielearn["question-points"] = 1;
+  w.extensions.prairielearn["question-max-points"] = 0;
+  let message = "";
+  try {
+    gradingPolicy(w);
+  } catch (e) {
+    message = String(e);
+  }
+  assert(
+    message.includes("question-max-points (exr-a)") &&
+      message.includes("required question ceiling must be positive"),
+    "impossible required zero-ceiling completion accepted",
+  );
+  w.assignments["exr-a"].requirement = "optional";
+  w.extensions.prairielearn["question-points"] = 0;
+  const native = gradingPolicy(w).questions["exr-a"];
+  assert(
+    native.points === 0 && native.maxPoints === 0,
+    "optional zero-ceiling policy changed",
+  );
+});
 const work = () => ({
   id: "sec-lab",
   source: "tasks/lab.qmd",
