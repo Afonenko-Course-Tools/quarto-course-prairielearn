@@ -56,7 +56,7 @@ export async function readSelected(root: string, s: any) {
   }
   return data;
 }
-export async function selectedSources(root: string, p: any) {
+export async function selectedSources(root: string, p: any, runtime?: {sourceExtensions?: string[];javaRelease?: number}) {
   if (!p.check || !p.sources?.length) {
     throw new Error("PL selected question requires project-check and sources");
   }
@@ -70,11 +70,14 @@ export async function selectedSources(root: string, p: any) {
       "PL source profile must select the student answer partition",
     );
   }
+  const extensions = runtime?.sourceExtensions ?? ['.java'];
+  if (!Array.isArray(extensions) || !extensions.length || extensions.some(x => typeof x !== 'string' || !/^\.[a-z][a-z0-9]*$/.test(x)) ||
+      runtime?.javaRelease !== undefined && extensions.some(x => x !== '.java')) throw new Error('PL invalid runtime source extensions');
   const names = new Set();
   const files = [];
   for (const s of p.sources) {
     if (
-      !s.submissionRelativePath.endsWith(".java") ||
+      !extensions.some(x => s.submissionRelativePath.endsWith(x)) ||
       names.has(s.submissionRelativePath)
     ) throw new Error("PL student build script or duplicate source denied");
     if (

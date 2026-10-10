@@ -225,7 +225,13 @@ Question defaults задают topic/submission и необязательный 
 платформенные поля. Runtime и источники выбирает общий project-check. Unknown
 metadata/attributes, missing inputs, symlinks, binary/NUL/oversize и изменение
 snapshot отклоняются до публикации. Package paths сохраняются от source root;
-выбранные `.java` — единственные submission files. В student-tests оцениваемая
+Для Java выбранные `.java` — единственные submission files. Невыпущенное
+расширение runtime registry допускает явный `sourceExtensions: [".fish"]`
+для текстовых источников другого runtime. Отсутствующее поле сохраняет
+Java-only поведение; Java profile с `javaRelease` не допускает иных расширений.
+Не-Java descriptor не получает фиктивные настройки JDK. Core project-check
+остаётся владельцем выбора источников; registry — владельцем допустимых
+расширений конкретного исполняющего образа. В student-tests оцениваемая
 suite остаётся отдельной от trusted variant fixtures.
 
 Доставка содержит `infoCourse.json`, выбранную instance, assessments, questions,
