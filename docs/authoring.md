@@ -263,8 +263,11 @@ status — graded/ungraded. Нужна ровно одна строка для �
 ещё не начатые optional вопросы (score0,ungraded). Неизвестные/дублирующиеся/
 отсутствующие вопросы и неверные scores отклоняются. Только graded score===1
 из required pool считается выполненным. Predicate возвращает completedRequired,
-requiredTotal,atLeast,passed и completion score0/1 для AGS, сохраняя weighted
-question scores для raw grade. Три scores0.7 при pass2 дают completedRequired0;
+requiredTotal,atLeast,passed и локальный completion score0/1. Для защиты Gateway
+отправляет в AGS `scoreGiven=completedRequired`, `scoreMaximum=requiredTotal`;
+pass определяется отдельным порогом atLeast. Обычная лабораторная передаёт
+свой объявленный raw score, сохраняя weighted question scores. Три scores0.7
+при pass2 дают completedRequired0;
 полностью выполненные optional вопросы не заменяют невыполненные required.
 Native assessment text разъясняет отдельный критерий выполнения, preferences
 сохраняют courseRequirement каждого участника.
