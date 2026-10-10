@@ -1,7 +1,7 @@
 # Демонстрационная группа Java и Gradle
 
-Авторская разметка текущего Git ref для `v3.0.0`.
-Общая модель принадлежит Core `v4.0.0`; минимум — Quarto 1.11.5 и CUE 0.17.1.
+Авторская разметка текущего Git ref для `4.0.0` (unreleased).
+Общая модель принадлежит Core `5.0.0` (unreleased); минимум — Quarto 1.11.5 и CUE 0.17.1.
 [План владельца](../../docs/plans/2026-10-08-implementation.md) фиксирует
 фактические проверки и дальнейший выпуск.
 
@@ -11,17 +11,18 @@
 CORE=/absolute/path/to/quarto-course bash tools/check-java.sh
 ```
 
-Установка закреплённых выпусков из каталога этой группы:
+Установка целых локальных кандидатов из каталога этой группы:
 
 ```sh
 cd bank
-quarto add Afonenko-Course-Tools/quarto-course@v4.0.0 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v3.0.0 --no-prompt
+quarto add /absolute/path/to/quarto-course --no-prompt
+quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 cd ..
 quarto run build.ts
 ```
 
-Native source-ссылки ведут к tool tag `v3.0.0` того же producer commit.
+Native source-ссылки локального кандидата ведут к main; выпуск закрепит их на опубликованный tag.
+Историческая поставка ниже относится к выпуску 2026-10-08.
 Готовая группа выпускается в отдельном immutable Release `demo-20261008`.
 `BUILD.json` фиксирует точный commit,
 зависимости, профиль и `sourceDirty: false` для готового asset. Tool tag и demo tag

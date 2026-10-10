@@ -69,7 +69,25 @@ export function declarations(raw: any, key: string) {
   for (
     const [id, v] of Object.entries(raw.delivery.instances) as [string, any][]
   ) {
-    closed(v, ["title", "self-enrollment", "works"]);
+    closed(v, ["title", "self-enrollment", "works", "publishing"]);
+    closed(v.publishing, ["start-date", "end-date"]);
+    const dates = [v.publishing["start-date"], v.publishing["end-date"]];
+    const timestamp =
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
+    if (
+      dates.some((date) =>
+        typeof date !== "string" || !timestamp.test(date) ||
+        !Number.isFinite(Date.parse(date)) ||
+        new Date(Date.parse(date.slice(0, 19) + "Z")).toISOString().slice(
+            0,
+            19,
+          ) !== date.slice(0, 19)
+      ) || Date.parse(dates[0]) >= Date.parse(dates[1])
+    ) {
+      throw new Error(
+        "PL instance publishing requires ordered explicit timestamps with offsets",
+      );
+    }
     if (
       !/^[a-z][a-z0-9-]*$/.test(id) || typeof v.title !== "string" ||
       !v.title || typeof v["self-enrollment"] !== "boolean" ||

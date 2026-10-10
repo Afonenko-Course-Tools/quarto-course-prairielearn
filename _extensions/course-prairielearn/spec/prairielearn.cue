@@ -52,7 +52,7 @@ import "list"
  delivery: {
   book: string & !=""
   course: {name: string & !="", title: string & !="", timezone: string & !="", topics: [...{name: string & !="", color: string & !="", description: string & !=""}]}
-  instances: {[string]: {title: string & !="", "self-enrollment": bool, works: [...string & =~"^sec-[a-z0-9-]+$"]}}
+  instances: {[string]: {title: string & !="", "self-enrollment": bool, publishing: {"start-date": string & !="", "end-date": string & !=""}, works: [...string & =~"^sec-[a-z0-9-]+$"]}}
  }
  "question-defaults": {topic: string & !="", submission: #PrairieLearnSubmission}
  "assessment-defaults"?: {attempts?: int & >=1, pass?: {"at-least": int & >=1}, assignment?: {"student-label": #PrairieLearnLabel} | {mode: #PrairieLearnAssignmentMode}}

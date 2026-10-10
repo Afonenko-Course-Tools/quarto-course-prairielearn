@@ -2,7 +2,7 @@
 type: documentation
 component: course-prairielearn
 status: current
-updated: 2026-10-08
+updated: 2026-10-10
 ---
 
 # Задания курса в PrairieLearn
@@ -17,16 +17,19 @@ updated: 2026-10-08
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Текущий ref содержит **unreleased кандидат 3.1.0** с режимом редактора.
-До публикации выпуска этот режим устанавливается целым архивом закреплённого
-Git commit. Команды ниже устанавливают выпущенный baseline 3.0.1, в котором
-сохраняется только upload; они не устанавливают unreleased editor.
+Текущий ref содержит **unreleased кандидат 4.0.0**, совместимый с Core **5.0.0**.
+Он экспортирует полный native курс, сохраняет правила выполнения работ и
+создаёт source editor с отдельной закрытой поставкой проверок. До публикации
+устанавливайте целые локальные кандидаты или архивы закреплённых commits:
 
 ```sh
-cd bank
-quarto add Afonenko-Course-Tools/quarto-course@v4.0.1 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v3.0.1 --no-prompt
+cd tasks
+quarto add /absolute/path/to/quarto-course --no-prompt
+quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 ```
+
+Теги `v4.0.0` адаптера и `v5.0.0` Core будут доступны после публикации
+координатором выпуска. Историю предыдущих выпусков сохраняет `docs/releases`.
 
 ```yaml
 lang: ru
@@ -172,7 +175,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Установка использует PrairieLearn `v3.0.1`, Core `v4.0.0`, Quarto 1.11.5
+Текущий кандидат использует PrairieLearn `4.0.0` и Core `5.0.0` (unreleased), Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
 `statementVisibility` и обязательные qualified `assignments`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant

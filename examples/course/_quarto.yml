@@ -9,7 +9,7 @@ project:
     - "!projects/**"
 book:
   repo-url: https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn
-  repo-branch: v3.0.0
+  repo-branch: main # unreleased 4.0.0 candidate; pin release tag after publication
   repo-subdir: examples/course
   repo-actions: [source]
   title: Задание с внешней проверкой

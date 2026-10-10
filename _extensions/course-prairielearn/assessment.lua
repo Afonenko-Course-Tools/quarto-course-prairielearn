@@ -34,6 +34,25 @@ local function number(value)
   return value
 end
 
+-- Pandoc transports YAML scalars as Inlines. Normalize only the numeric
+-- policy fields; preserve malformed collections and unknown keys for CUE.
+local function normalize_policy(value)
+  if type(value) ~= "table" or pandoc.utils.type(value) == "List" then return value end
+  value.attempts = number(value.attempts)
+  if type(value.pass) == "table" and pandoc.utils.type(value.pass) ~= "List" then
+    value.pass["at-least"] = number(value.pass["at-least"])
+  end
+  return value
+end
+
+function M.declarations(value)
+  local result = plain(value)
+  if type(result) == "table" then
+    result["assessment-defaults"] = normalize_policy(result["assessment-defaults"])
+  end
+  return result
+end
+
 function M.collect(meta)
   if meta.assessment == nil or meta.assessment.prairielearn == nil then return nil end
   -- Общие настройки действуют только при явном подключении адаптера.
@@ -42,11 +61,11 @@ function M.collect(meta)
     return diagnostics.message("PL.ASSESSMENT_INVALID", text, {source = quarto.doc.input_file, id = id,
       field = field or "assessment.prairielearn", hint = "Проверьте правила этой работы и общие настройки PrairieLearn"})
   end
-  local policy = plain(meta.assessment.prairielearn)
+  local policy = normalize_policy(plain(meta.assessment.prairielearn))
   if type(policy) ~= "table" then return policy end
   assert(pandoc.utils.type(policy) ~= "List", message("Правила работы должны быть YAML-картой"))
   local defaults = meta.prairielearn and meta.prairielearn["assessment-defaults"]
-  if defaults == nil then defaults = {} else defaults = plain(defaults) end
+  if defaults == nil then defaults = {} else defaults = normalize_policy(plain(defaults)) end
   assert(type(defaults) == "table" and pandoc.utils.type(defaults) ~= "List",
     message("Общие настройки должны быть YAML-картой", "prairielearn.assessment-defaults"))
   local value = merge(defaults, policy)

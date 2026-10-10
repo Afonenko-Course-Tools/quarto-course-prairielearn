@@ -12,5 +12,8 @@
     ],
     "assignment_label_prefix": "pl-",
     "assignment_label_pattern": "^[a-z][a-z0-9-]*$"
-  }
+  },
+  "version": "4.0.0",
+  "release_status": "unreleased",
+  "core_version": "5.0.0"
 }

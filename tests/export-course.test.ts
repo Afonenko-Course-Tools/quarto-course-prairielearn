@@ -14,7 +14,15 @@ Deno.test("closed delivery defaults and selected instance", () => {
         topics: [{ name: "Java", color: "blue2", description: "Java" }],
       },
       instances: {
-        pilot: { title: "Pilot", "self-enrollment": false, works: ["sec-lab"] },
+        pilot: {
+          title: "Pilot",
+          "self-enrollment": false,
+          publishing: {
+            "start-date": "1970-01-01T00:00:00Z",
+            "end-date": "9999-12-31T00:00:00Z",
+          },
+          works: ["sec-lab"],
+        },
       },
     },
     "question-defaults": {
@@ -22,6 +30,29 @@ Deno.test("closed delivery defaults and selected instance", () => {
       submission: { mode: "editor", "ace-mode": "ace/mode/java" },
     },
   }, "pilot");
+  for (
+    const publishing of [undefined, {}, {
+      "start-date": "2026-01-01",
+      "end-date": "2027-01-01",
+    }, {
+      "start-date": "2027-01-01T00:00:00Z",
+      "end-date": "2026-01-01T00:00:00Z",
+    }, {
+      "start-date": "2026-01-01T00:00:00Z",
+      "end-date": "2027-01-01T00:00:00Z",
+      unknown: true,
+    }]
+  ) {
+    const raw = structuredClone(d.raw);
+    raw.delivery.instances.pilot.publishing = publishing;
+    let rejected = false;
+    try {
+      declarations(raw, "pilot");
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, "invalid instance publishing accepted");
+  }
   assert(d.instance.works[0] === "sec-lab", "work lost");
   for (const field of ["unknown", "runtime", "sources"]) {
     let rejected = false;
@@ -124,6 +155,10 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
           pilot: {
             title: "Pilot",
             "self-enrollment": false,
+            publishing: {
+              "start-date": "1970-01-01T00:00:00Z",
+              "end-date": "9999-12-31T00:00:00Z",
+            },
             works: ["sec-lab"],
           },
         },
@@ -357,6 +392,21 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
       output: root + "/three",
       checksOutput: root + "/checks3.json",
     });
+    const instance = JSON.parse(
+      await Deno.readTextFile(
+        root + "/three/courseInstances/pilot/infoCourseInstance.json",
+      ),
+    );
+    assert(
+      !Object.hasOwn(instance, "allowAccess") &&
+        instance.selfEnrollment.enabled === false,
+      "modern selfEnrollment conflicts with legacy allowAccess in native sync",
+    );
+    assert(
+      instance.publishing.startDate === "1970-01-01T00:00:00Z" &&
+        instance.publishing.endDate === "9999-12-31T00:00:00Z",
+      "explicit publishing lost: native Students require instance availability",
+    );
     const native = JSON.parse(
       await Deno.readTextFile(
         root +
@@ -501,6 +551,10 @@ Deno.test("multiple_selected_defenses_for_one_essay reject before source collect
           pilot: {
             title: "Pilot",
             "self-enrollment": false,
+            publishing: {
+              "start-date": "1970-01-01T00:00:00Z",
+              "end-date": "9999-12-31T00:00:00Z",
+            },
             works: ["sec-one", "sec-two"],
           },
         },

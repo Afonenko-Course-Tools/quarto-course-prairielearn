@@ -1,7 +1,7 @@
 # Пример авторства PrairieLearn
 
-Авторская разметка текущего Git ref для `v3.0.0`,
-Core `v4.0.0`, Quarto 1.11.5 и CUE 0.17.1.
+Авторская разметка текущего Git ref для `4.0.0` (unreleased),
+Core `5.0.0` (unreleased), Quarto 1.11.5 и CUE 0.17.1.
 [План владельца](../../docs/plans/2026-10-08-implementation.md) фиксирует runtime
 проверки; [текущий контракт](../../docs/authoring.md) описывает банк и платформенную привязку.
 

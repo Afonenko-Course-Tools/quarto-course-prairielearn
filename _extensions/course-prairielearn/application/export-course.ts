@@ -161,8 +161,11 @@ export async function exportCourse(
           }),
         ),
         timezone: d.course.timezone,
-        allowAccess: [],
         selfEnrollment: { enabled: d.instance["self-enrollment"] },
+        publishing: {
+          startDate: d.instance.publishing["start-date"],
+          endDate: d.instance.publishing["end-date"],
+        },
       },
     );
     const questions: Record<string, any> = {};

@@ -2,7 +2,7 @@
 type: specification
 component: course-prairielearn
 status: current
-updated: 2026-10-08
+updated: 2026-10-10
 ---
 
 # Спецификация заданий и контрольных работ
@@ -11,7 +11,7 @@ updated: 2026-10-08
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
-переключения версий схемы. Явный экспорт поставляет только выбранные нативные вопросы; настройки работ и доступа остаются в PrairieLearn.
+переключения версий схемы. Адаптер 4.0.0 и Core 5.0.0 пока unreleased. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
 Канонические `#exr-*` имеют уникальные ID внутри явной области
 `exercise-bank: true`, собственные обязательные `difficulty` и положительное
 целое `time`. Эффективная `statement-visibility` берётся из атрибута задачи либо
@@ -283,3 +283,23 @@ Native label и access override UUID — UUIDv5 в namespace курса от
 экспортированных JSON: unassigned/foreign/revoked label denied и не listed;
 assigned обычный enrollment granted/submittable. Реальный Student session,
 прямой URL и Moodle AGS проверяются отдельно до readiness.
+
+
+В exporter 4.0.0 каждый instance требует явную закрытую декларацию публикации:
+
+```yaml
+publishing:
+  start-date: '2026-09-01T00:00:00+03:00'
+  end-date: '2027-07-01T00:00:00+03:00'
+```
+
+Оба значения — реальные ISO даты со временем и offset; начало строго раньше
+конца. Неизвестные поля, отсутствие policy, календарно неверные даты и даты без
+offset отвергаются. Экспорт переносит их в native `publishing.startDate/endDate`.
+Интервал разрешает доступ enrolled Student к instance; label ACL отдельно
+разрешает назначенные работы. `selfEnrollment` объявляется отдельно, старое
+instance `allowAccess` не генерируется: pinned Community запрещает сочетать их.
+Даты 1970–9999 в native примере — явная политика локального тестового pilot;
+преподаватель задаёт даты своего учебного потока. Teacher не получает PL admin
+из этой декларации. Правила попыток и pass.at-least наследуются через Core;
+декодер нормализует только эти числовые scalar поля перед CUE validation.

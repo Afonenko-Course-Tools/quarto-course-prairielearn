@@ -20,7 +20,7 @@ function M.validate(doc, effective)
   end})
   local source = native.source()
   if meta.prairielearn and meta.prairielearn.delivery then
-    native.vet(assessment.plain(meta.prairielearn), "#PrairieLearnDeclarations", {source = source, field = "prairielearn"})
+    native.vet(assessment.declarations(meta.prairielearn), "#PrairieLearnDeclarations", {source = source, field = "prairielearn"})
   end
   local work = meta["course-assessment-id"] and pandoc.utils.stringify(meta["course-assessment-id"])
   local policy = assessment.collect(meta)
