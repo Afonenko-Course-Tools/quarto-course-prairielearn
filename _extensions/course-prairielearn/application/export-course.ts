@@ -320,6 +320,7 @@ export async function exportCourse(
           const s of await selectedSources(
             resolve(input.projectRoot, f.projectRoot),
             f,
+            input.registry.profiles[f.check.runtime],
           )
         ) {
           const path = join(stage, base, "serverFilesQuestion/starter", s.name);

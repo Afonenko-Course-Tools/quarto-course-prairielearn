@@ -346,6 +346,17 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       checksOutput: root + "/checks2.json",
     });
     assert(canonical(a) === canonical(b), "exports differ");
+    const fishSource = "echo ok\n";
+    await Deno.mkdir(root + "/project/student", {recursive:true});
+    await Deno.writeTextFile(root + "/project/student/commands.fish", fishSource);
+    const fishCheck = {...check,runtime:"fish",sourceProfile:{root:"student",mode:"implementation",include:["commands.fish"]}};
+    delete (fishCheck as any).java;
+    const fishFact = {...fact,check:fishCheck,sources:[{projectRelativePath:"student/commands.fish",submissionRelativePath:"commands.fish",sha256:await hash(fishSource)}]};
+    const fishInput = {...input,checks:{...input.checks,projects:[fishFact]},registry:{schemaVersion:1,profiles:{fish:{mode:"implementation",sourceExtensions:[".fish"],image:"registry/fish@sha256:"+"c".repeat(64)}}},output:root+"/fish",checksOutput:root+"/fish-checks.json"};
+    await exportCourse(fishInput);
+    assert(await Deno.readTextFile(root+"/fish/questions/demo/exr-a/serverFilesQuestion/starter/commands.fish") === fishSource,"fish starter lost");
+    assert(!Object.hasOwn(JSON.parse(await Deno.readTextFile(root+"/fish/questions/demo/exr-a/tests/grading-job.json")),"java"),"fish descriptor pretends Java");
+
     const repeatInfo = JSON.parse(
       await Deno.readTextFile(root + "/one/questions/demo/exr-a/info.json"),
     );
