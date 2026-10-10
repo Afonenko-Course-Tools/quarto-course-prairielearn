@@ -320,6 +320,15 @@ export async function exportCourse(
           await Deno.readTextFile(join(stage, base, "info.json")),
         );
         info.partialCredit = c.scoring.mode !== "all-pass";
+        // Pinned Community validates assessment overrides against this embedded
+        // question schema. A sidecar preferences.schema.json is not loaded.
+        info.preferences = {
+          courseRequirement: {
+            type: "string",
+            default: "required",
+            enum: ["required", "optional"],
+          },
+        };
         await write(base + "/info.json", info);
         const f = input.checks.projects.find((f: any) => f.exerciseId === q.id);
         for (

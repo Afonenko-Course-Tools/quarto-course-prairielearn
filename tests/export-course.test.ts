@@ -1,5 +1,6 @@
 import { declarations } from "../_extensions/course-prairielearn/application/declarations.ts";
 import { selectedSources } from "../_extensions/course-prairielearn/application/source-selection.ts";
+import { infoQuestion } from "../_extensions/course-prairielearn/application/native-validators.js";
 const assert = (v: unknown, m: string) => {
   if (!v) throw new Error(m);
 };
@@ -421,6 +422,35 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
       native.zones[0].questions[2].preferences.courseRequirement === "optional",
       "native assignment fact lost",
     );
+    for (const member of native.zones[0].questions) {
+      const question = JSON.parse(
+        await Deno.readTextFile(
+          root + "/three/questions/" + member.id + "/info.json",
+        ),
+      );
+      const field = question.preferences?.courseRequirement;
+      assert(
+        field?.type === "string" && field.default === "required" &&
+          JSON.stringify(field.enum) ===
+            JSON.stringify(["required", "optional"]),
+        "native sync requires question-declared preferences schema for assessment overrides",
+      );
+      assert(
+        infoQuestion(question),
+        "preferences declaration violates pinned native schema",
+      );
+      assert(
+        field.enum.includes(member.preferences.courseRequirement),
+        "native preference override outside enum",
+      );
+      assert(
+        !infoQuestion({
+          ...question,
+          preferences: { courseRequirement: { ...field, unknown: true } },
+        }),
+        "upstream preferences fields must remain closed",
+      );
+    }
     assert(
       threeDelivery.works[0].completion.atLeast === 2 &&
         threeDelivery.works[0].completion.requiredQuestionIds.length === 2,

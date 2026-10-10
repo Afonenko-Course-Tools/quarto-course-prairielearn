@@ -303,3 +303,10 @@ instance `allowAccess` не генерируется: pinned Community запр�
 преподаватель задаёт даты своего учебного потока. Teacher не получает PL admin
 из этой декларации. Правила попыток и pass.at-least наследуются через Core;
 декодер нормализует только эти числовые scalar поля перед CUE validation.
+
+Native `infoAssessment` сохраняет requirement в question preferences; каждый
+question `info.json.preferences.courseRequirement` объявляет встроенную схему
+`{type: string, default: required, enum: [required, optional]}`. Pinned Community
+92584 проверяет assessment override по этой question schema при sync. Она не
+заменяет authoritative completion predicate, который использует закрытую
+политику delivery. Отдельный `preferences.schema.json` этим upstream не читается.
