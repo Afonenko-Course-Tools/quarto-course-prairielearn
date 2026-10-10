@@ -28,7 +28,7 @@ import "list"
 }
 
 #PrairieLearnSubmission: {mode: "editor", "ace-mode"?: string & =~"^ace/mode/[a-z][a-z0-9_]*$"} | {mode: "upload"}
-#PrairieLearnExercise: {grading: #PrairieLearnGrading, topic?: string & !="", submission?: #PrairieLearnSubmission}
+#PrairieLearnExercise: {grading: #PrairieLearnGrading, topic?: string & !="", submission?: #PrairieLearnSubmission, "single-variant"?: bool}
 #Exercise: {
 	target?: string
 	if target != _|_ if target == #PrairieLearnTarget {
@@ -72,7 +72,7 @@ import "list"
   course: {name: string & !="", title: string & !="", timezone: string & !="", topics: [...{name: string & !="", color: string & !="", description: string & !=""}]}
   instances: {[string]: {title: string & !="", "self-enrollment": bool, publishing: {"start-date": string & !="", "end-date": string & !=""}, works: [...string & =~"^sec-[a-z0-9-]+$"]}}
  }
- "question-defaults": {topic: string & !="", submission: #PrairieLearnSubmission}
+ "question-defaults": {topic: string & !="", submission: #PrairieLearnSubmission, "single-variant"?: bool}
  "assessment-defaults"?: {#PrairieLearnScoringPolicy
 attempts?: int & >=1, pass?: {"at-least": int & >=1}, assignment?: {"student-label": #PrairieLearnLabel} | {mode: #PrairieLearnAssignmentMode}}
 }

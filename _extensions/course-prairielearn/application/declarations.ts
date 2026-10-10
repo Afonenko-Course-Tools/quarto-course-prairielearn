@@ -16,7 +16,11 @@ export function closed(v: any, required: string[], optional: string[] = []) {
   }
 }
 export function question(v: any) {
-  closed(v, ["topic", "submission"]);
+  closed(v, ["topic", "submission"], ["single-variant"]);
+  if (
+    Object.hasOwn(v, "single-variant") &&
+    typeof v["single-variant"] !== "boolean"
+  ) throw Error("PL single-variant requires boolean");
   if (typeof v.topic !== "string" || !v.topic.trim()) {
     throw new Error("PL topic required");
   }
@@ -29,6 +33,9 @@ export function question(v: any) {
   ) throw new Error("PL submission invalid");
   return {
     topic: v.topic,
+    ...(Object.hasOwn(v, "single-variant")
+      ? { singleVariant: v["single-variant"] }
+      : {}),
     submission: {
       mode: v.submission.mode,
       ...(v.submission["ace-mode"]

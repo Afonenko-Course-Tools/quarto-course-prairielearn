@@ -28,12 +28,14 @@ function M.read(doc, effective)
       if doc.meta.prairielearn and doc.meta.prairielearn["question-defaults"] then
         local defaults = doc.meta.prairielearn["question-defaults"]
         payload.topic = pandoc.utils.stringify(defaults.topic)
+        if defaults["single-variant"] ~= nil then payload["single-variant"] = defaults["single-variant"] end
         local submission = defaults.submission
         if submission then
           payload.submission = {mode = pandoc.utils.stringify(submission.mode)}
           if submission["ace-mode"] then payload.submission["ace-mode"] = pandoc.utils.stringify(submission["ace-mode"]) end
         end
       end
+      if d.attributes["prairielearn-single-variant"] ~= nil then payload["single-variant"] = d.attributes["prairielearn-single-variant"] == "true" end
       if d.attributes["prairielearn-topic"] then payload.topic = d.attributes["prairielearn-topic"] end
       if d.attributes["prairielearn-submission"] then payload.submission = payload.submission or {}; payload.submission.mode = d.attributes["prairielearn-submission"]; if payload.submission.mode == "upload" then payload.submission["ace-mode"] = nil end end
       value.exercises:insert({id = d.identifier, payload = payload})

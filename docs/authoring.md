@@ -215,7 +215,12 @@ quarto run tasks/_extensions/course-prairielearn/entrypoints/export-course.ts CO
 OCI digest. Private testing допускает явный `--candidate-image sha256:IMAGE_ID`,
 который CLI проверяет через локальный Docker; delivery помечается `candidate`.
 
-Question defaults задают только topic/submission. Редкие атрибуты
+Question defaults задают topic/submission и необязательный YAML boolean
+`single-variant`. Он переносится в native `singleVariant` без подстановки;
+отсутствующее поле опускается (документированный default pinned PL: `false`).
+Явное `true` сохраняет прежний режим единственного варианта.
+`prairielearn-single-variant="true|false"` переопределяет настройку упражнения;
+`inspect-grading` показывает эффективное значение. Редкие атрибуты
 `prairielearn-topic` и `prairielearn-submission="editor|upload"` переопределяют
 платформенные поля. Runtime и источники выбирает общий project-check. Unknown
 metadata/attributes, missing inputs, symlinks, binary/NUL/oversize и изменение

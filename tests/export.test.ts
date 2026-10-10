@@ -989,3 +989,35 @@ Deno.test("literal Mustache in editor filenames is escaped in native attributes"
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("question repeat policy preserves authored true/false and omits absent", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    await Deno.mkdir(root + "/project/student", { recursive: true });
+    await Deno.mkdir(root + "/project/tests", { recursive: true });
+    await Deno.writeTextFile(root + "/project/student/Clamp.java", "starter");
+    await Deno.writeTextFile(root + "/project/tests/grade.sh", "test");
+    for (const value of [undefined, true, false]) {
+      const b: any = structuredClone(binding);
+      if (value !== undefined) b.questions["exr-clamp"].singleVariant = value;
+      const out = root + "/out-" + String(value);
+      await exportPrairieLearn(
+        p(),
+        { projectRoot: root, projects: { "exr-clamp": "/project" } },
+        b,
+        out,
+      );
+      const info = JSON.parse(
+        await Deno.readTextFile(out + "/questions/demo/exr-clamp/info.json"),
+      );
+      assert(
+        value === undefined
+          ? !Object.hasOwn(info, "singleVariant")
+          : info.singleVariant === value,
+        "repeat policy changed " + String(value),
+      );
+    }
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});

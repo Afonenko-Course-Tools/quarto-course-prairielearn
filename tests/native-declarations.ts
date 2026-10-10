@@ -70,6 +70,61 @@ try {
       ),
     ).href
   );
+  // Real Quarto inheritance transports authored booleans without losing false.
+  const priorConfig = await Deno.readTextFile(config);
+  for (const value of [undefined, true, false]) {
+    await Deno.writeTextFile(
+      config,
+      priorConfig.replace(
+        "  question-defaults:\n",
+        "  question-defaults:\n" +
+          (value === undefined ? "" : "    single-variant: " + value + "\n"),
+      ),
+    );
+    const model =
+      (await collectNativeModel(root, { book: "tasks" })).result.model;
+    const exercise = model.exercises.find((e: any) => e.id === "exr-add");
+    if (
+      value === undefined
+        ? Object.hasOwn(exercise.extensions.prairielearn, "single-variant")
+        : exercise.extensions.prairielearn["single-variant"] !== value
+    ) throw Error("course repeat inheritance lost " + value);
+  }
+  await Deno.writeTextFile(
+    config,
+    priorConfig.replace(
+      "  question-defaults:\n",
+      "  question-defaults:\n    single-variant: true\n",
+    ),
+  );
+  await Deno.writeTextFile(
+    lab,
+    authored.replace(
+      "---\n",
+      "---\nprairielearn:\n  question-defaults:\n    topic: Java\n    submission: {mode: editor}\n    single-variant: false\n",
+    ),
+  );
+  let repeatModel =
+    (await collectNativeModel(root, { book: "tasks" })).result.model;
+  if (
+    repeatModel.exercises.find((e: any) => e.id === "exr-add").extensions
+      .prairielearn["single-variant"] !== false
+  ) throw Error("document false repeat override lost");
+  await Deno.writeTextFile(
+    lab,
+    inheritedDoc.replace(
+      "#exr-add project=",
+      '#exr-add prairielearn-single-variant="false" project=',
+    ),
+  );
+  repeatModel =
+    (await collectNativeModel(root, { book: "tasks" })).result.model;
+  if (
+    repeatModel.exercises.find((e: any) => e.id === "exr-add").extensions
+      .prairielearn["single-variant"] !== false
+  ) throw Error("exercise false repeat override lost");
+  await Deno.writeTextFile(config, priorConfig);
+  await Deno.writeTextFile(lab, inheritedDoc);
   const collect = async () =>
     (await collectNativeModel(root, { book: "tasks" })).result.model
       .assessments[0];

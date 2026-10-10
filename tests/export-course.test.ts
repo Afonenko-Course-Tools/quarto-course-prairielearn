@@ -1,4 +1,7 @@
-import { declarations } from "../_extensions/course-prairielearn/application/declarations.ts";
+import {
+  declarations,
+  question,
+} from "../_extensions/course-prairielearn/application/declarations.ts";
 import { selectedSources } from "../_extensions/course-prairielearn/application/source-selection.ts";
 import { infoQuestion } from "../_extensions/course-prairielearn/application/native-validators.js";
 import { validateAssessmentSemantics } from "../_extensions/course-prairielearn/application/native-semantics.ts";
@@ -79,6 +82,7 @@ Deno.test("closed delivery defaults and selected instance", () => {
     "question-defaults": {
       topic: "Java",
       submission: { mode: "editor", "ace-mode": "ace/mode/java" },
+      "single-variant": false,
     },
   }, "pilot");
   for (
@@ -217,6 +221,7 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
       "question-defaults": {
         topic: "Java",
         submission: { mode: "editor", "ace-mode": "ace/mode/java" },
+        "single-variant": false,
       },
     };
     const assignment = { requirement: "required", workMode: "individual" };
@@ -341,6 +346,13 @@ Deno.test("full native export is deterministic, closed and atomic without bindin
       checksOutput: root + "/checks2.json",
     });
     assert(canonical(a) === canonical(b), "exports differ");
+    const repeatInfo = JSON.parse(
+      await Deno.readTextFile(root + "/one/questions/demo/exr-a/info.json"),
+    );
+    assert(
+      repeatInfo.singleVariant === false,
+      "course repeat false lost in full export",
+    );
     for (const [name, sha] of Object.entries(a.files)) {
       assert(
         await hash(await Deno.readFile(root + "/one/" + name)) === sha,
@@ -863,5 +875,34 @@ Deno.test("reference private and public test partitions cannot become implementa
     }
   } finally {
     await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("question repeat declaration is closed and typed", () => {
+  for (const value of [undefined, true, false]) {
+    const settings = question({
+      topic: "Java",
+      submission: { mode: "upload" },
+      ...(value === undefined ? {} : { "single-variant": value }),
+    });
+    assert(
+      value === undefined
+        ? !Object.hasOwn(settings, "singleVariant")
+        : settings.singleVariant === value,
+      "question normalization lost repeat value",
+    );
+  }
+  for (const value of ["false", 0, null, [], {}]) {
+    let rejected = false;
+    try {
+      question({
+        topic: "Java",
+        submission: { mode: "upload" },
+        "single-variant": value,
+      });
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, "invalid repeat scalar accepted");
   }
 });

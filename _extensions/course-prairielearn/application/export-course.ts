@@ -219,6 +219,11 @@ export async function exportCourse(
         const settings = e.extensions?.prairielearn?.topic
           ? question({
             topic: e.extensions.prairielearn.topic,
+            ...(Object.hasOwn(e.extensions.prairielearn, "single-variant")
+              ? {
+                "single-variant": e.extensions.prairielearn["single-variant"],
+              }
+              : {}),
             submission: e.extensions.prairielearn.submission ??
               input.config["question-defaults"].submission,
           })

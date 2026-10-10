@@ -66,6 +66,15 @@ const output = JSON.stringify(
     courseId: model.courseId,
     instance: flags["--instance"],
     works,
+    questions: model.result.model.exercises.filter((e: any) =>
+      e.target === "prairielearn"
+    ).map((e: any) => ({
+      id: e.id,
+      source: e.source,
+      ...(Object.hasOwn(e.extensions?.prairielearn ?? {}, "single-variant")
+        ? { singleVariant: e.extensions.prairielearn["single-variant"] }
+        : {}),
+    })),
     nativeOptionalFields:
       "Absent/null point ceilings and absent optional repeat controls are omitted and delegated to pinned Community; no internal defaults are inserted.",
   },

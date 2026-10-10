@@ -202,3 +202,22 @@ ceiling и повторные попытки описаны в [контракт
 `inspect-grading.ts` показывает effective policy до создания native delivery.
 Опубликованный 4.0.0 сохраняет прежний контракт; 5.0.0 устанавливается по тегу
 после публикации и явного обновления metadata курса.
+
+Question variant repetition is also authored metadata. Normal Quarto course,
+`_*.yaml`/directory metadata, and document inheritance apply:
+
+```yaml
+prairielearn:
+  question-defaults:
+    topic: Java
+    submission: {mode: editor, ace-mode: ace/mode/java}
+    single-variant: true
+```
+
+An exercise may override this with `prairielearn-single-variant="false"`.
+Only YAML booleans and the attribute literals `true`/`false` are accepted.
+The normalized question policy carries `single-variant` to native
+`info.json.singleVariant`; `inspect-grading` reports its effective value.
+When absent the exporter omits the field: pinned Community documents its
+native default as `false` (variants may be generated). Declare `true` explicitly
+to preserve the earlier exporter's forced single-variant behavior.
