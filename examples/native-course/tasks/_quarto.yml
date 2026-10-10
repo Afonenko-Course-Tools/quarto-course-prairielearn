@@ -1,0 +1,67 @@
+project:
+  type: book
+  pre-render: _extensions/course-core/entrypoints/pre.ts
+  post-render: _extensions/course-core/entrypoints/post.ts
+book:
+  title: Native Java
+  chapters: [index.qmd, lab.qmd]
+filters: [course-core, course-prairielearn]
+exercise-bank: true
+default-exercise-target: prairielearn
+default-exercise-statement-visibility: open
+default-exercise-project-check: junit
+course:
+  adapters: [prairielearn]
+project-checks:
+  defaults:
+    runtime: java25-junit-v1
+    java:
+      release: 25
+      encoding: UTF-8
+      compiler-options: [-proc:none, -Xmaxerrs, '5']
+    limits:
+      outer-seconds: 30
+      networking: false
+      max-output-bytes: 65536
+    scoring:
+      mode: weighted
+    references:
+      - name: default
+        root: reference
+        optional: false
+    discovery:
+      min-executed: 1
+  source-profiles:
+    main:
+      mode: implementation
+      root: student/src/main/java
+      include: ['**/*.java']
+  profiles:
+    junit:
+      source-profile: main
+      tests: ['tests/junit/**/*.java']
+prairielearn:
+  delivery:
+    book: tasks
+    course:
+      name: JAVA
+      title: Native Java
+      timezone: Europe/Minsk
+      topics:
+        - name: Java
+          color: blue2
+          description: Java exercises
+    instances:
+      pilot:
+        title: Native pilot
+        self-enrollment: false
+        # Explicit local pilot/test availability. Teaching flows declare their own dates.
+        publishing:
+          start-date: '1970-01-01T00:00:00Z'
+          end-date: '9999-12-31T00:00:00Z'
+        works: [sec-add]
+  question-defaults:
+    topic: Java
+    submission:
+      mode: editor
+      ace-mode: ace/mode/java

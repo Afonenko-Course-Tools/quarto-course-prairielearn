@@ -10,7 +10,8 @@ import "list"
 #PrairieLearnLabel: string & =~"^[a-z][a-z0-9-]*$"
 // END GENERATED VOCABULARY
 
-#PrairieLearnExercise: {grading: #PrairieLearnGrading}
+#PrairieLearnSubmission: {mode: "editor", "ace-mode"?: string & =~"^ace/mode/[a-z][a-z0-9_]*$"} | {mode: "upload"}
+#PrairieLearnExercise: {grading: #PrairieLearnGrading, topic?: string & !="", submission?: #PrairieLearnSubmission}
 #Exercise: {
 	target?: string
 	if target != _|_ if target == #PrairieLearnTarget {
@@ -45,4 +46,14 @@ import "list"
 			}
 		}
 	}
+}
+
+#PrairieLearnDeclarations: {
+ delivery: {
+  book: string & !=""
+  course: {name: string & !="", title: string & !="", timezone: string & !="", topics: [...{name: string & !="", color: string & !="", description: string & !=""}]}
+  instances: {[string]: {title: string & !="", "self-enrollment": bool, publishing: {"start-date": string & !="", "end-date": string & !=""}, works: [...string & =~"^sec-[a-z0-9-]+$"]}}
+ }
+ "question-defaults": {topic: string & !="", submission: #PrairieLearnSubmission}
+ "assessment-defaults"?: {attempts?: int & >=1, pass?: {"at-least": int & >=1}, assignment?: {"student-label": #PrairieLearnLabel} | {mode: #PrairieLearnAssignmentMode}}
 }

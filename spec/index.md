@@ -24,3 +24,13 @@ updated: 2026-10-08
 Банк и назначения принадлежат текущему Core; этот адаптер проверяет свой вход
 на собственной границе. Порядок выпуска и финальные проверки сохраняются в
 [отчёте реализации](../docs/releases/2026-10-08-implementation.md).
+
+## Full native export
+
+`application/declarations.ts` and `#PrairieLearnDeclarations` close the delivery
+configuration. `source-selection.ts` verifies Core SourceSelection SHA256 and
+preserves submission paths. `export-course.ts` produces a complete atomic native
+course and independent private checks inventory; IDs derive from stable Core keys.
+Pinned official PrairieLearn JSON schemas and bundled offline Ajv validators are
+recorded in `spec/upstream/provenance.json`. The runner descriptor is Platform-owned,
+not a second author configuration or a private GradingJob.

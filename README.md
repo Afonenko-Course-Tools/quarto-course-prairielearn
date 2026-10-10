@@ -2,7 +2,7 @@
 type: documentation
 component: course-prairielearn
 status: current
-updated: 2026-10-08
+updated: 2026-10-10
 ---
 
 # Задания курса в PrairieLearn
@@ -17,11 +17,28 @@ updated: 2026-10-08
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
+Контракт этого ref — **4.0.0**, совместимый с Core **5.0.0**.
+Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
+создаёт source editor с отдельной закрытой поставкой проверок. Для разработки
+устанавливайте целые локальные checkout или архивы закреплённых commits:
+
 ```sh
-cd bank
-quarto add Afonenko-Course-Tools/quarto-course@v4.0.0 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v3.0.1 --no-prompt
+cd tasks
+quarto add /absolute/path/to/quarto-course --no-prompt
+quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 ```
+
+Выпущенные версии устанавливайте по неизменяемым тегам после их публикации:
+
+```sh
+quarto add Afonenko-Course-Tools/quarto-course@v5.0.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v4.0.0 --no-prompt
+```
+
+Матрица совместимости задаёт контракты Core 5.0.0, exporter 4.0.0 и
+Platform CLI/schema 1.0.0. Наличие тегов проверяется в репозиториях владельцев,
+а production registry требует опубликованный OCI digest. Эта матрица не
+подтверждает публикацию или готовность курса. История сохранена в `docs/releases`.
 
 ```yaml
 lang: ru
@@ -105,6 +122,16 @@ student HTML. Полный HTML перед экспортом не требуе�
 необязательные `entrypoint`, `timeout`, `enableNetworking`, `environment`).
 Экспортёр не выбирает image и не переводит общие формулы оценки в LMS.
 
+Для простого ввода кода задайте `"submission":{"mode":"editor","aceMode":"ace/mode/java"}`
+в привязке вопроса. Экспортёр создаёт стандартный `pl-file-editor` с заготовкой
+из каждого принятого `student/<file>`. В этом режиме другие файлы локального
+проекта не копируются в публичную поставку и не появляются download/upload
+элементы. Введённый текст PL сам передаёт external grader как файл; отдельный
+workspace или VSCode не требуется. `aceMode` необязателен. По умолчанию либо
+при `"submission":{"mode":"upload"}` сохраняется загрузка файлов.
+Полные проекты и их ZIP для автономной работы обслуживает `project-download`.
+
+
 ```json
 {"questions":{"exr-clamp":{"topic":"Java","files":["Clamp.java"],
 "externalGradingOptions":{"image":"docker.io/library/gradle:9.1.0-jdk25",
@@ -112,7 +139,7 @@ student HTML. Полный HTML перед экспортом не требуе�
 ```
 
 Результат: `questions/<course-id>/<exr-id>/info.json`, `question.html`,
-`clientFilesQuestion` из `<project>/student` и приватные `tests` из
+В режиме upload — `clientFilesQuestion` из `<project>/student` и приватные `tests` из
 `<project>/tests`. Корневой `student/.gitignore` доставляется как обычный файл starter; прочие
 скрытые файлы и вложенные `.gitignore` исключены. `.gitignore` в приватных tests
 не доставляется. Соседний `reference` не публикуется. UUID определяется
@@ -157,9 +184,14 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Установка использует PrairieLearn `v3.0.1`, Core `v4.0.0`, Quarto 1.11.5
+Контракт этого ref использует PrairieLearn `4.0.0` и Core `5.0.0`, Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
 `statementVisibility` и обязательные qualified `assignments`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
 поставке, закрытые ключи и решения запрещены. Код и документация выпуска читаются
 из одного immutable tag; установленные `_extensions` сохраняются в Git курса.
+
+Полная native-поставка курса доступна через `entrypoints/export-course.ts`:
+[пример](examples/native-course/README.md), [контракт автора](docs/authoring.md#полная-native-поставка).
+Она не требует binding, export.json или ручного native shell; registry должен
+содержать настоящий production digest либо явно выбранный private local candidate.

@@ -1,0 +1,22 @@
+---
+assessment:
+  kind: lab
+  prairielearn:
+    attempts: 3
+    pass:
+      at-least: 1
+    assignment:
+      mode: assessment-id
+---
+
+# Addition {#sec-add}
+
+:::: {#exr-add project="/projects/add" difficulty="introductory" time="15"}
+## Widen before adding
+
+Implement `demo.Add.sum(int, int)` with a `long` result.
+::::
+
+::: {.task-items stage="homework"}
+1. @exr-add
+:::

@@ -15,7 +15,7 @@ try {
       hasSolution: false,
       hasPublicSolution: false,
       project: "",
-      head: { kind: "Div", level: 0, title: "" },
+      head: { kind: "Header", level: 2, title: "Native exercise" },
       body: { "pandoc-api-version": [1, 23, 1], meta: {}, blocks: [] },
       nested: 0,
       unknownAttributes: [],

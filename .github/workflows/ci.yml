@@ -32,8 +32,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          # Опубликованный релиз bundle Core/Presentation/Navigation.
-          ref: v4.0.0
+          # Core 5.0.0 release target; candidate runs may override with an available immutable ref.
+          # Contract compatibility does not assert that either owner tag is published.
+          ref: ${{ vars.COURSE_CORE_REF || 'v5.0.0' }}
           path: .ci-deps/core
           persist-credentials: false
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
@@ -46,6 +47,7 @@ jobs:
         run: quarto run tools/sync-contract.ts --check
       - run: quarto run tests/native-model.ts .ci-deps/core
       - run: quarto run tests/native-ordinary.ts .ci-deps/core
+      - run: quarto run tests/native-declarations.ts .ci-deps/core
       - run: quarto run tests/identity.ts .ci-deps/core
       - name: Версии инструментов
         run: |
@@ -63,7 +65,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: v4.0.0
+          ref: ${{ vars.COURSE_CORE_REF || 'v5.0.0' }}
           path: .ci-deps/core
           persist-credentials: false
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
@@ -82,5 +84,5 @@ jobs:
       - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
         with:
           gradle-version: '9.1.0'
-      - run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts
+      - run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/completion.test.ts
       - run: CORE="$PWD/.ci-deps/core" bash tools/check-java.sh
