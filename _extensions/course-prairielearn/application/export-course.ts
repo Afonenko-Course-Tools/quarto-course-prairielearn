@@ -2,7 +2,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { verificationInventoryHash } from "./verification-inventory.ts";
 import { gradingPolicy } from "./grading-policy.ts";
 import { completionPolicy } from "./completion.ts";
-import { normalizeDiscovery } from "./grading-descriptor.ts";
+import { runtimeDescriptor } from "./runtime-descriptor.ts";
 import * as validators from "./native-validators.js";
 import { validateAssessmentSemantics } from "./native-semantics.ts";
 import { exportPrairieLearn, uuid } from "./export.ts";
@@ -111,7 +111,7 @@ export async function exportCourse(
       dir: dirname(out),
       prefix: ".pl-course-",
     }),
-    scratch = await Deno.makeTempDir({ prefix: "pl-selected-" });
+    scratch = await Deno.makeTempDir({ dir: dirname(out), prefix: ".pl-selected-" });
   const write = async (path: string, v: any) => {
     await Deno.mkdir(dirname(join(stage, path)), { recursive: true });
     const schema = path.endsWith("/info.json")
@@ -199,8 +199,8 @@ export async function exportCourse(
             throw new Error("PL project symlink forbidden");
           }
         }
-        const sources = await selectedSources(root, fact);
         const profile = input.registry.profiles?.[fact.check.runtime];
+        const sources = await selectedSources(root, fact, profile);
         if (
           input.registry.schemaVersion !== 1 || !profile ||
           profile.mode !== fact.check.sourceProfile.mode
@@ -259,32 +259,8 @@ export async function exportCourse(
           );
         }
         const c = fact.check;
-        const descriptor = {
-          schemaVersion: 1,
-          sourceFiles: sources.map((s) => s.name),
-          testFiles: fact.trustedTests.map((t: any) =>
-            t.submissionRelativePath
-          ),
-          mode: c.sourceProfile.mode,
-          runtime: c.runtime,
-          java: {
-            release: 25,
-            encoding: "UTF-8",
-            "compiler-options": ["-proc:none", "-Xmaxerrs", "5"],
-            ...c.java,
-          },
-          limits: {
-            "outer-seconds": 30,
-            "compile-seconds": 15,
-            "run-seconds": 10,
-            "networking": false,
-            "max-output-bytes": 65536,
-            ...c.limits,
-          },
-          scoring: c.scoring ?? { mode: "weighted" },
-          discovery: normalizeDiscovery(c.discovery),
-          ...(c.variants ? { variants: c.variants } : {}),
-        };
+        const descriptor = runtimeDescriptor(c, profile,
+          sources.map(s => s.name), fact.trustedTests.map((t: any) => t.submissionRelativePath));
         await Deno.writeTextFile(
           join(project, "tests/grading-job.json"),
           JSON.stringify(descriptor, null, 2) + "\n",
@@ -344,6 +320,7 @@ export async function exportCourse(
           const s of await selectedSources(
             resolve(input.projectRoot, f.projectRoot),
             f,
+            input.registry.profiles[f.check.runtime],
           )
         ) {
           const path = join(stage, base, "serverFilesQuestion/starter", s.name);
