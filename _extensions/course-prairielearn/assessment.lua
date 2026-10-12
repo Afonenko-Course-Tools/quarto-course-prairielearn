@@ -1,3 +1,5 @@
+local __metrics=require("./observability/bridge").create_metrics("course-prairielearn",1)
+
 local contract = require("./contract")
 local diagnostics = require("./diagnostics")
 local vocabulary = contract.vocabulary
@@ -96,4 +98,6 @@ function M.collect(meta)
   return value
 end
 
+M.declarations=__metrics.wrap_sync({id="course-prairielearn.assessment.declarations",kind='phase'},M.declarations)
+M.collect=__metrics.wrap_sync({id="course-prairielearn.assessment.collect",kind='phase'},M.collect)
 return M

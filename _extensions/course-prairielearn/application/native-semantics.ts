@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 // JSON Schema does not express this pinned Community sync rule:
 // PrairieLearn/PrairieLearn 92584fe, src/sync/course-db.ts:1368.
 export function validateAssessmentSemantics(assessment: any, source: string) {
@@ -48,3 +50,6 @@ export function validateAssessmentSemantics(assessment: any, source: string) {
     }
   }
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+validateAssessmentSemantics=__metrics.wrapSync({id:"course-prairielearn.application.native-semantics.validateAssessmentSemantics",kind:"phase"},validateAssessmentSemantics);

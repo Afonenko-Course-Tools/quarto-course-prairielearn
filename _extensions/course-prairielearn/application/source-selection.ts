@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 import { join, relative, resolve } from "node:path";
 export const safePath = (p: string) =>
   typeof p === "string" && !!p && !/^(?:[\/\\]|[A-Za-z]:)/.test(p) &&
@@ -101,3 +103,12 @@ export async function selectedSources(root: string, p: any, runtime?: {sourceExt
   }
   return files;
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+hash=__metrics.wrapAsync({id:"course-prairielearn.application.source-selection.hash",kind:"phase"},hash);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+canonical=__metrics.wrapSync({id:"course-prairielearn.application.source-selection.canonical",kind:"phase"},canonical);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+readSelected=__metrics.wrapAsync({id:"course-prairielearn.application.source-selection.readSelected",kind:"phase"},readSelected);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+selectedSources=__metrics.wrapAsync({id:"course-prairielearn.application.source-selection.selectedSources",kind:"phase"},selectedSources);

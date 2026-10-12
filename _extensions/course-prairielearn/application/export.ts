@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 import { validateSlots } from "./slots.ts";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { diagnostic, type DiagnosticContext } from "./diagnostics.ts";
@@ -606,3 +608,8 @@ export async function exportPrairieLearn(
     throw e;
   }
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+uuid=__metrics.wrapAsync({id:"course-prairielearn.application.export.uuid",kind:"phase"},uuid);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+exportPrairieLearn=__metrics.wrapAsync({id:"course-prairielearn.application.export.exportPrairieLearn",kind:"phase"},exportPrairieLearn);

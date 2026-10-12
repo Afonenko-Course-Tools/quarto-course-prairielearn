@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 export const object = (v: any) =>
   v !== null && typeof v === "object" && !Array.isArray(v);
 export function closed(v: any, required: string[], optional: string[] = []) {
@@ -114,3 +116,10 @@ export function declarations(raw: any, key: string) {
     defaults: question(raw["question-defaults"]),
   };
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+closed=__metrics.wrapSync({id:"course-prairielearn.application.declarations.closed",kind:"phase"},closed);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+question=__metrics.wrapSync({id:"course-prairielearn.application.declarations.question",kind:"phase"},question);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+declarations=__metrics.wrapSync({id:"course-prairielearn.application.declarations.declarations",kind:"phase"},declarations);

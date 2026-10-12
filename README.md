@@ -221,3 +221,16 @@ The normalized question policy carries `single-variant` to native
 When absent the exporter omits the field: pinned Community documents its
 native default as `false` (variants may be generated). Declare `true` explicitly
 to preserve the earlier exporter's forced single-variant behavior.
+
+## Метрики производительности
+
+Значимые операции и явные обходы AST размечены локальным фасадом ABI 1.
+В обычной сборке (`off`, по умолчанию) фабрики возвращают исходные функции:
+агент, hooks, часы телеметрии и журналы не загружаются. Расширение самодостаточно.
+Сбор метрик включается launcher проекта `quarto-course-performance`; установка
+`COURSE_PERF_MODE` сама по себе агент не загружает и не обеспечивает валидные данные.
+TypeScript использует wall time, Lua — CPU процесса; шкалы анализируются раздельно.
+Counters обходов не являются числом посещённых AST-узлов.
+
+Прежний `COURSE_BUILD_TRACE` удалён; для новых измерений используются фасады ABI 1.
+Копии `observability/bridge.ts` и `bridge.lua` синхронизируются из проекта Performance.

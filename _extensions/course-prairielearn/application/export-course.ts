@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 import { qualifiedSlots, nativeSlotBlocks } from "./slots.ts";
 import { dirname, join, relative, resolve } from "node:path";
 import { verificationInventoryHash } from "./verification-inventory.ts";
@@ -459,3 +461,8 @@ async function parent(path: string) {
   await Deno.mkdir(dirname(path), { recursive: true });
   return path;
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+identity=__metrics.wrapAsync({id:"course-prairielearn.application.export-course.identity",kind:"phase"},identity);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+exportCourse=__metrics.wrapAsync({id:"course-prairielearn.application.export-course.exportCourse",kind:"phase"},exportCourse);

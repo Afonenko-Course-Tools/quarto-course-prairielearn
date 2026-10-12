@@ -1,3 +1,5 @@
+local __metrics=require("./observability/bridge").create_metrics("course-prairielearn",1)
+local __perfWalk1=__metrics.wrap_walk({id="course-prairielearn.native.walk.1",kind='ast_walk',scope="full-document"},function(node,filter)return node:walk(filter)end)
 local contract = require("./contract")
 local assessment = require("./assessment")
 local diagnostics = require("./diagnostics")
@@ -18,7 +20,7 @@ function M.read(doc, effective)
   local source = M.source()
   local value = {source = source, exercises = pandoc.List(),
     assessment = assessment.collect(doc.meta)}
-  doc:walk({traverse = "topdown", Div = function(d)
+  __perfWalk1(doc,{traverse = "topdown", Div = function(d)
     -- Core resolves this reserved public projection alongside full source facts.
     -- It is service transport, not a second authored platform exercise.
     if d.classes:includes("course-export-projection") and
@@ -87,4 +89,9 @@ function M.write(doc, value)
     file:write(pandoc.json.encode({name = contract.name, rules = contract.rules, directory = directory})); file:close()
   end
 end
+M.source=__metrics.wrap_sync({id="course-prairielearn.native.source",kind='phase'},M.source)
+M.target=__metrics.wrap_sync({id="course-prairielearn.native.target",kind='phase'},M.target)
+M.read=__metrics.wrap_sync({id="course-prairielearn.native.read",kind='phase'},M.read)
+M.vet=__metrics.wrap_sync({id="course-prairielearn.native.vet",kind='phase'},M.vet)
+M.write=__metrics.wrap_sync({id="course-prairielearn.native.write",kind='phase'},M.write)
 return M

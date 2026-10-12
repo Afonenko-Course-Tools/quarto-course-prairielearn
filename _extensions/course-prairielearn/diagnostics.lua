@@ -1,3 +1,5 @@
+local __metrics=require("./observability/bridge").create_metrics("course-prairielearn",1)
+
 -- Формат сообщений только этого пакета; исходные ошибки инструментов не меняем.
 local M = {}
 function M.message(code, message, context)
@@ -16,4 +18,5 @@ function M.message(code, message, context)
   if context.hint then text = text .. '\n  подсказка: ' .. context.hint end
   return text
 end
+M.message=__metrics.wrap_sync({id="course-prairielearn.diagnostics.message",kind='phase'},M.message)
 return M

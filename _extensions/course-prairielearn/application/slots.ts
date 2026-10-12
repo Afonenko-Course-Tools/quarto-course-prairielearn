@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 import { closed } from './declarations.ts';
 export function validateSlots(slots:any, courseId:string, workId:string, qualified=false){
  if(!Array.isArray(slots)||!slots.length)throw new Error('PL.SLOTS_INVALID: required slots v2');
@@ -22,3 +24,10 @@ export function nativeSlotBlocks(courseId:string,work:any,grading:any){
    : {id:courseId+'/'+slot.candidates[0],...grading.slots[slot.id],preferences};
  });
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+validateSlots=__metrics.wrapSync({id:"course-prairielearn.application.slots.validateSlots",kind:"phase"},validateSlots);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+qualifiedSlots=__metrics.wrapSync({id:"course-prairielearn.application.slots.qualifiedSlots",kind:"phase"},qualifiedSlots);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+nativeSlotBlocks=__metrics.wrapSync({id:"course-prairielearn.application.slots.nativeSlotBlocks",kind:"phase"},nativeSlotBlocks);
