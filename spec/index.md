@@ -2,7 +2,7 @@
 type: specification-index
 component: course-prairielearn
 status: current
-updated: 2026-10-08
+updated: 2026-10-12
 ---
 
 # Индекс спецификаций PrairieLearn
@@ -16,14 +16,11 @@ updated: 2026-10-08
 | --- | --- | --- | --- | --- |
 | [PrairieLearn: действующий контракт](../docs/authoring.md) | specification | course-prairielearn | current | native/CUE binding и selected participant delivery; client/tests/reference |
 | [Диагностика](../docs/diagnostics.md) | reference | course-prairielearn | current | Собственные ID и внешние причины этого адаптера |
-| [Body Core](../../quarto-course/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
-| [Авторская модель Core](../../quarto-course/spec/index.md) | specification/index | course-core | current | Банк, условия, решения и назначения |
-| [Результат реализации](../docs/releases/2026-10-08-implementation.md) | implementation-report | course-prairielearn | historical | Шаги 10 и завершение общего маршрута |
-| [Карта сохранённой истории](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/blob/70f62d424fb87ca2355a492123d89d32db5126dd/docs/history/2026-10-08/README.md) | history | course-prairielearn | historical | Исходные планы, probes/evidence, refs и provenance |
+| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/v6.0.0/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
+| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/v6.0.0/spec/index.md) | specification/index | course-core | current | Банк, условия, решения и назначения |
 
 Банк и назначения принадлежат текущему Core; этот адаптер проверяет свой вход
-на собственной границе. Порядок выпуска и финальные проверки сохраняются в
-[отчёте реализации](../docs/releases/2026-10-08-implementation.md).
+на собственной границе. Неизменяемые выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases).
 
 ## Full native export
 
