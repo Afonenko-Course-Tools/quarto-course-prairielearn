@@ -83,7 +83,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-      - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
         with:
           gradle-version: '9.1.0'
       - run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts
