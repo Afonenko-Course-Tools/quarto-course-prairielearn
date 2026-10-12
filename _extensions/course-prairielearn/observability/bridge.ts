@@ -24,7 +24,12 @@ const identity: Metrics = {
   childEnv: (base) => base,
 };
 export function createMetrics(extensionId: string, abiVersion: 1 = 1): Metrics {
-  const mode = Deno.env.get("COURSE_PERF_MODE");
+  let mode: string | undefined;
+  try {
+    mode = Deno.env.get("COURSE_PERF_MODE");
+  } catch {
+    return identity;
+  }
   if (!mode || mode === "off") return identity;
   const registry = globalThis as unknown as Record<symbol, unknown>;
   const agent = registry[Symbol.for("course.performance.agent.v1")] as {
