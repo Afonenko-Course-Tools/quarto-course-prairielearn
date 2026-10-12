@@ -20,7 +20,7 @@ export function gradingPolicy(work: any) {
     "assignment",
     "question-points",
     "question-max-points",
-    "question-overrides",
+    "slot-overrides",
     "max-points",
     "grade-rate-minutes",
     "advance-score-perc",
@@ -40,10 +40,10 @@ export function gradingPolicy(work: any) {
     policy["allow-multiple-instances"] !== undefined &&
     typeof policy["allow-multiple-instances"] !== "boolean"
   ) fail("allow-multiple-instances", "expected boolean");
-  const overrides = policy["question-overrides"] === undefined
+  const overrides = policy["slot-overrides"] === undefined
     ? {}
-    : policy["question-overrides"];
-  closed(overrides, [], work.items);
+    : policy["slot-overrides"];
+  closed(overrides, [], work.slots.map((slot:any)=>slot.id));
   const exam = ["test", "practical"].includes(work.kind);
   if (!exam && policy["allow-multiple-instances"] === true) {
     fail(
@@ -51,8 +51,9 @@ export function gradingPolicy(work: any) {
       "pinned Community forbids multiple Homework instances",
     );
   }
-  const questions: Record<string, any> = {};
-  for (const id of work.items) {
+  const slots: Record<string, any> = {};
+  for (const slot of work.slots) {
+    const id=slot.id;
     const override = overrides[id] === undefined ? {} : overrides[id];
     closed(override, [], questionFields);
     const effective = {
@@ -82,7 +83,7 @@ export function gradingPolicy(work: any) {
       );
     }
     if (
-      work.assignments?.[id]?.requirement !== "optional" &&
+      slot.assignment.requirement !== "optional" &&
       (Array.isArray(points) ? points.includes(0) : points === 0)
     ) {
       fail(
@@ -99,7 +100,7 @@ export function gradingPolicy(work: any) {
           : "expected nonnegative scalar or null",
       );
     }
-    if (ceiling === 0 && work.assignments?.[id]?.requirement !== "optional") {
+    if (ceiling === 0 && slot.assignment.requirement !== "optional") {
       fail(
         `question-max-points (${id})`,
         "required question ceiling must be positive; native zero-ceiling grading cannot complete a required question",
@@ -118,7 +119,7 @@ export function gradingPolicy(work: any) {
     if (advance !== undefined && (!scalar(advance) || advance > 100)) {
       fail(`advance-score-perc (${id})`, "expected number from 0 to 100");
     }
-    questions[id] = {
+    slots[id] = {
       points,
       triesPerVariant: effective.attempts,
       ...(ceiling != null ? { maxPoints: ceiling } : {}),
@@ -126,7 +127,7 @@ export function gradingPolicy(work: any) {
     };
   }
   return {
-    questions,
+    slots,
     assessment: {
       ...(policy["max-points"] != null
         ? { maxPoints: policy["max-points"] }

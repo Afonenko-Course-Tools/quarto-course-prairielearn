@@ -11,7 +11,7 @@ updated: 2026-10-10
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
-переключения версий схемы. Контракты этого ref: адаптер 5.0.0 и Core 5.0.0; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
+переключения версий схемы. Контракты этого ref: адаптер 6.0.0 и Core 6.0.0; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
 Канонические `#exr-*` имеют уникальные ID внутри явной области
 `exercise-bank: true`, собственные обязательные `difficulty` и положительное
 целое `time`. Эффективная `statement-visibility` берётся из атрибута задачи либо
@@ -47,14 +47,14 @@ CUE проверяет полученную модель и отклоняет �
 | Поле | Значение |
 |---|---|
 | `attempts` | Положительное целое число оцениваемых попыток для каждого задания. |
-| `pass.at-least` | Положительное целое число полностью выполненных required заданий, не больше числа required участников `.task-items`. |
+| `pass.at-least` | Положительное целое число полностью выполненных required заданий, не больше числа required позиций `.task-items`. |
 | `assignment` | Одна стратегия назначения: `mode: assessment-id` либо `student-label: <метка>`. |
 
 Локальные поля переопределяют общие; карты объединяются рекурсивно. Исключение —
 `assignment`: локальная стратегия целиком заменяет общую. В одной стратегии
 нельзя одновременно задавать `mode` и `student-label`. Неизвестные поля и
 неподдерживаемые режимы — ошибка. Все задания, входящие в такую контрольную, должны иметь
-`target="prairielearn"`. Их количество определяется ссылками в `.task-items`;
+`target="prairielearn"`. Их количество определяется позициями в `.task-items`;
 отдельный счётчик не используется. Повторы и ссылки на отсутствующие задания
 проверяет ядро.
 
@@ -106,7 +106,7 @@ student-label = "pl-" + sha1(UTF8(course.id) + byte(0) + UTF8(assessment.id))
 
 `attempts: 3` задаёт три оцениваемые попытки без снижения максимального балла.
 `pass.at-least: 2` означает две полностью выполненные задачи. Частичный балл
-за незавершённую задачу не считается выполненной задачей. Полная поставка сохраняет эту семантику в закрытом `works[].completion`, который применяет gateway к доверенным per-question results. Native raw grade остаётся отдельным показателем.
+за незавершённую задачу не считается выполненной задачей. Полная поставка сохраняет эту семантику в закрытом `works[].completion`, который применяет gateway к доверенным per-slot results. Native raw grade остаётся отдельным показателем.
 API доступа, назначение пользователей и запуск внешней проверки относятся к PrairieLearn.
 Экспортёр требует явную привязку каждого вопроса к `image`; `entrypoint`,
 `timeout`, `enableNetworking`, `environment` — необязательные явные настройки. Он создаёт файлы
@@ -144,19 +144,18 @@ Legacy `entrypoints/export.ts` создаёт только нативные во
 помещаются в `.assessment-preview` вне назначений. Stage demonstration требует
 open условия, канонической роли demonstration и фактического публичного решения.
 
-Body сохраняет `schema: course-body-package-v1`. Question содержит
+Body сохраняет `schema: course-body-package-v2`. Question содержит
 `statementVisibility: open|restricted`, boolean `hasPublicSolution` и
 необязательный `purpose: demonstration|discussion|independent-study|control`.
 `visibility: public` означает безопасный participant payload, включая выбранное
 restricted условие. Решения, ключи, gradingNotes и закрытые маркеры не входят
 в `question.html`; их guards сохраняются.
 
-Body work содержит qualified `items` и обязательные `assignments` с точно теми
-же ключами. Значение — `{stage?, requirement, workMode}` с указанными enum.
-Необязательный `theoryTime` — положительное конечное число минут, включая дробное;
-адаптер принимает его без собственного расчёта времени. Native CUE продолжает
-проверять локальную Course-модель. Binding вопросов по локальному `q.id` —
-самостоятельная платформенная карта, его ключи не заменяются Body assignments.
+Body work содержит qualified `slots`: позиция `course/work/slot`, candidates
+`course/exr-*`, selection fixed/random и assignment `{stage?,requirement,workMode}`.
+TheoryTime — положительное конечное число минут; Core владеет диапазонами времени.
+Кандидаты всех позиций совпадают с каталогом выбранных вопросов. Binding вопросов
+использует local q.id независимо от slot.id. Прежние items/assignments не принимаются.
 
 В поставку входят выбранные условия, поля ответа и проверенные ресурсы;
 внутренние заголовки условия сохраняются. Preview, внешние заголовки работы,
@@ -265,77 +264,28 @@ UUID. Обычная лабораторная доступна enrolled Student 
 
 `application/completion.ts` экспортирует `completionPolicy(courseId, work)` и
 `evaluateCompletion(policy, results)`. Policy в `delivery.works[].completion`:
-`schemaVersion:1`, `mode:required-question-completion`,
-`source:per-question-results-v1`, qualified `questionIds`/`requiredQuestionIds`,
+`schemaVersion:2`, `mode:required-slot-completion`,
+`source:per-slot-results-v2`, qualified `slotIds`/`requiredSlotIds`,
 `atLeast`, `fullyCompletedScore:1`. Порог больше required pool отклоняется.
 Gateway сначала проверяет user/activity/course-instance/assessment и текущий
 `deliveryHash`, затем читает доверенный narrow bridge и применяет predicate.
 Aggregate gradebook score не поддерживается как источник completion.
 
-Results закрыты: `schemaVersion:1`, `source:per-question-results-v1`,
-`questions:[{questionId, score, status}]`; score — конечное число0..1,
-status — graded/ungraded. Нужна ровно одна строка для каждого участника, включая
-ещё не начатые optional вопросы (score0,ungraded). Неизвестные/дублирующиеся/
-отсутствующие вопросы и неверные scores отклоняются. Только graded score===1
-из required pool считается выполненным. Predicate возвращает completedRequired,
-requiredTotal,atLeast,passed и локальный completion score0/1. Для защиты Gateway
-отправляет в AGS `scoreGiven=completedRequired`, `scoreMaximum=requiredTotal`;
-pass определяется отдельным порогом atLeast. Обычная лабораторная передаёт
-свой объявленный raw score, сохраняя weighted question scores. Три scores0.7
-при pass2 дают completedRequired0;
-полностью выполненные optional вопросы не заменяют невыполненные required.
-Native assessment text разъясняет отдельный критерий выполнения, preferences
-сохраняют courseRequirement каждого участника.
+Локальный evaluateCompletion принимает закрытый v2 с `slots:[{slotId,qualifiedId,
+score,status}]`, где статус complete/grading/unanswered. Ровно одна строка относится
+к назначенной позиции. Только complete score1 обязательной позиции учитывается.
+Полный Platform bridge дополнительно связывает state/currentAttempt, assignmentId/
+version, точки points/maxPoints и полный selected native instance_questions scope;
+Gateway проверяет эти данные независимо. Not-started не выдумывает выбор.
+Обычная lab передаёт фактическую взвешенную native оценку отдельно от completion.
 
-`verificationInventoryHash` — SHA256 от canonical sorted списка
-`{qualifiedId,scenario,optional}`: starter, все declared reference:NAME и
-contract:ID. Это opaque обязательство полной проверки; private решения и случаи
-не попадают в native payload. Platform сверяет hash и receipt coverage.
-Discovery нормализуется одинаково: min-executed1,allow-skippedfalse, затем
-объявленные поля, в том числе partial/empty maps.
+## Авторские баллы и повторные попытки (exporter 6.0.0)
 
-
-Native label и access override UUID — UUIDv5 в namespace курса от
-`student-label/<instance>/<label>` и `access/<instance>/<workId>`. Оффлайн test
-`tests/native-acl.ts` выполняет настоящий pinned Community resolver против
-экспортированных JSON: unassigned/foreign/revoked label denied и не listed;
-assigned обычный enrollment granted/submittable. Реальный Student session,
-прямой URL и Moodle AGS проверяются отдельно до readiness.
-
-
-В exporter 4.0.0 каждый instance требует явную закрытую декларацию публикации:
-
-```yaml
-publishing:
-  start-date: '2026-09-01T00:00:00+03:00'
-  end-date: '2027-07-01T00:00:00+03:00'
-```
-
-Оба значения — реальные ISO даты со временем и offset; начало строго раньше
-конца. Неизвестные поля, отсутствие policy, календарно неверные даты и даты без
-offset отвергаются. Экспорт переносит их в native `publishing.startDate/endDate`.
-Интервал разрешает доступ enrolled Student к instance; label ACL отдельно
-разрешает назначенные работы. `selfEnrollment` объявляется отдельно, старое
-instance `allowAccess` не генерируется: pinned Community запрещает сочетать их.
-Даты 1970–9999 в native примере — явная политика локального тестового pilot;
-преподаватель задаёт даты своего учебного потока. Teacher не получает PL admin
-из этой декларации. Правила попыток и pass.at-least наследуются через Core;
-декодер нормализует только эти числовые scalar поля перед CUE validation.
-
-Native `infoAssessment` сохраняет requirement в question preferences; каждый
-question `info.json.preferences.courseRequirement` объявляет встроенную схему
-`{type: string, default: required, enum: [required, optional]}`. Pinned Community
-92584 проверяет assessment override по этой question schema при sync. Она не
-заменяет authoritative completion predicate, который использует закрытую
-политику delivery. Отдельный `preferences.schema.json` этим upstream не читается.
-
-
-## Авторские баллы и повторные попытки (exporter 5.0.0)
-
-Версия 5.0.0 меняет контракт полного native экспорта: каждый вопрос выбранной
-работы требует явно объявленных баллов. Выпущенный 4.0.0 сохраняет свой контракт;
-обновляйте курсы после публикации 5.0.0 и объявления новых метаданных. Эти документы
-не подтверждают публикацию тегов или OCI image.
+Версия6.0.0 требует явной цены каждой позиции выбранной работы. Defaults
+question-points/question-max-points и attempts задают общие значения,
+slot-overrides меняет их по local slot ID. Случайная группа имеет общую максимальную
+цену и попытки. Прежние версии Body/delivery/completion не поддерживаются.
+Номер в документации сам по себе не подтверждает опубликованный тег или OCI image.
 
 Настройки задаются в metadata курса/книги, `_quarto.yml`, `_metadata.yml`,
 подключённом через native `metadata-files` файле `_*.yaml` либо front matter
@@ -348,7 +298,7 @@ question `info.json.preferences.courseRequirement` объявляет встро
 
 Отдельное объединение адаптера применяется между разными путями: inherited
 `prairielearn.assessment-defaults`, локальная `assessment.prairielearn` и
-`question-overrides`. На этих границах списки заменяются целиком, maps сливаются,
+`slot-overrides`. На этих границах списки заменяются целиком, maps сливаются,
 а явный null очищает ceiling. Это не отменяет предварительное native слияние
 Quarto по одному пути. Для предсказуемого авторства используйте scalar course
 points 1, а Exam schedule задавайте в document `assessment.prairielearn` или
@@ -375,7 +325,7 @@ assessment:
     question-points: [5, 3, 1]
     question-max-points: null
     allow-multiple-instances: true
-    question-overrides:
+    slot-overrides:
       exr-first:
         question-points: [4, 2]
         attempts: 2
@@ -400,7 +350,7 @@ boolean разрешён для Exam, Homework допускает только f
 — native `gradeRateMinutes`, неотрицательный минимальный интервал graded submissions.
 `advance-score-perc` — question `advanceScorePerc`, число 0–100 для перехода к
 следующим вопросам. Отсутствующие optional retry controls опускаются, поведение
-определяет pinned Community. `question-overrides` задаётся по точным локальным
+определяет pinned Community. `slot-overrides` задаётся по точным локальным
 ID участников и допускает points/max-points/attempts/advance-score-perc; неизвестные
 ID и поля отвергаются. `maxVariants` и другие неподдерживаемые knobs запрещены.
 Проектные runtime/limits/networking остаются закрытым отдельным project-check
@@ -431,3 +381,23 @@ awarded points / question max points; Exam начисляет приращени
 превращает diminishing credit в completion, не заменяет его JUnit score и не
 меняет подсчёт required вопросов на weighted grade. Аналогично высокий Homework
 ceiling может требовать накопления native credit до полной стоимости.
+
+## Случайные позиции и транспорт v2
+
+Core 6.0.0 задаёт `slots` вместо прежних `items/assignments`. Экспортёр 6.0.0
+принимает только Body `course-body-package-v2`. `slot.id` в Body и delivery —
+`course/work/slot`, кандидаты — `course/exr-*`. Все кандидаты экспортируются и
+проверяются атомарно, включая неназначенные конкретному студенту. Повтор снимка
+сохраняет стабильные UUID, полный каталог и delivery hash.
+
+Случайный Span `[@exr-a; @exr-b]{.task-alternatives #alt-x selection="random"}`
+создаёт один native блок `{numberChoose:1, points, triesPerVariant, alternatives}`.
+Обычная fixed позиция создаёт блок с `id`. Одновременные id/alternatives и выбор
+подмножества всей зоны отклоняются. В native БД fixed также имеет alternative group.
+
+`slot-overrides` заменяет прежнее поле question-overrides и адресует местный ID
+позиции exr-* или alt-*. Баллы, потолок и попытки действуют на всю группу: варианты
+имеют одинаковую максимальную цену. Completion v2 использует slotIds/requiredSlotIds,
+`mode: required-slot-completion`, `source: per-slot-results-v2`. Порог pass.at-least
+считает обязательные позиции; частичный балл и optional их не заменяют.
+Native delivery имеет schemaVersion2, work.slots и полный questions каталог.

@@ -1,3 +1,4 @@
+import { qualifiedSlots, nativeSlotBlocks } from "./slots.ts";
 import { dirname, join, relative, resolve } from "node:path";
 import { verificationInventoryHash } from "./verification-inventory.ts";
 import { gradingPolicy } from "./grading-policy.ts";
@@ -345,7 +346,7 @@ export async function exportCourse(
           number: String(index + 1),
           ...grading.assessment,
           text:
-            `Completion requires fully completing at least ${completion.atLeast} required questions. Partial scores and optional questions do not count toward completion.`,
+            `Выполните не менее ${completion.atLeast} обязательных позиций полностью. Частичный результат и необязательные позиции не заменяют обязательные.`,
           accessControl: work.relatedExercise
             ? [{
               beforeRelease: { listed: false },
@@ -372,20 +373,14 @@ export async function exportCourse(
             }],
           zones: [{
             title: work.title,
-            questions: work.items.map((id: string) => ({
-              id: input.courseId + "/" + id,
-              ...grading.questions[id],
-              preferences: {
-                courseRequirement: work.assignments[id].requirement,
-              },
-            })),
+            questions: nativeSlotBlocks(input.courseId,work,grading),
           }],
         },
       );
     }
     const files = await inventory(stage);
     const delivery: any = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       courseId: input.courseId,
       bookRoot: input.checks.bookRoot,
       sourceSnapshotHash: input.checks.sourceSnapshotHash,
@@ -399,8 +394,7 @@ export async function exportCourse(
       gradingPayloads: questions,
       works: works.map((w: any) => ({
         id: w.id,
-        items: w.items,
-        assignments: w.assignments,
+        slots: qualifiedSlots(input.courseId,w),
         policy: Object.fromEntries(
           Object.entries(w.extensions.prairielearn).filter(([key]) =>
             w.relatedExercise || key !== "assignment"

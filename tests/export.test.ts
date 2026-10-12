@@ -4,7 +4,7 @@ const assert = (v: unknown, m: string) => {
   if (!v) throw Error(m);
 };
 const p = () => ({
-  schema: "course-body-package-v1",
+  schema: "course-body-package-v2",
   owner: "demo",
   release: "native",
   apiVersion: [1, 23, 1],
@@ -27,10 +27,7 @@ const p = () => ({
     source: "lab.qmd",
     kind: "lab",
     title: "Lab",
-    items: ["demo/exr-clamp"],
-    assignments: {
-      "demo/exr-clamp": { requirement: "required", workMode: "individual" },
-    },
+    slots: [{id:'demo/sec-lab/exr-clamp',selection:'fixed',candidates:['demo/exr-clamp'],assignment:{requirement:'required',workMode:'individual'}}],
   }],
   resources: [],
 });
@@ -164,7 +161,7 @@ Deno.test("PL refuses questions outside selected work and protects literal templ
       projects: { "exr-clamp": "/projects/clamp" },
     };
     const foreign = p();
-    foreign.works[0].items = [];
+    foreign.works[0].slots = [];
     let rejected = false;
     try {
       await exportPrairieLearn(foreign, context, binding, root + "/invalid");
@@ -590,7 +587,7 @@ Deno.test("PL accepts restricted participant-safe statements and new assignment 
       const candidate: any = p();
       candidate.works[0].kind = kind;
       candidate.works[0].theoryTime = 2.5;
-      candidate.works[0].assignments["demo/exr-clamp"] = {
+      candidate.works[0].slots[0].assignment = {
         stage: "homework",
         requirement: "optional",
         workMode: "pair",
@@ -601,7 +598,7 @@ Deno.test("PL accepts restricted participant-safe statements and new assignment 
       );
       assert(
         delivery.works[0].theoryTime === 2.5 &&
-          delivery.works[0].assignments["demo/exr-clamp"].workMode === "pair",
+          delivery.works[0].slots[0].assignment.workMode === "pair",
         "assignment metadata lost",
       );
     }
@@ -609,7 +606,7 @@ Deno.test("PL accepts restricted participant-safe statements and new assignment 
     demonstration.questions[0].statementVisibility = "open";
     demonstration.questions[0].purpose = "demonstration";
     demonstration.questions[0].hasPublicSolution = true;
-    demonstration.works[0].assignments["demo/exr-clamp"].stage =
+    demonstration.works[0].slots[0].assignment.stage =
       "demonstration";
     await exportPrairieLearn(
       demonstration,
@@ -628,51 +625,36 @@ Deno.test("PL standalone guards reject invalid work, assignment and statement po
     const cases: [string, (p: any) => void][] = [
       ["null work", (p) => p.works[0] = null],
       ["null question", (p) => p.questions[0] = null],
-      ["missing assignments", (p) => delete p.works[0].assignments],
-      [
-        "legacy requirements",
-        (p) => p.works[0].requirements = { "exr-clamp": "required" },
-      ],
-      [
-        "bare assignment key",
-        (p) =>
-          p.works[0].assignments = {
-            "exr-clamp": { requirement: "required", workMode: "individual" },
-          },
-      ],
-      [
-        "extra assignment key",
-        (p) =>
-          p.works[0].assignments["demo/exr-other"] = {
-            requirement: "required",
-            workMode: "individual",
-          },
-      ],
-      ["missing assignment", (p) => p.works[0].assignments = {}],
+      ["missing slots",(p)=>delete p.works[0].slots],
+      ["old assignments",(p)=>p.works[0].assignments={}],
+      ["old items",(p)=>p.works[0].items=[]],
+      ["unqualified slot",(p)=>p.works[0].slots[0].id='exr-clamp'],
+      ["foreign candidate",(p)=>p.works[0].slots[0].candidates=['other/exr-clamp']],
+      ["missing assignment",(p)=>delete p.works[0].slots[0].assignment],
       [
         "missing requirement",
-        (p) => delete p.works[0].assignments["demo/exr-clamp"].requirement,
+        (p) => delete p.works[0].slots[0].assignment.requirement,
       ],
       [
         "missing workMode",
-        (p) => delete p.works[0].assignments["demo/exr-clamp"].workMode,
+        (p) => delete p.works[0].slots[0].assignment.workMode,
       ],
       [
         "unknown assignment field",
-        (p) => p.works[0].assignments["demo/exr-clamp"].extra = true,
+        (p) => p.works[0].slots[0].assignment.extra = true,
       ],
       [
         "invalid stage",
-        (p) => p.works[0].assignments["demo/exr-clamp"].stage = "lecture",
+        (p) => p.works[0].slots[0].assignment.stage = "lecture",
       ],
       [
         "invalid requirement",
         (p) =>
-          p.works[0].assignments["demo/exr-clamp"].requirement = "mandatory",
+          p.works[0].slots[0].assignment.requirement = "mandatory",
       ],
       [
         "invalid work mode",
-        (p) => p.works[0].assignments["demo/exr-clamp"].workMode = "team",
+        (p) => p.works[0].slots[0].assignment.workMode = "team",
       ],
       ["legacy kind", (p) => p.works[0].kind = "handout"],
       ["foreign owner", (p) => p.works[0].owner = "other"],
@@ -705,17 +687,17 @@ Deno.test("PL standalone guards reject invalid work, assignment and statement po
         p.questions[0].statementVisibility = "open";
       }],
       ["restricted demonstration", (p) => {
-        p.works[0].assignments["demo/exr-clamp"].stage = "demonstration";
+        p.works[0].slots[0].assignment.stage = "demonstration";
         p.questions[0].purpose = "demonstration";
         p.questions[0].hasPublicSolution = true;
       }],
       ["demonstration without purpose", (p) => {
-        p.works[0].assignments["demo/exr-clamp"].stage = "demonstration";
+        p.works[0].slots[0].assignment.stage = "demonstration";
         p.questions[0].statementVisibility = "open";
         p.questions[0].hasPublicSolution = true;
       }],
       ["demonstration without public solution", (p) => {
-        p.works[0].assignments["demo/exr-clamp"].stage = "demonstration";
+        p.works[0].slots[0].assignment.stage = "demonstration";
         p.questions[0].statementVisibility = "open";
         p.questions[0].purpose = "demonstration";
       }],

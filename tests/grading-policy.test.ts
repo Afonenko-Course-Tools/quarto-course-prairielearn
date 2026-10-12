@@ -4,7 +4,7 @@ const assert = (v: unknown, m: string) => {
 };
 Deno.test("required zero-ceiling Homework fails actionable; optional zero-point zero-ceiling remains supported", () => {
   const w = work();
-  w.assignments["exr-a"].requirement = "required";
+  w.slots[0].assignment.requirement = "required";
   w.extensions.prairielearn["question-points"] = 1;
   w.extensions.prairielearn["question-max-points"] = 0;
   let message = "";
@@ -18,9 +18,9 @@ Deno.test("required zero-ceiling Homework fails actionable; optional zero-point 
       message.includes("required question ceiling must be positive"),
     "impossible required zero-ceiling completion accepted",
   );
-  w.assignments["exr-a"].requirement = "optional";
+  w.slots[0].assignment.requirement = "optional";
   w.extensions.prairielearn["question-points"] = 0;
-  const native = gradingPolicy(w).questions["exr-a"];
+  const native = gradingPolicy(w).slots["exr-a"];
   assert(
     native.points === 0 && native.maxPoints === 0,
     "optional zero-ceiling policy changed",
@@ -30,11 +30,7 @@ const work = () => ({
   id: "sec-lab",
   source: "tasks/lab.qmd",
   kind: "lab",
-  items: ["exr-a", "exr-b"],
-  assignments: {
-    "exr-a": { requirement: "optional" },
-    "exr-b": { requirement: "required" },
-  },
+  slots: [{id:'exr-a',selection:'fixed',candidates:['exr-a'],assignment:{requirement:'optional',workMode:'individual'}},{id:'exr-b',selection:'fixed',candidates:['exr-b'],assignment:{requirement:'required',workMode:'individual'}}],
   extensions: {
     prairielearn: {
       attempts: 3,
@@ -45,7 +41,7 @@ const work = () => ({
       "grade-rate-minutes": 0,
       "advance-score-perc": 60,
       "allow-multiple-instances": false,
-      "question-overrides": {
+      "slot-overrides": {
         "exr-b": {
           "question-points": 4,
           attempts: 5,
@@ -58,15 +54,15 @@ const work = () => ({
 Deno.test("authored scores and retry controls preserve scalar values and per-question null/overrides", () => {
   const p = gradingPolicy(work());
   assert(
-    p.questions["exr-a"].points === 2.5 &&
-      p.questions["exr-a"].maxPoints === 6 &&
-      p.questions["exr-a"].triesPerVariant === 3,
+    p.slots["exr-a"].points === 2.5 &&
+      p.slots["exr-a"].maxPoints === 6 &&
+      p.slots["exr-a"].triesPerVariant === 3,
     "default changed",
   );
   assert(
-    p.questions["exr-b"].points === 4 &&
-      p.questions["exr-b"].triesPerVariant === 5 &&
-      !Object.hasOwn(p.questions["exr-b"], "maxPoints"),
+    p.slots["exr-b"].points === 4 &&
+      p.slots["exr-b"].triesPerVariant === 5 &&
+      !Object.hasOwn(p.slots["exr-b"], "maxPoints"),
     "override/clear lost",
   );
   assert(
@@ -78,7 +74,7 @@ Deno.test("authored scores and retry controls preserve scalar values and per-que
 Deno.test("missing explicit points fails actionable; no internal score/count ceiling or repeat default", () => {
   const w = work();
   delete w.extensions.prairielearn["question-points"];
-  delete w.extensions.prairielearn["question-overrides"];
+  delete w.extensions.prairielearn["slot-overrides"];
   let error = "";
   try {
     gradingPolicy(w);
@@ -92,15 +88,15 @@ Deno.test("missing explicit points fails actionable; no internal score/count cei
     "missing score diagnostic not actionable",
   );
   w.extensions.prairielearn["question-points"] = 0;
-  w.assignments["exr-b"].requirement = "optional";
+  w.slots[1].assignment.requirement = "optional";
   delete w.extensions.prairielearn["max-points"];
   delete w.extensions.prairielearn["question-max-points"];
   delete w.extensions.prairielearn["grade-rate-minutes"];
   delete w.extensions.prairielearn["allow-multiple-instances"];
   const p = gradingPolicy(w);
   assert(
-    p.questions["exr-a"].points === 0 &&
-      !Object.hasOwn(p.questions["exr-a"], "maxPoints") &&
+    p.slots["exr-a"].points === 0 &&
+      !Object.hasOwn(p.slots["exr-a"], "maxPoints") &&
       Object.keys(p.assessment).length === 0,
     "optional native defaults replaced silently",
   );
@@ -119,10 +115,10 @@ Deno.test("Exam accepts nonincreasing arrays, clears max; Homework rejects array
       ["allow-multiple-instances", "false"],
       ["maxVariants", 2],
       ["allow-multiple-instances", true],
-      ["question-overrides", null],
-      ["question-overrides", { "exr-a": null }],
-      ["question-overrides", { "exr-unknown": { "question-points": 1 } }],
-      ["question-overrides", { "exr-a": { unknown: 1 } }],
+      ["slot-overrides", null],
+      ["slot-overrides", { "exr-a": null }],
+      ["slot-overrides", { "exr-unknown": { "question-points": 1 } }],
+      ["slot-overrides", { "exr-a": { unknown: 1 } }],
     ] as [string, any][]
   ) {
     const w = work();
@@ -147,7 +143,7 @@ Deno.test("Exam accepts nonincreasing arrays, clears max; Homework rejects array
   assert(bad, "Exam silently drops authored Homework max");
   w.extensions.prairielearn["question-max-points"] = null;
   assert(
-    JSON.stringify(gradingPolicy(w).questions["exr-a"].points) === "[5,3,1]",
+    JSON.stringify(gradingPolicy(w).slots["exr-a"].points) === "[5,3,1]",
     "Exam list changed",
   );
   w.extensions.prairielearn["question-points"] = [1, 3];
@@ -171,7 +167,7 @@ Deno.test("Exam accepts nonincreasing arrays, clears max; Homework rejects array
 
 Deno.test("required zero-point questions fail closed; optional zero never supplies completion", () => {
   const w = work();
-  w.assignments["exr-a"].requirement = "required";
+  w.slots[0].assignment.requirement = "required";
   w.extensions.prairielearn["question-points"] = 0;
   w.extensions.prairielearn["question-max-points"] = null;
   let message = "";
@@ -184,9 +180,9 @@ Deno.test("required zero-point questions fail closed; optional zero never suppli
     message.includes("required questions must have positive points"),
     "required zero silently accepted",
   );
-  w.assignments["exr-a"].requirement = "optional";
+  w.slots[0].assignment.requirement = "optional";
   assert(
-    gradingPolicy(w).questions["exr-a"].points === 0,
+    gradingPolicy(w).slots["exr-a"].points === 0,
     "optional zero with no ceiling rejected",
   );
 });

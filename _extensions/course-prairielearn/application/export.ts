@@ -1,3 +1,4 @@
+import { validateSlots } from "./slots.ts";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { diagnostic, type DiagnosticContext } from "./diagnostics.ts";
 const fail = (
@@ -167,7 +168,7 @@ export async function exportPrairieLearn(
       "questions",
       "works",
       "resources",
-    ]) || p?.schema !== "course-body-package-v1" ||
+    ]) || p?.schema !== "course-body-package-v2" ||
     !/^([a-z][a-z0-9-]*)$/.test(p.owner) || !Array.isArray(p.questions) ||
     !p.questions.length || !Array.isArray(p.resources) ||
     !Array.isArray(p.apiVersion)
@@ -198,73 +199,12 @@ export async function exportPrairieLearn(
   } catch (e) {
     if (!(e instanceof Deno.errors.NotFound)) throw e;
   }
-  if (
-    !Array.isArray(p.works) || p.works.length !== 1 ||
-    !Array.isArray(work?.items) || !p.works[0].items.length ||
-    new Set(p.works[0].items).size !== p.works[0].items.length ||
-    p.works[0].items.length !== p.questions.length ||
-    p.questions.some((q: any) => !p.works[0].items.includes(q?.key))
-  ) {
-    refuse(
-      "Вопросы должны совпадать с составом одной выбранной работы",
-      "works.items",
-    );
-  }
-  if (
-    !fields(work, [
-      "owner",
-      "id",
-      "key",
-      "source",
-      "kind",
-      "title",
-      "items",
-      "assignments",
-    ], ["theoryTime", "relatedExercise"]) ||
-    work.owner !== p.owner || typeof work.id !== "string" ||
-    !/^[a-z][a-z0-9-]*$/.test(work.id) ||
-    work.key !== p.owner + "/" + work.id || typeof work.source !== "string" ||
-    !work.source ||
-    typeof work.title !== "string" || !work.title.trim() ||
-    !["lab", "seminar", "practical", "test"].includes(work.kind) ||
-    !record(work.assignments) ||
-    Object.keys(work.assignments).length !== work.items.length ||
-    work.items.some((key: unknown) =>
-      typeof key !== "string" || !key.startsWith(p.owner + "/") ||
-      !Object.hasOwn(work.assignments, key)
-    ) ||
-    Object.keys(work.assignments).some((key) => !work.items.includes(key)) ||
-    work.relatedExercise !== undefined &&
-      (typeof work.relatedExercise !== "string" ||
-        !/^exr-[a-z0-9][a-z0-9-]*$/.test(work.relatedExercise)) ||
-    work.theoryTime !== undefined &&
-      (typeof work.theoryTime !== "number" ||
-        !Number.isFinite(work.theoryTime) || work.theoryTime <= 0)
-  ) {
-    refuse(
-      "Неверные метаданные выбранной работы или карта назначений",
-      "works",
-    );
-  }
-  for (
-    const [key, assignment] of Object.entries(work.assignments) as [
-      string,
-      any,
-    ][]
-  ) {
-    if (
-      !fields(assignment, ["requirement", "workMode"], ["stage"]) ||
-      !["required", "optional"].includes(assignment.requirement) ||
-      !["individual", "pair", "group"].includes(assignment.workMode) ||
-      assignment.stage !== undefined &&
-        !["demonstration", "classroom", "homework"].includes(assignment.stage)
-    ) {
-      refuse(
-        "Неверные поля назначения задания " + key,
-        "works.assignments." + key,
-      );
-    }
-  }
+  if(!Array.isArray(p.works)||p.works.length!==1)refuse("Требуется одна работа","works");
+  if(!fields(work,["owner","id","key","source","kind","title","slots"],["theoryTime","relatedExercise"])||work.owner!==p.owner||work.key!==p.owner+"/"+work.id||typeof work.id!=="string"||!/^[a-z][a-z0-9-]*$/.test(work.id)||typeof work.source!=="string"||!work.source||typeof work.title!=="string"||!work.title.trim()||!["lab","seminar","practical","test"].includes(work.kind)||work.relatedExercise!==undefined&&!/^exr-[a-z0-9][a-z0-9-]*$/.test(work.relatedExercise)||work.theoryTime!==undefined&&(typeof work.theoryTime!=="number"||!Number.isFinite(work.theoryTime)||work.theoryTime<=0))refuse("Неверные поля работы v2","works");
+  try {validateSlots(work.slots,p.owner,work.id,true);} catch(error){refuse("Неверные позиции Body v2: "+String(error),"works.slots");}
+  const candidates=work.slots.flatMap((slot:any)=>slot.candidates);
+  if(candidates.length!==p.questions.length||p.questions.some((q:any)=>!candidates.includes(q?.key)))refuse("Каталог должен содержать всех кандидатов","works.slots");
+  const assignments=Object.fromEntries(work.slots.flatMap((slot:any)=>slot.candidates.map((id:string)=>[id,slot.assignment])));
   const prepared: { name: string; data: Uint8Array }[] = [];
   const text = (name: string, data: string) =>
     prepared.push({ name, data: new TextEncoder().encode(data) });
@@ -315,7 +255,7 @@ export async function exportPrairieLearn(
       );
     }
     if (
-      work.assignments[q.key].stage === "demonstration" &&
+      assignments[q.key].stage === "demonstration" &&
       (q.statementVisibility !== "open" || q.purpose !== "demonstration" ||
         !q.hasPublicSolution)
     ) {

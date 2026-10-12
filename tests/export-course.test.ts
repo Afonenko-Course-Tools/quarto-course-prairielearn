@@ -33,7 +33,7 @@ Deno.test("pinned native Exam semantics reject question ceilings including alter
       const member = { id: "demo/exr-a", points: 1, [field]: 1 };
       const assessment = {
         type: "Exam",
-        zones: [{ questions: [pooled ? { alternatives: [member] } : member] }],
+        zones: [{ questions: [pooled ? { numberChoose:1,alternatives: [member] } : member] }],
       };
       let rejected = false;
       try {
@@ -230,8 +230,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       source: "lab.qmd",
       kind: "lab",
       title: "Lab",
-      items: ["exr-a"],
-      assignments: { "exr-a": assignment },
+      slots: [{id:"exr-a",selection:"fixed",candidates:["exr-a"],assignment}],
       extensions: {
         prairielearn: {
           attempts: 2,
@@ -273,7 +272,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       trustedTests: [test],
     };
     const body = {
-      schema: "course-body-package-v1",
+      schema: "course-body-package-v2",
       owner: "demo",
       release: "1",
       apiVersion: [1, 23, 1],
@@ -297,8 +296,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         source: "lab.qmd",
         kind: "lab",
         title: "Lab",
-        items: ["demo/exr-a"],
-        assignments: { "demo/exr-a": assignment },
+        slots: [{id:"demo/sec-lab/exr-a",selection:"fixed",candidates:["demo/exr-a"],assignment}],
       }],
     };
     const input: any = {
@@ -472,26 +470,14 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       }
       assert(absent, "missing explicit points published partial output");
     }
-    three.items = ids;
-    three.assignments = Object.fromEntries(
-      ids.map((
-        id,
-        i,
-      ) => [id, {
-        ...assignment,
-        requirement: i === 2 ? "optional" : "required",
-      }]),
-    );
+    three.slots=ids.map((id,i)=>({id,selection:'fixed',candidates:[id],assignment:{...assignment,requirement:i===2?'optional':'required'}}));
     three.extensions.prairielearn.pass["at-least"] = 2;
     threeBody.questions = ids.map((id) => ({
       ...structuredClone(body.questions[0]),
       id,
       key: "demo/" + id,
     }));
-    threeBody.works[0].items = ids.map((id) => "demo/" + id);
-    threeBody.works[0].assignments = Object.fromEntries(
-      ids.map((id) => ["demo/" + id, three.assignments[id]]),
-    );
+    threeBody.works[0].slots=three.slots.map((slot:any)=>({...slot,id:'demo/sec-lab/'+slot.id,candidates:slot.candidates.map((id:string)=>'demo/'+id)}));
     const threeDelivery = await exportCourse({
       ...input,
       result: {
@@ -508,6 +494,19 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       output: root + "/three",
       checksOutput: root + "/checks3.json",
     });
+    const randomWork=structuredClone(three);
+    randomWork.slots=[{id:'alt-numbers',selection:'random',candidates:ids.slice(0,2),assignment:{...assignment,requirement:'required'}},{...three.slots[2],assignment:{...assignment,requirement:'required'}}];
+    const randomBody=structuredClone(threeBody);
+    randomBody.works[0].slots=randomWork.slots.map((slot:any)=>({...slot,id:'demo/sec-lab/'+slot.id,candidates:slot.candidates.map((id:string)=>'demo/'+id)}));
+    const randomInput={...input,result:{model:{assessments:[randomWork],exercises:ids.map(id=>({id,target:'prairielearn'}))}},checks:{...input.checks,projects:ids.map(id=>({...fact,exerciseId:id}))},body:async()=>randomBody};
+    const randomDelivery=await exportCourse({...randomInput,output:root+'/random',checksOutput:root+'/random-checks.json'});
+    const randomAgain=await exportCourse({...randomInput,output:root+'/random-again',checksOutput:root+'/random-again-checks.json'});
+    const randomNative=JSON.parse(await Deno.readTextFile(root+'/random/courseInstances/pilot/assessments/sec-lab/infoAssessment.json'));
+    assert(randomDelivery.schemaVersion===2&&randomDelivery.questions.length===3&&randomDelivery.works[0].slots.length===2&&randomDelivery.works[0].completion.requiredSlotIds.length===2,'random catalog/slots/completion not preserved');
+    assert(randomDelivery.deliveryHash===randomAgain.deliveryHash,'random unchanged snapshot is not deterministic');
+    const pool=randomNative.zones[0].questions[0];
+    assert(pool.numberChoose===1&&pool.alternatives.length===2&&pool.points===2.5&&pool.maxPoints===6&&pool.triesPerVariant===2&&!('id' in pool),'random group native shape changed');
+    assert(randomNative.zones[0].questions[1].id==='demo/'+ids[2]&&randomNative.zones[0].numberChoose===undefined,'mixed fixed/random native blocks invalid');
     const instance = JSON.parse(
       await Deno.readTextFile(
         root + "/three/courseInstances/pilot/infoCourseInstance.json",
@@ -587,7 +586,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
     }
     assert(
       threeDelivery.works[0].completion.atLeast === 2 &&
-        threeDelivery.works[0].completion.requiredQuestionIds.length === 2,
+        threeDelivery.works[0].completion.requiredSlotIds.length === 2,
       "authoritative required completion not sealed",
     );
     assert(
