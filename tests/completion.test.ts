@@ -8,22 +8,18 @@ const assert = (v: unknown, m: string) => {
 };
 const work = {
   id: "sec-lab",
-  items: ["exr-a", "exr-b", "exr-c"],
-  assignments: {
-    "exr-a": { requirement: "required" },
-    "exr-b": { requirement: "required" },
-    "exr-c": { requirement: "required" },
-  },
+  slots: ['exr-a','exr-b','exr-c'].map(id=>({id,selection:'fixed',candidates:[id],assignment:{requirement:'required',workMode:'individual'}})),
   extensions: { prairielearn: { pass: { "at-least": 2 } } },
 };
 function results(scores: number[]) {
   return {
-    schemaVersion: 1,
-    source: "per-question-results-v1",
-    questions: scores.map((score, i) => ({
-      questionId: "demo/" + work.items[i],
+    schemaVersion: 2,
+    source: "per-slot-results-v2",
+    slots: scores.map((score, i) => ({
+      slotId: "demo/sec-lab/" + work.slots[i].id,
+      qualifiedId: "demo/"+work.slots[i].id,
       score,
-      status: "graded",
+      status: "complete",
     })),
   };
 }
@@ -41,8 +37,8 @@ Deno.test("partial weighted scores reaching native point threshold never complet
 });
 Deno.test("optional completions cannot replace required pool and impossible threshold rejected", () => {
   const w = structuredClone(work);
-  w.assignments["exr-b"].requirement = "optional";
-  w.assignments["exr-c"].requirement = "optional";
+  w.slots[1].assignment.requirement = "optional";
+  w.slots[2].assignment.requirement = "optional";
   w.extensions.prairielearn.pass["at-least"] = 1;
   assert(
     !evaluateCompletion(completionPolicy("demo", w), results([0, 1, 1])).passed,
@@ -62,9 +58,9 @@ Deno.test("aggregate absent duplicate invalid and ungraded result paths fail clo
   for (
     const r of [{ score: 1 }, results([1]), {
       ...results([1, 1, 0]),
-      questions: [
-        results([1, 1, 0]).questions[0],
-        results([1, 1, 0]).questions[0],
+      slots: [
+        results([1, 1, 0]).slots[0],
+        results([1, 1, 0]).slots[0],
       ],
     }, results([1.1, 1, 0])]
   ) {
@@ -77,7 +73,7 @@ Deno.test("aggregate absent duplicate invalid and ungraded result paths fail clo
     assert(rejected, "unsupported results accepted");
   }
   const r = results([1, 1, 0]);
-  r.questions[0].status = "ungraded";
+  r.slots[0].status = "unanswered";
   assert(!evaluateCompletion(p, r).passed, "ungraded counted");
 });
 Deno.test("partial discovery defaults are identical for each single key and empty map", () => {

@@ -20,7 +20,7 @@ import "list"
 #PrairieLearnScoringPolicy: {
  "question-points"?: #PrairieLearnQuestionPoints
  "question-max-points"?: (number & >=0) | null
- "question-overrides"?: {[string & =~"^exr-[a-z0-9-]+$"]: #PrairieLearnQuestionGrading}
+ "slot-overrides"?: {[string & =~"^(exr|alt)-[a-z0-9-]+$"]: #PrairieLearnQuestionGrading}
  "max-points"?: (number & >=0) | null
  "grade-rate-minutes"?: number & >=0
  "advance-score-perc"?: number & >=0 & <=100
@@ -48,9 +48,9 @@ import "list"
 }
 
 #Assessment: {
-	items: [...string]
+	slots: [...{id:string,candidates:[...string],assignment:{requirement:string,...},...}]
 	extensions: prairielearn?: #PrairieLearnAssessment & {
-		pass: "at-least": <=len(items)
+		pass: "at-least": <=len(slots)
 	}
 }
 
@@ -59,9 +59,9 @@ import "list"
 	assessments: [..._]
 	PL001_externalAssessmentMembers: {
 		for a in assessments if a.extensions.prairielearn != _|_ {
-			for id in a.items {
+			for slot in a.slots { for id in slot.candidates {
 				"\(a.id)/\(id)": list.Contains([for e in exercises if e.target != _|_ if e.target == #PrairieLearnTarget {e.id}], id) & true
-			}
+			}}
 		}
 	}
 }

@@ -80,7 +80,7 @@ try {
     "Quarto same-key concatenation changed",
   );
   assert(
-    JSON.stringify(gradingPolicy(work).questions["exr-add"].points) ===
+    JSON.stringify(gradingPolicy(work).slots["exr-add"].points) ===
       expected,
     "adapter changed authored Quarto concatenation",
   );
@@ -97,7 +97,7 @@ try {
     await Deno.readTextFile(join(root, "effective.json")),
   );
   assert(
-    JSON.stringify(report.works[0].native.questions["exr-add"].points) ===
+    JSON.stringify(report.works[0].native.slots["exr-add"].points) ===
       expected,
     "inspect report changed same-key concatenation",
   );

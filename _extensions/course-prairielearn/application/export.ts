@@ -1,3 +1,4 @@
+import { validateSlots } from "./slots.ts";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { diagnostic, type DiagnosticContext } from "./diagnostics.ts";
 const fail = (
@@ -167,7 +168,7 @@ export async function exportPrairieLearn(
       "questions",
       "works",
       "resources",
-    ]) || p?.schema !== "course-body-package-v1" ||
+    ]) || p?.schema !== "course-body-package-v2" ||
     !/^([a-z][a-z0-9-]*)$/.test(p.owner) || !Array.isArray(p.questions) ||
     !p.questions.length || !Array.isArray(p.resources) ||
     !Array.isArray(p.apiVersion)
@@ -198,73 +199,12 @@ export async function exportPrairieLearn(
   } catch (e) {
     if (!(e instanceof Deno.errors.NotFound)) throw e;
   }
-  if (
-    !Array.isArray(p.works) || p.works.length !== 1 ||
-    !Array.isArray(work?.items) || !p.works[0].items.length ||
-    new Set(p.works[0].items).size !== p.works[0].items.length ||
-    p.works[0].items.length !== p.questions.length ||
-    p.questions.some((q: any) => !p.works[0].items.includes(q?.key))
-  ) {
-    refuse(
-      "Вопросы должны совпадать с составом одной выбранной работы",
-      "works.items",
-    );
-  }
-  if (
-    !fields(work, [
-      "owner",
-      "id",
-      "key",
-      "source",
-      "kind",
-      "title",
-      "items",
-      "assignments",
-    ], ["theoryTime", "relatedExercise"]) ||
-    work.owner !== p.owner || typeof work.id !== "string" ||
-    !/^[a-z][a-z0-9-]*$/.test(work.id) ||
-    work.key !== p.owner + "/" + work.id || typeof work.source !== "string" ||
-    !work.source ||
-    typeof work.title !== "string" || !work.title.trim() ||
-    !["lab", "seminar", "practical", "test"].includes(work.kind) ||
-    !record(work.assignments) ||
-    Object.keys(work.assignments).length !== work.items.length ||
-    work.items.some((key: unknown) =>
-      typeof key !== "string" || !key.startsWith(p.owner + "/") ||
-      !Object.hasOwn(work.assignments, key)
-    ) ||
-    Object.keys(work.assignments).some((key) => !work.items.includes(key)) ||
-    work.relatedExercise !== undefined &&
-      (typeof work.relatedExercise !== "string" ||
-        !/^exr-[a-z0-9][a-z0-9-]*$/.test(work.relatedExercise)) ||
-    work.theoryTime !== undefined &&
-      (typeof work.theoryTime !== "number" ||
-        !Number.isFinite(work.theoryTime) || work.theoryTime <= 0)
-  ) {
-    refuse(
-      "Неверные метаданные выбранной работы или карта назначений",
-      "works",
-    );
-  }
-  for (
-    const [key, assignment] of Object.entries(work.assignments) as [
-      string,
-      any,
-    ][]
-  ) {
-    if (
-      !fields(assignment, ["requirement", "workMode"], ["stage"]) ||
-      !["required", "optional"].includes(assignment.requirement) ||
-      !["individual", "pair", "group"].includes(assignment.workMode) ||
-      assignment.stage !== undefined &&
-        !["demonstration", "classroom", "homework"].includes(assignment.stage)
-    ) {
-      refuse(
-        "Неверные поля назначения задания " + key,
-        "works.assignments." + key,
-      );
-    }
-  }
+  if(!Array.isArray(p.works)||p.works.length!==1)refuse("Требуется одна работа","works");
+  if(!fields(work,["owner","id","key","source","kind","title","slots"],["theoryTime","relatedExercise"])||work.owner!==p.owner||work.key!==p.owner+"/"+work.id||typeof work.id!=="string"||!/^[a-z][a-z0-9-]*$/.test(work.id)||typeof work.source!=="string"||!work.source||typeof work.title!=="string"||!work.title.trim()||!["lab","seminar","practical","test"].includes(work.kind)||work.relatedExercise!==undefined&&(typeof work.relatedExercise!=="string"||!/^exr-[a-z0-9][a-z0-9-]*$/.test(work.relatedExercise))||work.theoryTime!==undefined&&(typeof work.theoryTime!=="number"||!Number.isFinite(work.theoryTime)||work.theoryTime<=0))refuse("Неверные поля работы v2","works");
+  try {validateSlots(work.slots,p.owner,work.id,true);} catch(error){refuse("Неверные позиции Body v2: "+String(error),"works.slots");}
+  const candidates=work.slots.flatMap((slot:any)=>slot.candidates);
+  if(candidates.length!==p.questions.length||p.questions.some((q:any)=>!candidates.includes(q?.key)))refuse("Каталог должен содержать всех кандидатов","works.slots");
+  const assignments=Object.fromEntries(work.slots.flatMap((slot:any)=>slot.candidates.map((id:string)=>[id,slot.assignment])));
   const prepared: { name: string; data: Uint8Array }[] = [];
   const text = (name: string, data: string) =>
     prepared.push({ name, data: new TextEncoder().encode(data) });
@@ -315,7 +255,7 @@ export async function exportPrairieLearn(
       );
     }
     if (
-      work.assignments[q.key].stage === "demonstration" &&
+      assignments[q.key].stage === "demonstration" &&
       (q.statementVisibility !== "open" || q.purpose !== "demonstration" ||
         !q.hasPublicSolution)
     ) {
@@ -436,12 +376,43 @@ export async function exportPrairieLearn(
     }
     const blocks = structuredClone(q.condition);
     const resources = new Map<string, any>();
+    const anchorPrefix = "pl-" + await uuid(q.key) + "-";
+    const anchors = new Map<string, string>();
+    // TableHead/Body/Foot, Row and Cell carry semantic Attr arrays, not t nodes.
+    const nodeAttrs = (node:any):any[] => {
+      if(node.t === "Header")return [node.c[1]];
+      if(node.t === "Table"){
+        const [, , , head, bodies, foot]=node.c;
+        const rows=[...head[1],...bodies.flatMap((body:any)=>[...body[2],...body[3]]),...foot[1]];
+        return [node.c[0],head[0],...bodies.map((body:any)=>body[0]),foot[0],...rows.flatMap((row:any)=>[row[0],...row[1].map((cell:any)=>cell[0])])];
+      }
+      return ["Div","Span","CodeBlock","Code","Link","Image","Figure"].includes(node.t)?[node.c[0]]:[];
+    };
+    const indexAnchors = (value: any) => {
+      if (Array.isArray(value)) {
+        value.forEach(indexAnchors);
+        return;
+      }
+      if (!value || typeof value !== "object") return;
+      for(const attr of nodeAttrs(value)){
+        if (attr?.[0]) {
+          if (anchors.has(attr[0])) {
+            questionFail("Повторная цель в публичном вопросе: " + attr[0], "condition.reference");
+          }
+          anchors.set(attr[0], anchorPrefix + attr[0]);
+        }
+      }
+      Object.values(value).forEach(indexAnchors);
+    };
+    indexAnchors(blocks);
     const map = (node: any) => {
       if (!node || typeof node !== "object") return;
       if (["RawBlock", "RawInline", "Cite", "Note"].includes(node.t)) {
         questionFail("Неподдерживаемый узел условия: " + node.t, "condition");
       }
-      if (node.t === "Header") node.c[1][0] = "";
+      for(const attr of nodeAttrs(node)){
+        if(attr?.[0])attr[0]=anchors.get(attr[0]);
+      }
       if (
         ["Div", "Span", "CodeBlock", "Code"].includes(node.t) &&
         node.c[0][1].some((c: string) =>
@@ -452,7 +423,19 @@ export async function exportPrairieLearn(
       if (node.t === "Image" || node.t === "Link") {
         const href = node.c[2][0],
           resource = p.resources.find((r: any) => r.target === href);
-        if (resource) {
+        if (node.t === "Link" && href.startsWith("#")) {
+          let target: string;
+          try {
+            target = decodeURIComponent(href.slice(1));
+          } catch (cause) {
+            questionFail("Неверная fragment ссылка: " + href, "condition.reference", cause);
+          }
+          const actual = anchors.get(target!);
+          if (!actual) {
+            questionFail("Цель ссылки отсутствует в публичном вопросе: " + href, "condition.reference");
+          }
+          node.c[2][0] = "#" + actual;
+        } else if (resource) {
           if (
             !safe(resource.target) || resource.owner !== p.owner ||
             resource.visibility !== "public" ||

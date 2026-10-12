@@ -136,8 +136,8 @@ try {
   ) throw Error("native YAML-file numeric/boolean defaults lost");
   const mapped = gradingPolicy(inherited);
   if (
-    mapped.questions["exr-add"].points !== 7 ||
-    mapped.questions["exr-add"].maxPoints !== 9 ||
+    mapped.slots["exr-add"].points !== 7 ||
+    mapped.slots["exr-add"].maxPoints !== 9 ||
     mapped.assessment.maxPoints !== 20
   ) throw Error("metadata native mappings changed");
   // Quarto metadata-files takes precedence over the book config at this scope.
@@ -165,7 +165,7 @@ try {
     question-points: [5, 2]
     question-max-points: null
     allow-multiple-instances: true
-    question-overrides:
+    slot-overrides:
       exr-add:
         question-points: [3, 1]
         attempts: 2
@@ -178,16 +178,16 @@ try {
     local.extensions.prairielearn["question-max-points"] !== null ||
     JSON.stringify(local.extensions.prairielearn["question-points"]) !==
       "[5,2]" ||
-    JSON.stringify(native.questions["exr-add"].points) !== "[3,1]" ||
-    native.questions["exr-add"].triesPerVariant !== 2 ||
-    Object.hasOwn(native.questions["exr-add"], "maxPoints") ||
+    JSON.stringify(native.slots["exr-add"].points) !== "[3,1]" ||
+    native.slots["exr-add"].triesPerVariant !== 2 ||
+    Object.hasOwn(native.slots["exr-add"], "maxPoints") ||
     native.assessment.multipleInstance !== true
   ) throw Error("document numeric/list/null/boolean overrides lost");
   await Deno.writeTextFile(
     join(book, "_grading.yaml"),
     (await Deno.readTextFile(join(book, "_grading.yaml"))).replace(
       "    question-points: 7",
-      "    question-points: [9, 7, 5]\n    question-overrides:\n      exr-add:\n        question-points: [10, 6, 2]",
+      "    question-points: [9, 7, 5]\n    slot-overrides:\n      exr-add:\n        question-points: [10, 6, 2]",
     ),
   );
   await Deno.writeTextFile(
@@ -201,7 +201,7 @@ try {
   if (
     JSON.stringify(shortened.extensions.prairielearn["question-points"]) !==
       "[8,4]" ||
-    JSON.stringify(shortNative.questions["exr-add"].points) !== "[8,4]"
+    JSON.stringify(shortNative.slots["exr-add"].points) !== "[8,4]"
   ) {
     throw Error(
       "shorter inherited question-points lists retained trailing entries",
@@ -223,7 +223,7 @@ try {
     await Deno.readTextFile(join(root, "effective.json")),
   );
   if (
-    JSON.stringify(report.works[0].native.questions["exr-add"].points) !==
+    JSON.stringify(report.works[0].native.slots["exr-add"].points) !==
       "[8,4]" || report.works[0].effectivePolicy["question-max-points"] !== null
   ) throw Error("installed effective inspection differs from collected model");
   await Deno.writeTextFile(config, "metadata-files: [_grading.yaml]\n" + base);

@@ -45,8 +45,8 @@ normalize_policy = function(value)
       for i, point in ipairs(value[key]) do value[key][i] = number(point) end
     else value[key] = number(value[key]) end
   end
-  if type(value["question-overrides"]) == "table" then
-    for _, override in pairs(value["question-overrides"]) do normalize_policy(override) end
+  if type(value["slot-overrides"]) == "table" then
+    for _, override in pairs(value["slot-overrides"]) do normalize_policy(override) end
   end
   if type(value.pass) == "table" and pandoc.utils.type(value.pass) ~= "List" then
     value.pass["at-least"] = number(value.pass["at-least"])

@@ -49,10 +49,7 @@ try {
     id: "sec-work",
     kind: "test",
     source: "work.qmd",
-    items: ["exr-native"],
-    assignments: {
-      "exr-native": { requirement: "required", workMode: "individual" },
-    },
+    slots: [{id:"exr-native",selection:"fixed",candidates:["exr-native"],assignment:{requirement:"required",workMode:"individual"}}],
     title: "Работа",
     memberContainers: 1,
     memberKinds: ["OrderedList"],

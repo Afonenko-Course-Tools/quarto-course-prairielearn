@@ -4,7 +4,7 @@ const assert = (v: unknown, m: string) => {
   if (!v) throw Error(m);
 };
 const p = () => ({
-  schema: "course-body-package-v1",
+  schema: "course-body-package-v2",
   owner: "demo",
   release: "native",
   apiVersion: [1, 23, 1],
@@ -27,10 +27,7 @@ const p = () => ({
     source: "lab.qmd",
     kind: "lab",
     title: "Lab",
-    items: ["demo/exr-clamp"],
-    assignments: {
-      "demo/exr-clamp": { requirement: "required", workMode: "individual" },
-    },
+    slots: [{id:'demo/sec-lab/exr-clamp',selection:'fixed',candidates:['demo/exr-clamp'],assignment:{requirement:'required',workMode:'individual'}}],
   }],
   resources: [],
 });
@@ -164,7 +161,7 @@ Deno.test("PL refuses questions outside selected work and protects literal templ
       projects: { "exr-clamp": "/projects/clamp" },
     };
     const foreign = p();
-    foreign.works[0].items = [];
+    foreign.works[0].slots = [];
     let rejected = false;
     try {
       await exportPrairieLearn(foreign, context, binding, root + "/invalid");
@@ -590,7 +587,7 @@ Deno.test("PL accepts restricted participant-safe statements and new assignment 
       const candidate: any = p();
       candidate.works[0].kind = kind;
       candidate.works[0].theoryTime = 2.5;
-      candidate.works[0].assignments["demo/exr-clamp"] = {
+      candidate.works[0].slots[0].assignment = {
         stage: "homework",
         requirement: "optional",
         workMode: "pair",
@@ -601,7 +598,7 @@ Deno.test("PL accepts restricted participant-safe statements and new assignment 
       );
       assert(
         delivery.works[0].theoryTime === 2.5 &&
-          delivery.works[0].assignments["demo/exr-clamp"].workMode === "pair",
+          delivery.works[0].slots[0].assignment.workMode === "pair",
         "assignment metadata lost",
       );
     }
@@ -609,7 +606,7 @@ Deno.test("PL accepts restricted participant-safe statements and new assignment 
     demonstration.questions[0].statementVisibility = "open";
     demonstration.questions[0].purpose = "demonstration";
     demonstration.questions[0].hasPublicSolution = true;
-    demonstration.works[0].assignments["demo/exr-clamp"].stage =
+    demonstration.works[0].slots[0].assignment.stage =
       "demonstration";
     await exportPrairieLearn(
       demonstration,
@@ -628,51 +625,36 @@ Deno.test("PL standalone guards reject invalid work, assignment and statement po
     const cases: [string, (p: any) => void][] = [
       ["null work", (p) => p.works[0] = null],
       ["null question", (p) => p.questions[0] = null],
-      ["missing assignments", (p) => delete p.works[0].assignments],
-      [
-        "legacy requirements",
-        (p) => p.works[0].requirements = { "exr-clamp": "required" },
-      ],
-      [
-        "bare assignment key",
-        (p) =>
-          p.works[0].assignments = {
-            "exr-clamp": { requirement: "required", workMode: "individual" },
-          },
-      ],
-      [
-        "extra assignment key",
-        (p) =>
-          p.works[0].assignments["demo/exr-other"] = {
-            requirement: "required",
-            workMode: "individual",
-          },
-      ],
-      ["missing assignment", (p) => p.works[0].assignments = {}],
+      ["missing slots",(p)=>delete p.works[0].slots],
+      ["old assignments",(p)=>p.works[0].assignments={}],
+      ["old items",(p)=>p.works[0].items=[]],
+      ["unqualified slot",(p)=>p.works[0].slots[0].id='exr-clamp'],
+      ["foreign candidate",(p)=>p.works[0].slots[0].candidates=['other/exr-clamp']],
+      ["missing assignment",(p)=>delete p.works[0].slots[0].assignment],
       [
         "missing requirement",
-        (p) => delete p.works[0].assignments["demo/exr-clamp"].requirement,
+        (p) => delete p.works[0].slots[0].assignment.requirement,
       ],
       [
         "missing workMode",
-        (p) => delete p.works[0].assignments["demo/exr-clamp"].workMode,
+        (p) => delete p.works[0].slots[0].assignment.workMode,
       ],
       [
         "unknown assignment field",
-        (p) => p.works[0].assignments["demo/exr-clamp"].extra = true,
+        (p) => p.works[0].slots[0].assignment.extra = true,
       ],
       [
         "invalid stage",
-        (p) => p.works[0].assignments["demo/exr-clamp"].stage = "lecture",
+        (p) => p.works[0].slots[0].assignment.stage = "lecture",
       ],
       [
         "invalid requirement",
         (p) =>
-          p.works[0].assignments["demo/exr-clamp"].requirement = "mandatory",
+          p.works[0].slots[0].assignment.requirement = "mandatory",
       ],
       [
         "invalid work mode",
-        (p) => p.works[0].assignments["demo/exr-clamp"].workMode = "team",
+        (p) => p.works[0].slots[0].assignment.workMode = "team",
       ],
       ["legacy kind", (p) => p.works[0].kind = "handout"],
       ["foreign owner", (p) => p.works[0].owner = "other"],
@@ -705,17 +687,17 @@ Deno.test("PL standalone guards reject invalid work, assignment and statement po
         p.questions[0].statementVisibility = "open";
       }],
       ["restricted demonstration", (p) => {
-        p.works[0].assignments["demo/exr-clamp"].stage = "demonstration";
+        p.works[0].slots[0].assignment.stage = "demonstration";
         p.questions[0].purpose = "demonstration";
         p.questions[0].hasPublicSolution = true;
       }],
       ["demonstration without purpose", (p) => {
-        p.works[0].assignments["demo/exr-clamp"].stage = "demonstration";
+        p.works[0].slots[0].assignment.stage = "demonstration";
         p.questions[0].statementVisibility = "open";
         p.questions[0].hasPublicSolution = true;
       }],
       ["demonstration without public solution", (p) => {
-        p.works[0].assignments["demo/exr-clamp"].stage = "demonstration";
+        p.works[0].slots[0].assignment.stage = "demonstration";
         p.questions[0].statementVisibility = "open";
         p.questions[0].purpose = "demonstration";
       }],
@@ -1020,4 +1002,85 @@ Deno.test("question repeat policy preserves authored true/false and omits absent
   } finally {
     await Deno.remove(root, { recursive: true });
   }
+});
+Deno.test('Body v2 rejects non-string relatedExercise without publishing output', async()=>{
+ const root=await Deno.makeTempDir();
+ try {
+  for(const d of ['student','tests'])await Deno.mkdir(root+'/projects/clamp/'+d,{recursive:true});
+  await Deno.writeTextFile(root+'/projects/clamp/student/Clamp.java','starter');
+  await Deno.writeTextFile(root+'/projects/clamp/tests/grade.sh','tests');
+  for(const value of [['exr-clamp'],null,42,{id:'exr-clamp'}]) {
+   const body:any=p();body.works[0].relatedExercise=value;
+   const out=root+'/out';let refused=false;
+   try {await exportPrairieLearn(body,{projectRoot:root,projects:{'exr-clamp':'/projects/clamp'}},binding,out);}catch(error){refused=String(error).includes('ADAPTER');}
+   assert(refused,'Malformed relatedExercise accepted: '+JSON.stringify(value));
+   let absent=false;try{await Deno.stat(out);}catch(error){absent=error instanceof Deno.errors.NotFound;}
+   assert(absent,'Invalid Body published partial output');
+  }
+ }finally{await Deno.remove(root,{recursive:true});}
+});
+
+Deno.test('PL standalone native anchors preserve headers and namespace question targets', async()=>{
+ const root=await Deno.makeTempDir();
+ try{
+  await Deno.mkdir(root+'/projects/clamp/student',{recursive:true});await Deno.mkdir(root+'/projects/clamp/tests',{recursive:true});
+  await Deno.writeTextFile(root+'/projects/clamp/student/Clamp.java','STARTER');await Deno.writeTextFile(root+'/projects/clamp/tests/grade.sh','TESTS');
+  const candidate:any=p();
+  const condition=[{t:'Para',c:[{t:'Link',c:[['',[],[]],[{t:'Str',c:'[1]'}],['#ref-public','']]},{t:'Space'},{t:'Link',c:[['',[],[]],[{t:'Str',c:'Local section'}],['#sec-local','']]}]},{t:'Header',c:[3,['sec-local',[],[]],[{t:'Str',c:'LOCAL_HEADER'}]]},{t:'Div',c:[['refs',['references','csl-bib-body'],[]],[{t:'Div',c:[['ref-public',['csl-entry'],[]],[{t:'Para',c:[{t:'Str',c:'NATIVE_ATTRIBUTION'}]}]]}]]}];
+  candidate.questions[0].condition=condition;
+  candidate.questions.push({...structuredClone(candidate.questions[0]),id:'exr-other',key:'demo/exr-other'});
+  candidate.works[0].slots.push({id:'demo/sec-lab/exr-other',selection:'fixed',candidates:['demo/exr-other'],assignment:{requirement:'required',workMode:'individual'}});
+  await exportPrairieLearn(candidate,{projectRoot:root,projects:{'exr-clamp':'/projects/clamp','exr-other':'/projects/clamp'}},{questions:{...binding.questions,'exr-other':binding.questions['exr-clamp']}},root+'/out');
+  const first=await Deno.readTextFile(root+'/out/questions/demo/exr-clamp/question.html'),second=await Deno.readTextFile(root+'/out/questions/demo/exr-other/question.html');
+  const ids=(html:string)=>[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
+  const links=(html:string)=>[...html.matchAll(/href="#([^"]+)"/g)].map(m=>m[1]);
+  for(const html of [first,second])assert(html.includes('NATIVE_ATTRIBUTION')&&html.includes('LOCAL_HEADER')&&links(html).length===2&&links(html).every(id=>ids(html).includes(id)),'standalone native references or Header target lost');
+  assert(ids(first).every(id=>!ids(second).includes(id)),'two questions with identical native IDs collide');
+ }finally{await Deno.remove(root,{recursive:true})}
+});
+
+Deno.test('PL local anchor boundary rejects missing or duplicate targets and keeps asset guards',async()=>{
+ const root=await Deno.makeTempDir();
+ try{
+  await Deno.mkdir(root+'/projects/clamp/student',{recursive:true});await Deno.mkdir(root+'/projects/clamp/tests',{recursive:true});
+  await Deno.writeTextFile(root+'/projects/clamp/student/Clamp.java','STARTER');await Deno.writeTextFile(root+'/projects/clamp/tests/grade.sh','TESTS');
+  const cases=[
+   [{t:'Para',c:[{t:'Link',c:[['',[],[]],[{t:'Str',c:'Missing'}],['#ref-missing','']]}]}],
+   [{t:'Div',c:[['duplicate',[],[]],[]]},{t:'Header',c:[2,['duplicate',[],[]],[{t:'Str',c:'Duplicate'}]]}],
+   [{t:'Div',c:[['ref-present',[],[]],[]]},{t:'Para',c:[{t:'Image',c:[['',[],[]],[{t:'Str',c:'Image'}],['#ref-present','']]}]}],
+   [{t:'Div',c:[['ref-present',[],[]],[]]},{t:'Para',c:[{t:'Link',c:[['',[],[]],[{t:'Str',c:'Asset'}],['missing.png#ref-present','']]}]}],
+  ];
+  for(let i=0;i<cases.length;i++){
+   const candidate:any=p();candidate.questions[0].condition=cases[i];let rejected=false;
+   try{await exportPrairieLearn(candidate,{projectRoot:root,projects:{'exr-clamp':'/projects/clamp'}},binding,root+'/out-'+i)}catch(e){rejected=(e as any)?.code==='ADAPTER'&&String(e).includes('condition')}
+   assert(rejected,'invalid standalone anchor or missing asset accepted: '+i);
+  }
+ }finally{await Deno.remove(root,{recursive:true})}
+});
+
+Deno.test('PL real Pandoc Table semantic attrs namespace all targets across questions',async()=>{
+ const root=await Deno.makeTempDir();
+ try{
+  await Deno.mkdir(root+'/projects/clamp/student',{recursive:true});await Deno.mkdir(root+'/projects/clamp/tests',{recursive:true});
+  await Deno.writeTextFile(root+'/projects/clamp/student/Clamp.java','STARTER');await Deno.writeTextFile(root+'/projects/clamp/tests/grade.sh','TESTS');
+  await Deno.writeTextFile(root+'/table.md','| Head |\n|---|\n| Cell |\n');
+  const result=await new Deno.Command(Deno.env.get('QUARTO')||'quarto',{args:['pandoc',root+'/table.md','--from=markdown','--to=json'],stdout:'piped',stderr:'piped'}).output();assert(result.success,'native Pandoc Table failed');
+  const ast=JSON.parse(new TextDecoder().decode(result.stdout)),table=ast.blocks[0];assert(table.t==='Table','real Pandoc Table required');
+  const c=table.c,headRow=c[3][1][0],bodyRow=c[4][0][3][0],footRow=structuredClone(bodyRow);c[5][1]=[footRow];const intermediateRow=structuredClone(headRow);c[4][0][2]=[intermediateRow];
+  const attrs=[c[0],c[3][0],c[4][0][0],c[5][0],headRow[0],headRow[1][0][0],bodyRow[0],bodyRow[1][0][0],footRow[0],footRow[1][0][0],intermediateRow[0],intermediateRow[1][0][0]];
+  const targets=['table-root','table-head','table-body','table-foot','head-row','head-cell','body-row','cell-target','foot-row','foot-cell','intermediate-row','intermediate-cell'];attrs.forEach((a:any,i:number)=>a[0]=targets[i]);
+  ast.blocks.push({t:'Para',c:targets.flatMap(id=>[{t:'Link',c:[['',[],[]],[{t:'Str',c:id}],['#'+id,'']]},{t:'Space'}])});
+  const candidate:any=p();candidate.apiVersion=ast['pandoc-api-version'];candidate.questions[0].condition=ast.blocks;
+  candidate.questions.push({...structuredClone(candidate.questions[0]),id:'exr-other',key:'demo/exr-other'});
+  candidate.works[0].slots.push({id:'demo/sec-lab/exr-other',selection:'fixed',candidates:['demo/exr-other'],assignment:{requirement:'required',workMode:'individual'}});
+  const context={projectRoot:root,projects:{'exr-clamp':'/projects/clamp','exr-other':'/projects/clamp'}},bothBindings={questions:{...binding.questions,'exr-other':binding.questions['exr-clamp']}};
+  await exportPrairieLearn(candidate,context,bothBindings,root+'/out');
+  const htmls=await Promise.all(['exr-clamp','exr-other'].map(id=>Deno.readTextFile(root+'/out/questions/demo/'+id+'/question.html')));
+  const ids=(html:string)=>[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]),links=(html:string)=>[...html.matchAll(/href="#([^"]+)"/g)].map(m=>m[1]);
+  for(const html of htmls)assert(ids(html).length===targets.length&&ids(html).every(id=>id.startsWith('pl-'))&&links(html).every(id=>ids(html).includes(id)),'semantic Table IDs or links not namespaced/preserved');
+  assert(ids(htmls[0]).every(id=>!ids(htmls[1]).includes(id)),'semantic Table targets collide across questions');
+  const duplicate=structuredClone(candidate);duplicate.questions[0].condition[0].c[4][0][3][0][1][0][0][0]='table-root';let rejected=false;
+  try{await exportPrairieLearn(duplicate,context,bothBindings,root+'/duplicate');}catch(e){rejected=(e as any)?.code==='ADAPTER'&&String(e).includes('Повторная цель')}
+  assert(rejected,'duplicate semantic Table/Cell target accepted');
+ }finally{await Deno.remove(root,{recursive:true})}
 });

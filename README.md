@@ -17,7 +17,7 @@ updated: 2026-10-10
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Контракт этого ref — **5.0.0**, совместимый с Core **5.0.0**.
+Контракт этого ref — **6.0.0**, совместимый с Core **6.0.0**.
 Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
 создаёт source editor с отдельной закрытой поставкой проверок. Для разработки
 устанавливайте целые локальные checkout или архивы закреплённых commits:
@@ -31,12 +31,12 @@ quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 Выпущенные версии устанавливайте по неизменяемым тегам после их публикации:
 
 ```sh
-quarto add Afonenko-Course-Tools/quarto-course@v5.0.0 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v5.0.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v6.0.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v6.0.0 --no-prompt
 ```
 
-Матрица совместимости задаёт контракты Core 5.0.0, exporter 5.0.0 и
-Platform CLI/schema 1.0.0. Наличие тегов проверяется в репозиториях владельцев,
+Матрица совместимости задаёт контракты Core 6.0.0, exporter 6.0.0 и
+Platform/Gateway2.0.0, delivery/results v2. Наличие тегов проверяется в репозиториях владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
 подтверждает публикацию или готовность курса. История сохранена в `docs/releases`.
 
@@ -184,9 +184,9 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует PrairieLearn `5.0.0` и Core `5.0.0`, Quarto 1.11.5
+Контракт этого ref использует PrairieLearn `6.0.0` и Core `6.0.0`, Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
-`statementVisibility` и обязательные qualified `assignments`; binding продолжает
+`statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
 поставке, закрытые ключи и решения запрещены. Код и документация выпуска читаются
 из одного immutable tag; установленные `_extensions` сохраняются в Git курса.
@@ -196,11 +196,11 @@ Quarto `--profile`, сохраняются при экспорте.
 Она не требует binding, export.json или ручного native shell; registry должен
 содержать настоящий production digest либо явно выбранный private local candidate.
 
-Полный exporter 5.0.0 требует авторский `question-points`; пример явно объявляет
+Полный exporter 6.0.0 требует авторский `question-points`; пример явно объявляет
 default 1, который можно заменить в course/directory/document metadata. Баллы,
 ceiling и повторные попытки описаны в [контракте](docs/authoring.md#авторские-баллы-и-повторные-попытки-exporter-500);
 `inspect-grading.ts` показывает effective policy до создания native delivery.
-Опубликованный 4.0.0 сохраняет прежний контракт; 5.0.0 устанавливается по тегу
+Текущий контракт6.0.0 несовместим с прежним Body; после публикации устанавливается по тегу
 после публикации и явного обновления metadata курса.
 
 Question variant repetition is also authored metadata. Normal Quarto course,
