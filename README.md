@@ -36,7 +36,7 @@ quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v6.0.0 --no-prompt
 ```
 
 Матрица совместимости задаёт контракты Core 6.0.0, exporter 6.0.0 и
-Platform CLI/schema 1.0.0. Наличие тегов проверяется в репозиториях владельцев,
+Platform/Gateway2.0.0, delivery/results v2. Наличие тегов проверяется в репозиториях владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
 подтверждает публикацию или готовность курса. История сохранена в `docs/releases`.
 

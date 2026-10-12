@@ -1003,3 +1003,19 @@ Deno.test("question repeat policy preserves authored true/false and omits absent
     await Deno.remove(root, { recursive: true });
   }
 });
+Deno.test('Body v2 rejects non-string relatedExercise without publishing output', async()=>{
+ const root=await Deno.makeTempDir();
+ try {
+  for(const d of ['student','tests'])await Deno.mkdir(root+'/projects/clamp/'+d,{recursive:true});
+  await Deno.writeTextFile(root+'/projects/clamp/student/Clamp.java','starter');
+  await Deno.writeTextFile(root+'/projects/clamp/tests/grade.sh','tests');
+  for(const value of [['exr-clamp'],null,42,{id:'exr-clamp'}]) {
+   const body:any=p();body.works[0].relatedExercise=value;
+   const out=root+'/out';let refused=false;
+   try {await exportPrairieLearn(body,{projectRoot:root,projects:{'exr-clamp':'/projects/clamp'}},binding,out);}catch(error){refused=String(error).includes('ADAPTER');}
+   assert(refused,'Malformed relatedExercise accepted: '+JSON.stringify(value));
+   let absent=false;try{await Deno.stat(out);}catch(error){absent=error instanceof Deno.errors.NotFound;}
+   assert(absent,'Invalid Body published partial output');
+  }
+ }finally{await Deno.remove(root,{recursive:true});}
+});
