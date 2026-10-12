@@ -1057,3 +1057,30 @@ Deno.test('PL local anchor boundary rejects missing or duplicate targets and kee
   }
  }finally{await Deno.remove(root,{recursive:true})}
 });
+
+Deno.test('PL real Pandoc Table semantic attrs namespace all targets across questions',async()=>{
+ const root=await Deno.makeTempDir();
+ try{
+  await Deno.mkdir(root+'/projects/clamp/student',{recursive:true});await Deno.mkdir(root+'/projects/clamp/tests',{recursive:true});
+  await Deno.writeTextFile(root+'/projects/clamp/student/Clamp.java','STARTER');await Deno.writeTextFile(root+'/projects/clamp/tests/grade.sh','TESTS');
+  await Deno.writeTextFile(root+'/table.md','| Head |\n|---|\n| Cell |\n');
+  const result=await new Deno.Command(Deno.env.get('QUARTO')||'quarto',{args:['pandoc',root+'/table.md','--from=markdown','--to=json'],stdout:'piped',stderr:'piped'}).output();assert(result.success,'native Pandoc Table failed');
+  const ast=JSON.parse(new TextDecoder().decode(result.stdout)),table=ast.blocks[0];assert(table.t==='Table','real Pandoc Table required');
+  const c=table.c,headRow=c[3][1][0],bodyRow=c[4][0][3][0],footRow=structuredClone(bodyRow);c[5][1]=[footRow];const intermediateRow=structuredClone(headRow);c[4][0][2]=[intermediateRow];
+  const attrs=[c[0],c[3][0],c[4][0][0],c[5][0],headRow[0],headRow[1][0][0],bodyRow[0],bodyRow[1][0][0],footRow[0],footRow[1][0][0],intermediateRow[0],intermediateRow[1][0][0]];
+  const targets=['table-root','table-head','table-body','table-foot','head-row','head-cell','body-row','cell-target','foot-row','foot-cell','intermediate-row','intermediate-cell'];attrs.forEach((a:any,i:number)=>a[0]=targets[i]);
+  ast.blocks.push({t:'Para',c:targets.flatMap(id=>[{t:'Link',c:[['',[],[]],[{t:'Str',c:id}],['#'+id,'']]},{t:'Space'}])});
+  const candidate:any=p();candidate.apiVersion=ast['pandoc-api-version'];candidate.questions[0].condition=ast.blocks;
+  candidate.questions.push({...structuredClone(candidate.questions[0]),id:'exr-other',key:'demo/exr-other'});
+  candidate.works[0].slots.push({id:'demo/sec-lab/exr-other',selection:'fixed',candidates:['demo/exr-other'],assignment:{requirement:'required',workMode:'individual'}});
+  const context={projectRoot:root,projects:{'exr-clamp':'/projects/clamp','exr-other':'/projects/clamp'}},bothBindings={questions:{...binding.questions,'exr-other':binding.questions['exr-clamp']}};
+  await exportPrairieLearn(candidate,context,bothBindings,root+'/out');
+  const htmls=await Promise.all(['exr-clamp','exr-other'].map(id=>Deno.readTextFile(root+'/out/questions/demo/'+id+'/question.html')));
+  const ids=(html:string)=>[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]),links=(html:string)=>[...html.matchAll(/href="#([^"]+)"/g)].map(m=>m[1]);
+  for(const html of htmls)assert(ids(html).length===targets.length&&ids(html).every(id=>id.startsWith('pl-'))&&links(html).every(id=>ids(html).includes(id)),'semantic Table IDs or links not namespaced/preserved');
+  assert(ids(htmls[0]).every(id=>!ids(htmls[1]).includes(id)),'semantic Table targets collide across questions');
+  const duplicate=structuredClone(candidate);duplicate.questions[0].condition[0].c[4][0][3][0][1][0][0][0]='table-root';let rejected=false;
+  try{await exportPrairieLearn(duplicate,context,bothBindings,root+'/duplicate');}catch(e){rejected=(e as any)?.code==='ADAPTER'&&String(e).includes('Повторная цель')}
+  assert(rejected,'duplicate semantic Table/Cell target accepted');
+ }finally{await Deno.remove(root,{recursive:true})}
+});

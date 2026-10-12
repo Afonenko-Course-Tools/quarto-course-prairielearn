@@ -378,24 +378,29 @@ export async function exportPrairieLearn(
     const resources = new Map<string, any>();
     const anchorPrefix = "pl-" + await uuid(q.key) + "-";
     const anchors = new Map<string, string>();
-    const nodeAttr = (node: any) => node.t === "Header"
-      ? node.c[1]
-      : ["Div", "Span", "CodeBlock", "Code", "Link", "Image", "Table", "Figure"]
-          .includes(node.t)
-      ? node.c[0]
-      : undefined;
+    // TableHead/Body/Foot, Row and Cell carry semantic Attr arrays, not t nodes.
+    const nodeAttrs = (node:any):any[] => {
+      if(node.t === "Header")return [node.c[1]];
+      if(node.t === "Table"){
+        const [, , , head, bodies, foot]=node.c;
+        const rows=[...head[1],...bodies.flatMap((body:any)=>[...body[2],...body[3]]),...foot[1]];
+        return [node.c[0],head[0],...bodies.map((body:any)=>body[0]),foot[0],...rows.flatMap((row:any)=>[row[0],...row[1].map((cell:any)=>cell[0])])];
+      }
+      return ["Div","Span","CodeBlock","Code","Link","Image","Figure"].includes(node.t)?[node.c[0]]:[];
+    };
     const indexAnchors = (value: any) => {
       if (Array.isArray(value)) {
         value.forEach(indexAnchors);
         return;
       }
       if (!value || typeof value !== "object") return;
-      const attr = nodeAttr(value);
-      if (attr?.[0]) {
-        if (anchors.has(attr[0])) {
-          questionFail("Повторная цель в публичном вопросе: " + attr[0], "condition.reference");
+      for(const attr of nodeAttrs(value)){
+        if (attr?.[0]) {
+          if (anchors.has(attr[0])) {
+            questionFail("Повторная цель в публичном вопросе: " + attr[0], "condition.reference");
+          }
+          anchors.set(attr[0], anchorPrefix + attr[0]);
         }
-        anchors.set(attr[0], anchorPrefix + attr[0]);
       }
       Object.values(value).forEach(indexAnchors);
     };
@@ -405,8 +410,9 @@ export async function exportPrairieLearn(
       if (["RawBlock", "RawInline", "Cite", "Note"].includes(node.t)) {
         questionFail("Неподдерживаемый узел условия: " + node.t, "condition");
       }
-      const attr = nodeAttr(node);
-      if (attr?.[0]) attr[0] = anchors.get(attr[0]);
+      for(const attr of nodeAttrs(node)){
+        if(attr?.[0])attr[0]=anchors.get(attr[0]);
+      }
       if (
         ["Div", "Span", "CodeBlock", "Code"].includes(node.t) &&
         node.c[0][1].some((c: string) =>
