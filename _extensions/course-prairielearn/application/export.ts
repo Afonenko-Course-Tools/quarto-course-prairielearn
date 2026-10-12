@@ -376,12 +376,37 @@ export async function exportPrairieLearn(
     }
     const blocks = structuredClone(q.condition);
     const resources = new Map<string, any>();
+    const anchorPrefix = "pl-" + await uuid(q.key) + "-";
+    const anchors = new Map<string, string>();
+    const nodeAttr = (node: any) => node.t === "Header"
+      ? node.c[1]
+      : ["Div", "Span", "CodeBlock", "Code", "Link", "Image", "Table", "Figure"]
+          .includes(node.t)
+      ? node.c[0]
+      : undefined;
+    const indexAnchors = (value: any) => {
+      if (Array.isArray(value)) {
+        value.forEach(indexAnchors);
+        return;
+      }
+      if (!value || typeof value !== "object") return;
+      const attr = nodeAttr(value);
+      if (attr?.[0]) {
+        if (anchors.has(attr[0])) {
+          questionFail("Повторная цель в публичном вопросе: " + attr[0], "condition.reference");
+        }
+        anchors.set(attr[0], anchorPrefix + attr[0]);
+      }
+      Object.values(value).forEach(indexAnchors);
+    };
+    indexAnchors(blocks);
     const map = (node: any) => {
       if (!node || typeof node !== "object") return;
       if (["RawBlock", "RawInline", "Cite", "Note"].includes(node.t)) {
         questionFail("Неподдерживаемый узел условия: " + node.t, "condition");
       }
-      if (node.t === "Header") node.c[1][0] = "";
+      const attr = nodeAttr(node);
+      if (attr?.[0]) attr[0] = anchors.get(attr[0]);
       if (
         ["Div", "Span", "CodeBlock", "Code"].includes(node.t) &&
         node.c[0][1].some((c: string) =>
@@ -392,7 +417,19 @@ export async function exportPrairieLearn(
       if (node.t === "Image" || node.t === "Link") {
         const href = node.c[2][0],
           resource = p.resources.find((r: any) => r.target === href);
-        if (resource) {
+        if (node.t === "Link" && href.startsWith("#")) {
+          let target: string;
+          try {
+            target = decodeURIComponent(href.slice(1));
+          } catch (cause) {
+            questionFail("Неверная fragment ссылка: " + href, "condition.reference", cause);
+          }
+          const actual = anchors.get(target!);
+          if (!actual) {
+            questionFail("Цель ссылки отсутствует в публичном вопросе: " + href, "condition.reference");
+          }
+          node.c[2][0] = "#" + actual;
+        } else if (resource) {
           if (
             !safe(resource.target) || resource.owner !== p.owner ||
             resource.visibility !== "public" ||

@@ -47,6 +47,7 @@ jobs:
         run: quarto run tools/sync-contract.ts --check
       - run: quarto run tests/native-model.ts .ci-deps/core
       - run: quarto run tests/native-ordinary.ts .ci-deps/core
+      - run: quarto run tests/native-references.ts .ci-deps/core
       - run: quarto run tests/native-declarations.ts .ci-deps/core
       - run: quarto run tests/native-directory-grading.ts .ci-deps/core
       - run: quarto run tests/identity.ts .ci-deps/core

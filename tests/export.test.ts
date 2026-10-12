@@ -1019,3 +1019,41 @@ Deno.test('Body v2 rejects non-string relatedExercise without publishing output'
   }
  }finally{await Deno.remove(root,{recursive:true});}
 });
+
+Deno.test('PL standalone native anchors preserve headers and namespace question targets', async()=>{
+ const root=await Deno.makeTempDir();
+ try{
+  await Deno.mkdir(root+'/projects/clamp/student',{recursive:true});await Deno.mkdir(root+'/projects/clamp/tests',{recursive:true});
+  await Deno.writeTextFile(root+'/projects/clamp/student/Clamp.java','STARTER');await Deno.writeTextFile(root+'/projects/clamp/tests/grade.sh','TESTS');
+  const candidate:any=p();
+  const condition=[{t:'Para',c:[{t:'Link',c:[['',[],[]],[{t:'Str',c:'[1]'}],['#ref-public','']]},{t:'Space'},{t:'Link',c:[['',[],[]],[{t:'Str',c:'Local section'}],['#sec-local','']]}]},{t:'Header',c:[3,['sec-local',[],[]],[{t:'Str',c:'LOCAL_HEADER'}]]},{t:'Div',c:[['refs',['references','csl-bib-body'],[]],[{t:'Div',c:[['ref-public',['csl-entry'],[]],[{t:'Para',c:[{t:'Str',c:'NATIVE_ATTRIBUTION'}]}]]}]]}];
+  candidate.questions[0].condition=condition;
+  candidate.questions.push({...structuredClone(candidate.questions[0]),id:'exr-other',key:'demo/exr-other'});
+  candidate.works[0].slots.push({id:'demo/sec-lab/exr-other',selection:'fixed',candidates:['demo/exr-other'],assignment:{requirement:'required',workMode:'individual'}});
+  await exportPrairieLearn(candidate,{projectRoot:root,projects:{'exr-clamp':'/projects/clamp','exr-other':'/projects/clamp'}},{questions:{...binding.questions,'exr-other':binding.questions['exr-clamp']}},root+'/out');
+  const first=await Deno.readTextFile(root+'/out/questions/demo/exr-clamp/question.html'),second=await Deno.readTextFile(root+'/out/questions/demo/exr-other/question.html');
+  const ids=(html:string)=>[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
+  const links=(html:string)=>[...html.matchAll(/href="#([^"]+)"/g)].map(m=>m[1]);
+  for(const html of [first,second])assert(html.includes('NATIVE_ATTRIBUTION')&&html.includes('LOCAL_HEADER')&&links(html).length===2&&links(html).every(id=>ids(html).includes(id)),'standalone native references or Header target lost');
+  assert(ids(first).every(id=>!ids(second).includes(id)),'two questions with identical native IDs collide');
+ }finally{await Deno.remove(root,{recursive:true})}
+});
+
+Deno.test('PL local anchor boundary rejects missing or duplicate targets and keeps asset guards',async()=>{
+ const root=await Deno.makeTempDir();
+ try{
+  await Deno.mkdir(root+'/projects/clamp/student',{recursive:true});await Deno.mkdir(root+'/projects/clamp/tests',{recursive:true});
+  await Deno.writeTextFile(root+'/projects/clamp/student/Clamp.java','STARTER');await Deno.writeTextFile(root+'/projects/clamp/tests/grade.sh','TESTS');
+  const cases=[
+   [{t:'Para',c:[{t:'Link',c:[['',[],[]],[{t:'Str',c:'Missing'}],['#ref-missing','']]}]}],
+   [{t:'Div',c:[['duplicate',[],[]],[]]},{t:'Header',c:[2,['duplicate',[],[]],[{t:'Str',c:'Duplicate'}]]}],
+   [{t:'Div',c:[['ref-present',[],[]],[]]},{t:'Para',c:[{t:'Image',c:[['',[],[]],[{t:'Str',c:'Image'}],['#ref-present','']]}]}],
+   [{t:'Div',c:[['ref-present',[],[]],[]]},{t:'Para',c:[{t:'Link',c:[['',[],[]],[{t:'Str',c:'Asset'}],['missing.png#ref-present','']]}]}],
+  ];
+  for(let i=0;i<cases.length;i++){
+   const candidate:any=p();candidate.questions[0].condition=cases[i];let rejected=false;
+   try{await exportPrairieLearn(candidate,{projectRoot:root,projects:{'exr-clamp':'/projects/clamp'}},binding,root+'/out-'+i)}catch(e){rejected=(e as any)?.code==='ADAPTER'&&String(e).includes('condition')}
+   assert(rejected,'invalid standalone anchor or missing asset accepted: '+i);
+  }
+ }finally{await Deno.remove(root,{recursive:true})}
+});
