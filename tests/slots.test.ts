@@ -17,3 +17,21 @@ Deno.test('random native block chooses one and rejects id with alternatives or z
   let rejected=false;try{validateAssessmentSemantics(value,'test')}catch{rejected=true}assert(rejected,'ambiguous native selection accepted');
  }
 });
+Deno.test('pinned native pools carry preferences on eligible alternatives and preserve one priced slot',()=>{
+ for(const requirement of ['required','optional']){
+  const assignment={requirement,workMode:'individual'};
+  const w={id:'sec-lab',kind:'lab',slots:[{id:'alt-x',selection:'random',candidates:['exr-a','exr-b'],assignment},{id:'exr-c',selection:'fixed',candidates:['exr-c'],assignment}],extensions:{prairielearn:{attempts:3,'question-points':2,'question-max-points':6,pass:{'at-least':requirement==='required'?1:0}}}};
+  const [pool,fixed]=nativeSlotBlocks('demo',w,gradingPolicy(w));
+  assert(!('preferences' in pool),'pinned sync forbids preferences on alternative pools');
+  assert(pool.numberChoose===1&&pool.points===2&&pool.maxPoints===6&&pool.triesPerVariant===3&&pool.alternatives.length===2,'one selected slot must inherit authoritative pricing and three graded submissions');
+  assert(pool.alternatives.every((alternative:any)=>alternative.preferences?.courseRequirement===requirement&&!('points' in alternative)&&!('triesPerVariant' in alternative)),'eligible alternatives must carry question preferences while pricing remains per slot');
+  assert(fixed.id==='demo/exr-c'&&fixed.preferences.courseRequirement===requirement&&fixed.triesPerVariant===3,'fixed native question preferences changed');
+ }
+});
+Deno.test('pinned native semantic boundary rejects pool preferences even when schema-valid',()=>{
+ for(const preferences of [{},{courseRequirement:'required'}]){
+  let rejected=false;
+  try{validateAssessmentSemantics({type:'Homework',zones:[{questions:[{numberChoose:1,points:1,triesPerVariant:3,preferences,alternatives:[{id:'demo/exr-a'},{id:'demo/exr-b'}]}]}]},'pool/infoAssessment.json')}catch(error){rejected=String(error).includes('preferences')&&String(error).includes('pool/infoAssessment.json')}
+  assert(rejected,'schema-valid pool preferences passed the pinned sync boundary');
+ }
+});

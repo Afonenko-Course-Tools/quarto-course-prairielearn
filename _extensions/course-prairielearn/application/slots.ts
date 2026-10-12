@@ -15,8 +15,10 @@ export function validateSlots(slots:any, courseId:string, workId:string, qualifi
 }
 export function qualifiedSlots(courseId:string,work:any){return validateSlots(work.slots,courseId,work.id).map((slot:any)=>({...slot,id:courseId+'/'+work.id+'/'+slot.id,candidates:slot.candidates.map((id:string)=>courseId+'/'+id)}));}
 export function nativeSlotBlocks(courseId:string,work:any,grading:any){
- return validateSlots(work.slots,courseId,work.id).map((slot:any)=>({
-  ...(slot.selection==='random'?{numberChoose:1,alternatives:slot.candidates.map((id:string)=>({id:courseId+'/'+id}))}:{id:courseId+'/'+slot.candidates[0]}),
-  ...grading.slots[slot.id],preferences:{courseRequirement:slot.assignment.requirement}
- }));
+ return validateSlots(work.slots,courseId,work.id).map((slot:any)=>{
+  const preferences={courseRequirement:slot.assignment.requirement};
+  return slot.selection==='random'
+   ? {numberChoose:1,alternatives:slot.candidates.map((id:string)=>({id:courseId+'/'+id,preferences})),...grading.slots[slot.id]}
+   : {id:courseId+'/'+slot.candidates[0],...grading.slots[slot.id],preferences};
+ });
 }

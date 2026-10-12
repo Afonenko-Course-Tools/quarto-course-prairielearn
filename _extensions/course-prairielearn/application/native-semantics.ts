@@ -11,6 +11,8 @@ export function validateAssessmentSemantics(assessment: any, source: string) {
     for (const question of zone.questions) {
       if(question.id!==undefined&&question.alternatives!==undefined)throw new Error(`PL upstream semantic ${source}: id and alternatives cannot coexist`);
       if(question.alternatives&&question.numberChoose!==1)throw new Error(`PL upstream semantic ${source}: alternatives require numberChoose=1`);
+      // Pinned course-db.ts:1296: preferences are question-specific, never pool-wide.
+      if(question.alternatives&&question.preferences!==undefined)throw new Error(`PL upstream semantic ${source}: preferences must be set on each alternative, not on the pool`);
       if(assessment.type==="Exam"&&(question.maxPoints!=null||question.maxAutoPoints!=null))throw new Error(`PL upstream semantic ${source}: Exam question cannot specify ceilings`);
       for (const alternative of question.alternatives ?? [question]) {
         if (

@@ -402,6 +402,9 @@ Core 6.0.0 задаёт `slots` вместо прежних `items/assignments`.
 
 Случайный Span `[@exr-a; @exr-b]{.task-alternatives #alt-x selection="random"}`
 создаёт один native блок `{numberChoose:1, points, triesPerVariant, alternatives}`.
+`preferences.courseRequirement` задаётся каждому кандидату внутри `alternatives`;
+preferences на самом pool запрещены pinned native sync. Общие баллы, потолок и
+triesPerVariant наследуются только выбранным вопросом, без дополнительных позиций.
 Обычная fixed позиция создаёт блок с `id`. Одновременные id/alternatives и выбор
 подмножества всей зоны отклоняются. В native БД fixed также имеет alternative group.
 

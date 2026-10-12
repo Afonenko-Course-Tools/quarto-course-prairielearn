@@ -506,6 +506,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
     assert(randomDelivery.deliveryHash===randomAgain.deliveryHash,'random unchanged snapshot is not deterministic');
     const pool=randomNative.zones[0].questions[0];
     assert(pool.numberChoose===1&&pool.alternatives.length===2&&pool.points===2.5&&pool.maxPoints===6&&pool.triesPerVariant===2&&!('id' in pool),'random group native shape changed');
+    assert(!('preferences' in pool)&&pool.alternatives.every((alternative:any)=>alternative.preferences.courseRequirement==='required'),'pinned native importer requires preferences on each eligible alternative');
     assert(randomNative.zones[0].questions[1].id==='demo/'+ids[2]&&randomNative.zones[0].numberChoose===undefined,'mixed fixed/random native blocks invalid');
     const instance = JSON.parse(
       await Deno.readTextFile(
