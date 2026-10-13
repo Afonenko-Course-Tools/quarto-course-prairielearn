@@ -1,4 +1,10 @@
 local __metrics=require("./observability/bridge").create_metrics("course-prairielearn",1)
+local __perfProbe={}
+local __perfChildContext=__metrics.child_env(__perfProbe)~=__perfProbe
+local __perfPipe=__metrics.wrap_sync({id="course-prairielearn.validate.command.pipe",kind='command'},function(tool,args,input)
+ if not __perfChildContext then return pandoc.pipe(tool,args,input) end
+ return pandoc.system.with_environment(__metrics.child_env({}),function()return pandoc.pipe(tool,args,input)end)
+end)
 local __perfWalk1=__metrics.wrap_walk({id="course-prairielearn.validate.walk.1",kind='ast_walk',scope="full-document"},function(node,filter)return node:walk(filter)end)
 local __perfWalk2=__metrics.wrap_walk({id="course-prairielearn.validate.walk.2",kind='ast_walk',scope="full-document"},function(node,filter)return node:walk(filter)end)
 local __perfWalk3=__metrics.wrap_walk({id="course-prairielearn.validate.walk.3",kind='ast_walk',scope="full-document"},function(node,filter)return node:walk(filter)end)
@@ -75,7 +81,7 @@ function M.validate(doc, effective)
     local directory = pandoc.path.directory(debug.getinfo(1, "S").source:sub(2))
     local args = {"run", directory .. "/validate-paths.ts", quarto.project.directory, source}
     for _, project in ipairs(projects) do args[#args + 1] = project.path; args[#args + 1] = project.id end
-    pandoc.pipe(os.getenv("QUARTO") or "quarto", args, "")
+    __perfPipe(os.getenv("QUARTO") or "quarto", args, "")
   end
 end
 M.validate=__metrics.wrap_sync({id="course-prairielearn.validate.validate",kind='phase'},M.validate)

@@ -51,6 +51,7 @@ async function command(
   try {
     child = new Deno.Command(tool, {
       args,
+      env: __metrics.childEnv({}),
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",
@@ -613,3 +614,6 @@ export async function exportPrairieLearn(
 uuid=__metrics.wrapAsync({id:"course-prairielearn.application.export.uuid",kind:"phase"},uuid);
 // @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
 exportPrairieLearn=__metrics.wrapAsync({id:"course-prairielearn.application.export.exportPrairieLearn",kind:"phase"},exportPrairieLearn);
+
+// @ts-expect-error JS допускает замену function binding; публичная сигнатура сохраняется.
+command=__metrics.wrapAsync({id:"course-prairielearn.application.export.command",kind:"command"},command);

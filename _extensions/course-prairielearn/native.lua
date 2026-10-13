@@ -1,4 +1,10 @@
 local __metrics=require("./observability/bridge").create_metrics("course-prairielearn",1)
+local __perfProbe={}
+local __perfChildContext=__metrics.child_env(__perfProbe)~=__perfProbe
+local __perfPipe=__metrics.wrap_sync({id="course-prairielearn.native.command.pipe",kind='command'},function(tool,args,input)
+ if not __perfChildContext then return pandoc.pipe(tool,args,input) end
+ return pandoc.system.with_environment(__metrics.child_env({}),function()return pandoc.pipe(tool,args,input)end)
+end)
 local __perfWalk1=__metrics.wrap_walk({id="course-prairielearn.native.walk.1",kind='ast_walk',scope="full-document"},function(node,filter)return node:walk(filter)end)
 local contract = require("./contract")
 local assessment = require("./assessment")
@@ -52,7 +58,7 @@ function M.vet(value, definition, context)
     local source = pandoc.path.join({temp, "source.cue"})
     file = assert(io.open(source, "w")); file:write('package course\n#Source: {inline: string & !=""} | {file: string & =~"^/[^.]"}\n'); file:close()
     local tool = os.getenv("CUE") or "cue"
-    local ok, cause = pcall(pandoc.pipe, tool, {"vet", directory .. "/" .. contract.rules, source, json, "-d", definition, "-c", "--all-errors"}, "")
+    local ok, cause = pcall(__perfPipe, tool, {"vet", directory .. "/" .. contract.rules, source, json, "-d", definition, "-c", "--all-errors"}, "")
     if not ok then
       assert(false, diagnostics.message(nil, "Не удалось выполнить внешнюю проверку CUE (" .. tool .. ") для " .. definition, context) .. "\n" .. tostring(cause))
     end
