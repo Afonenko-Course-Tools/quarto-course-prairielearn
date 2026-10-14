@@ -280,6 +280,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         owner: "demo",
         id: "exr-a",
         key: "demo/exr-a",
+        title: "Задача A",
         source: "a.qmd",
         visibility: "public",
         statementVisibility: "open",
@@ -288,7 +289,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         condition: [{ t: "Para", c: [{ t: "Str", c: "PUBLIC_CONDITION" }] }],
         publicAnswer: [],
       }],
-      resources: [],
+      resources: [{owner: "demo", source: "lab.qmd", effectiveBase: root, target: "diagram.svg", visibility: "public", data: btoa("<svg>PUBLIC_DIAGRAM</svg>"), sha256: await hash("<svg>PUBLIC_DIAGRAM</svg>")}],
       works: [{
         owner: "demo",
         id: "sec-lab",
@@ -296,6 +297,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         source: "lab.qmd",
         kind: "lab",
         title: "Lab",
+        introduction: [{t: "Para", c: [{t: "Str", c: 'Подготовка к работе {{literal}} PL_CLIENT_FILE_URL_TOKEN src="PL_CLIENT_FILE_URL_TOKEN/example.png" href="PL_CLIENT_FILE_URL_TOKEN/example.png" PL_CLIENT_FILE_URL_TOKEN_0'}, {t: "Space"}, {t: "Link", c: [["", [], []], [{t: "Str", c: "Теория"}], ["https://example.test/theory.html", ""]]}, {t: "Image", c: [["", [], []], [{t: "Str", c: "Диаграмма"}], ["diagram.svg", ""]]}]}],
         slots: [{id:"demo/sec-lab/exr-a",selection:"fixed",candidates:["demo/exr-a"],assignment}],
       }],
     };
@@ -344,6 +346,15 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       checksOutput: root + "/checks2.json",
     });
     assert(canonical(a) === canonical(b), "exports differ");
+    const overview = JSON.parse(await Deno.readTextFile(root + "/one/courseInstances/pilot/assessments/sec-lab/infoAssessment.json")).text;
+    assert(overview.includes("Подготовка к работе") && overview.includes('target="_blank"') &&
+      !overview.includes("{{literal}}") && !overview.includes("PRIVATE_REFERENCE"),
+      "Native обзор потерял введение/ссылку или содержит приватные данные");
+    assert(overview.includes("{{ client_files_course }}/diagram.svg") &&
+      await Deno.readTextFile(root + "/one/clientFilesCourse/diagram.svg") === "<svg>PUBLIC_DIAGRAM</svg>",
+      "Обзор должен использовать штатный native токен и публичное вложение курса");
+    assert(overview.includes("PL_CLIENT_FILE_URL_TOKEN"), "Буквальный авторский текст маркера превратился в шаблон");
+    assert(overview.includes('src="PL_CLIENT_FILE_URL_TOKEN/example.png"') && overview.includes('href="PL_CLIENT_FILE_URL_TOKEN/example.png"') && overview.includes("PL_CLIENT_FILE_URL_TOKEN_0"), "Авторский текст, похожий на атрибут ресурса, превратился в шаблон");
     const fishSource = "echo ok\n";
     await Deno.mkdir(root + "/project/student", {recursive:true});
     await Deno.writeTextFile(root + "/project/student/commands.fish", fishSource);

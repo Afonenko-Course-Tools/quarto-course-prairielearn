@@ -99,6 +99,7 @@ await exportCourse({
       projectRoot: collected.projectRoot,
       courseId: collected.courseId,
       work,
+      bodyReferences: collected.bodyReferences,
       includeClosed: true,
     })).publicPackage,
 });
