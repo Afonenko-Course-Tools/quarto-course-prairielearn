@@ -73,7 +73,7 @@ export function declarations(raw: any, key: string) {
   if (
     !object(raw.delivery.instances) ||
     !Object.hasOwn(raw.delivery.instances, key) ||
-    !/^[a-z][a-z0-9-]*$/.test(key)
+    !/^[a-z0-9][a-z0-9-]*$/.test(key)
   ) throw new Error("PL instance missing");
   for (
     const [id, v] of Object.entries(raw.delivery.instances) as [string, any][]
@@ -98,7 +98,7 @@ export function declarations(raw: any, key: string) {
       );
     }
     if (
-      !/^[a-z][a-z0-9-]*$/.test(id) || typeof v.title !== "string" ||
+      !/^[a-z0-9][a-z0-9-]*$/.test(id) || typeof v.title !== "string" ||
       !v.title || typeof v["self-enrollment"] !== "boolean" ||
       !Array.isArray(v.works) || !v.works.length ||
       new Set(v.works).size !== v.works.length || v.works.some((w: any) =>

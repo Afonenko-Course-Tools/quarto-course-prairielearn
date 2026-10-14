@@ -291,6 +291,13 @@ Gateway проверяет эти данные независимо. Not-started
 
 ## Авторские баллы и повторные попытки (exporter 7.0.0)
 
+Ключ `prairielearn.delivery.instances` — безопасный lowercase slug
+`^[a-z0-9][a-z0-9-]*$`, например `pilot` или `2026-2027-s1`.
+Начальная цифра допускает учебный год; slash, dot, пробел и underscore запрещены.
+Это правило instance, а не assignment label или work ID. UUID продолжает
+вычисляться в прежнем namespace `instance/<key>` относительно course UUID;
+добавление нового семестра не переименовывает прежний `pilot`.
+
 Версия7.0.0 требует явной цены каждой позиции выбранной работы. Defaults
 question-points/question-max-points и attempts задают общие значения,
 slot-overrides меняет их по local slot ID. Случайная группа имеет общую максимальную

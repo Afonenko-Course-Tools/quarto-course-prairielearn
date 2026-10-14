@@ -109,6 +109,18 @@ Deno.test("closed delivery defaults and selected instance", () => {
     assert(rejected, "invalid instance publishing accepted");
   }
   assert(d.instance.works[0] === "sec-lab", "work lost");
+  const semester = structuredClone(d.raw);
+  semester.delivery.instances["2026-2027-s1"] = structuredClone(semester.delivery.instances.pilot);
+  const next = declarations(semester, "2026-2027-s1");
+  assert(next.instance.works[0] === "sec-lab", "Семестр с годом в начале должен сохранять назначенные работы");
+  assert(declarations(semester, "pilot").instance.works[0] === "sec-lab", "Добавление семестра не должно менять старый pilot");
+  for (const key of ["../2026", "/2026", "2026/2027", "-2026", "2026 S1", "2026_S1"]) {
+    const unsafe = structuredClone(d.raw);
+    unsafe.delivery.instances[key] = structuredClone(unsafe.delivery.instances.pilot);
+    let rejected = false;
+    try {declarations(unsafe, key);} catch {rejected = true;}
+    assert(rejected, "Недопустимый ключ семестра принят: " + key);
+  }
   for (const field of ["unknown", "runtime", "sources"]) {
     let rejected = false;
     try {
@@ -803,6 +815,10 @@ Deno.test("course instance assessment UUIDs use approved stable namespaces", asy
       "6cbeb308-b0c5-51fc-bc0e-0f6bcbe75a45",
     "assessment UUID drift",
   );
+  const java = await identity("course/java-semester-one");
+  assert(java === "036dee22-0705-5c6d-abd5-30620afcce9b", "Java course UUID изменился");
+  assert(await identity("instance/pilot", java) === "18980649-6462-5ba4-a0c4-b5bcd1634fef", "Java pilot UUID изменился");
+  assert(await identity("instance/2026-2027-s1", java) === "4141f9c0-8233-591f-ac1c-53275f3b8c02", "UUID нового семестра вычислен вне утверждённого namespace");
 });
 Deno.test("multiple_selected_defenses_for_one_essay reject before source collection", async () => {
   const root = await Deno.makeTempDir();
