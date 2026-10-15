@@ -34,7 +34,7 @@ jobs:
           repository: Afonenko-Course-Tools/quarto-course
           # Существующий immutable candidate Core 7.0.0; stable tag ещё не выпущен.
           # После release применяется фактически опубликованный ref.
-          ref: ${{ vars.COURSE_CORE_REF || '02ead9cd7d906a47acf99a1f012b316ae1dedfa0' }}
+          ref: ${{ vars.COURSE_CORE_REF || '1d2429065e66d1dc856637e863c901fe9148af04' }}
           path: .ci-deps/core
           persist-credentials: false
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
@@ -67,7 +67,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: ${{ vars.COURSE_CORE_REF || '02ead9cd7d906a47acf99a1f012b316ae1dedfa0' }}
+          ref: ${{ vars.COURSE_CORE_REF || '1d2429065e66d1dc856637e863c901fe9148af04' }}
           path: .ci-deps/core
           persist-credentials: false
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
