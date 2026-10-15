@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 import { normalizeDiscovery } from './grading-descriptor.ts';
 export function runtimeDescriptor(c: any, profile: any, sources: string[], tests: string[]) {
   const javaRuntime = profile.javaRelease !== undefined || !profile.sourceExtensions;
@@ -11,3 +13,6 @@ export function runtimeDescriptor(c: any, profile: any, sources: string[], tests
     ...(c.variants ? {variants:c.variants} : {}),
   };
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+runtimeDescriptor=__metrics.wrapSync({id:"course-prairielearn.application.runtime-descriptor.runtimeDescriptor",kind:"phase"},runtimeDescriptor);

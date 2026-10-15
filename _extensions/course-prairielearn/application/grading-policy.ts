@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 import { closed } from "./declarations.ts";
 const scalar = (v: any) =>
   typeof v === "number" && Number.isFinite(v) && v >= 0;
@@ -141,3 +143,6 @@ export function gradingPolicy(work: any) {
     },
   };
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+gradingPolicy=__metrics.wrapSync({id:"course-prairielearn.application.grading-policy.gradingPolicy",kind:"phase"},gradingPolicy);

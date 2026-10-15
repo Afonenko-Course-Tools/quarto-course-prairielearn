@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 export const object = (v: any) =>
   v !== null && typeof v === "object" && !Array.isArray(v);
 export function closed(v: any, required: string[], optional: string[] = []) {
@@ -71,7 +73,7 @@ export function declarations(raw: any, key: string) {
   if (
     !object(raw.delivery.instances) ||
     !Object.hasOwn(raw.delivery.instances, key) ||
-    !/^[a-z][a-z0-9-]*$/.test(key)
+    !/^[a-z0-9][a-z0-9-]*$/.test(key)
   ) throw new Error("PL instance missing");
   for (
     const [id, v] of Object.entries(raw.delivery.instances) as [string, any][]
@@ -96,7 +98,7 @@ export function declarations(raw: any, key: string) {
       );
     }
     if (
-      !/^[a-z][a-z0-9-]*$/.test(id) || typeof v.title !== "string" ||
+      !/^[a-z0-9][a-z0-9-]*$/.test(id) || typeof v.title !== "string" ||
       !v.title || typeof v["self-enrollment"] !== "boolean" ||
       !Array.isArray(v.works) || !v.works.length ||
       new Set(v.works).size !== v.works.length || v.works.some((w: any) =>
@@ -114,3 +116,10 @@ export function declarations(raw: any, key: string) {
     defaults: question(raw["question-defaults"]),
   };
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+closed=__metrics.wrapSync({id:"course-prairielearn.application.declarations.closed",kind:"phase"},closed);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+question=__metrics.wrapSync({id:"course-prairielearn.application.declarations.question",kind:"phase"},question);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+declarations=__metrics.wrapSync({id:"course-prairielearn.application.declarations.declarations",kind:"phase"},declarations);

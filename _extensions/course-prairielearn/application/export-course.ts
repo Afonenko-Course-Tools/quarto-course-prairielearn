@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 import { qualifiedSlots, nativeSlotBlocks } from "./slots.ts";
 import { dirname, join, relative, resolve } from "node:path";
 import { verificationInventoryHash } from "./verification-inventory.ts";
@@ -6,7 +8,7 @@ import { completionPolicy } from "./completion.ts";
 import { runtimeDescriptor } from "./runtime-descriptor.ts";
 import * as validators from "./native-validators.js";
 import { validateAssessmentSemantics } from "./native-semantics.ts";
-import { exportPrairieLearn, uuid } from "./export.ts";
+import { exportPrairieLearn, renderPublicBody, uuid } from "./export.ts";
 import { declarations, question } from "./declarations.ts";
 import {
   canonical,
@@ -179,6 +181,26 @@ export async function exportCourse(
         p = await input.body(work.id),
         binding: any = { questions: {} },
         projects: Record<string, string> = {};
+      const publicWork = p.works?.[0];
+      if (!publicWork || publicWork.key !== input.courseId + "/" + work.id ||
+          publicWork.introduction !== undefined && !Array.isArray(publicWork.introduction)) {
+        throw new Error("PL публичное введение не соответствует выбранной работе: " + work.id);
+      }
+      const overview = await renderPublicBody(p, publicWork.introduction ?? [], publicWork.key,
+        {source: publicWork.source, id: work.id, field: "introduction"},
+        "clientFilesCourse", "{{ client_files_course }}");
+      for (const file of overview.files) {
+        const target = join(stage, file.name);
+        await Deno.mkdir(dirname(target), {recursive: true});
+        try {
+          if (await hash(await Deno.readFile(target)) !== await hash(file.data)) {
+            throw new Error("PL конфликт публичного ресурса обзора: " + file.name);
+          }
+        } catch (e) {
+          if (!(e instanceof Deno.errors.NotFound)) throw e;
+          await Deno.writeFile(target, file.data);
+        }
+      }
       for (const q of p.questions) {
         const e = input.result.model.exercises.find((e: any) => e.id === q.id);
         if (e?.target !== "prairielearn") {
@@ -346,7 +368,7 @@ export async function exportCourse(
           number: String(index + 1),
           ...grading.assessment,
           text:
-            `Выполните не менее ${completion.atLeast} обязательных позиций полностью. Частичный результат и необязательные позиции не заменяют обязательные.`,
+            overview.html + `<p>Выполните не менее ${completion.atLeast} обязательных позиций полностью. Частичный результат и необязательные позиции не заменяют обязательные.</p>`,
           accessControl: work.relatedExercise
             ? [{
               beforeRelease: { listed: false },
@@ -459,3 +481,8 @@ async function parent(path: string) {
   await Deno.mkdir(dirname(path), { recursive: true });
   return path;
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+identity=__metrics.wrapAsync({id:"course-prairielearn.application.export-course.identity",kind:"phase"},identity);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+exportCourse=__metrics.wrapAsync({id:"course-prairielearn.application.export-course.exportCourse",kind:"phase"},exportCourse);

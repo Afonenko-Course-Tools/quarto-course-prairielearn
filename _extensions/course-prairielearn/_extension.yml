@@ -1,5 +1,5 @@
 title: Задания курса в PrairieLearn
-version: 6.0.0
+version: 7.0.0
 quarto-required: ">=1.11.5"
 contributes:
   filters:
@@ -12,5 +12,5 @@ contributes:
       grading-inspection-entrypoint: entrypoints/inspect-grading.ts
       native-entrypoint: entrypoints/export-course.ts
       native-contract: course-native-delivery-v2
-      core-version: 6.0.0
+      core-version: 7.0.0
       activation: explicit-script-only

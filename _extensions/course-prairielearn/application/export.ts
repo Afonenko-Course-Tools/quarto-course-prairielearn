@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 import { validateSlots } from "./slots.ts";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { diagnostic, type DiagnosticContext } from "./diagnostics.ts";
@@ -49,6 +51,7 @@ async function command(
   try {
     child = new Deno.Command(tool, {
       args,
+      env: __metrics.childEnv({}),
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",
@@ -144,6 +147,154 @@ async function files(
   await walk(root);
   return collected.sort((a, b) => a.name.localeCompare(b.name));
 }
+export async function renderPublicBody(
+  p: any, nodes: any[], key: string, questionContext: DiagnosticContext,
+  resourceBase: string, clientFilesToken: string,
+): Promise<{html: string; files: {name: string; data: Uint8Array}[]}> {
+  const questionFail = (message: string, field: string, cause?: unknown): never =>
+    fail(message, {...questionContext, field}, cause);
+  const files: {name: string; data: Uint8Array}[] = [];
+    const blocks = structuredClone(nodes);
+    const authored = JSON.stringify(nodes);
+    let markerIndex = 0;
+    while (authored.includes("PL_CLIENT_FILE_URL_TOKEN_" + markerIndex)) markerIndex++;
+    const resourceMarker = "PL_CLIENT_FILE_URL_TOKEN_" + markerIndex;
+    const resources = new Map<string, any>();
+    const anchorPrefix = "pl-" + await uuid(key) + "-";
+    const anchors = new Map<string, string>();
+    // TableHead/Body/Foot, Row and Cell carry semantic Attr arrays, not t nodes.
+    const nodeAttrs = (node:any):any[] => {
+      if(node.t === "Header")return [node.c[1]];
+      if(node.t === "Table"){
+        const [, , , head, bodies, foot]=node.c;
+        const rows=[...head[1],...bodies.flatMap((body:any)=>[...body[2],...body[3]]),...foot[1]];
+        return [node.c[0],head[0],...bodies.map((body:any)=>body[0]),foot[0],...rows.flatMap((row:any)=>[row[0],...row[1].map((cell:any)=>cell[0])])];
+      }
+      return ["Div","Span","CodeBlock","Code","Link","Image","Figure"].includes(node.t)?[node.c[0]]:[];
+    };
+    const indexAnchors = (value: any) => {
+      if (Array.isArray(value)) {
+        value.forEach(indexAnchors);
+        return;
+      }
+      if (!value || typeof value !== "object") return;
+      for(const attr of nodeAttrs(value)){
+        if (attr?.[0]) {
+          if (anchors.has(attr[0])) {
+            questionFail("Повторная цель в публичном вопросе: " + attr[0], "condition.reference");
+          }
+          anchors.set(attr[0], anchorPrefix + attr[0]);
+        }
+      }
+      Object.values(value).forEach(indexAnchors);
+    };
+    indexAnchors(blocks);
+    const map = (node: any) => {
+      if (!node || typeof node !== "object") return;
+      if (["RawBlock", "RawInline", "Cite", "Note"].includes(node.t)) {
+        questionFail("Неподдерживаемый узел условия: " + node.t, "condition");
+      }
+      for(const attr of nodeAttrs(node)){
+        if(attr?.[0])attr[0]=anchors.get(attr[0]);
+      }
+      if (
+        ["Div", "Span", "CodeBlock", "Code"].includes(node.t) &&
+        node.c[0][1].some((c: string) =>
+          ["answer", "answer-spec", "correct", "solution", "grading-notes"]
+            .includes(c)
+        )
+      ) questionFail("Закрытая отметка в публичном условии", "condition");
+      if (node.t === "Image" || node.t === "Link") {
+        const href = node.c[2][0],
+          resource = p.resources.find((r: any) => r.target === href);
+        if (node.t === "Link" && href.startsWith("#")) {
+          let target: string;
+          try {
+            target = decodeURIComponent(href.slice(1));
+          } catch (cause) {
+            questionFail("Неверная fragment ссылка: " + href, "condition.reference", cause);
+          }
+          const actual = anchors.get(target!);
+          if (!actual) {
+            questionFail("Цель ссылки отсутствует в публичном вопросе: " + href, "condition.reference");
+          }
+          node.c[2][0] = "#" + actual;
+        } else if (resource) {
+          if (
+            !safe(resource.target) || resource.owner !== p.owner ||
+            resource.visibility !== "public" ||
+            typeof resource.data !== "string"
+          ) {
+            questionFail(
+              "Неверный публичный ресурс: " + href,
+              "condition.resource",
+            );
+          }
+          resources.set(resource.target, resource);
+          node.c[2][0] = resourceMarker + "/" + resource.target;
+        } else if (!(node.t === "Link" && /^https?:\/\//.test(href))) {
+          questionFail(
+            "Ресурс условия отсутствует в публичной поставке: " + href,
+            "condition.resource",
+          );
+        }
+      }
+      if (node.t === "Link" && !node.c[2][0].startsWith("#")) {
+        const attributes = node.c[0][2].filter((pair: string[]) => !["target", "rel"].includes(pair[0]));
+        const oldRel = node.c[0][2].find((pair: string[]) => pair[0] === "rel")?.[1] ?? "";
+        attributes.push(["target", "_blank"], ["rel", [...new Set([...oldRel.split(/\s+/).filter(Boolean), "noopener", "noreferrer"])].join(" ")]);
+        node.c[0][2] = attributes;
+      }
+      Object.values(node).forEach((value) => {
+        if (Array.isArray(value)) value.forEach(map);
+        else map(value);
+      });
+    };
+    blocks.forEach(map);
+    for (const r of resources.values()) {
+      let bytes: Uint8Array;
+      try {
+        bytes = Uint8Array.from(atob(r.data), (c) => c.charCodeAt(0));
+      } catch (cause) {
+        questionFail(
+          "Неверная кодировка ресурса: " + r.target,
+          "resources.data",
+          cause,
+        );
+      }
+      const hash = Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest("SHA-256", new Uint8Array(bytes!)),
+        ),
+        (x) => x.toString(16).padStart(2, "0"),
+      ).join("");
+      if (hash !== r.sha256) {
+        questionFail(
+          "Контрольная сумма ресурса не совпадает: " + r.target,
+          "resources.sha256",
+        );
+      }
+      files.push({
+        name: resourceBase + "/" + r.target,
+        data: bytes!,
+      });
+    }
+    const authoredHtml = await command(
+      ["pandoc", "--from=json", "--to=html5", "--mathml"],
+      JSON.stringify({ "pandoc-api-version": p.apiVersion, meta: {}, blocks }),
+      questionContext,
+    );
+    const html = authoredHtml.replaceAll("{{", "&#123;&#123;").replaceAll(
+      "}}",
+      "&#125;&#125;",
+    ).replaceAll(resourceMarker + "/", clientFilesToken + "/");
+  return {html, files};
+}
+function metadata(q: any): string {
+  const difficulty: Record<string, string> = {introductory: "Начальный", intermediate: "Средний", advanced: "Высокий"};
+  const parts = [q.difficulty ? "Сложность: " + difficulty[q.difficulty] : "", q.time !== undefined ? "Время: " + q.time + " мин" : ""].filter(Boolean);
+  return parts.length ? '<p class="course-question-metadata">' + parts.join(' · ') + '</p>\n' : '';
+}
 export async function exportPrairieLearn(
   p: any,
   context: ProjectContext,
@@ -200,7 +351,7 @@ export async function exportPrairieLearn(
     if (!(e instanceof Deno.errors.NotFound)) throw e;
   }
   if(!Array.isArray(p.works)||p.works.length!==1)refuse("Требуется одна работа","works");
-  if(!fields(work,["owner","id","key","source","kind","title","slots"],["theoryTime","relatedExercise"])||work.owner!==p.owner||work.key!==p.owner+"/"+work.id||typeof work.id!=="string"||!/^[a-z][a-z0-9-]*$/.test(work.id)||typeof work.source!=="string"||!work.source||typeof work.title!=="string"||!work.title.trim()||!["lab","seminar","practical","test"].includes(work.kind)||work.relatedExercise!==undefined&&(typeof work.relatedExercise!=="string"||!/^exr-[a-z0-9][a-z0-9-]*$/.test(work.relatedExercise))||work.theoryTime!==undefined&&(typeof work.theoryTime!=="number"||!Number.isFinite(work.theoryTime)||work.theoryTime<=0))refuse("Неверные поля работы v2","works");
+  if(!fields(work,["owner","id","key","source","kind","title","slots"],["theoryTime","relatedExercise","introduction"])||work.owner!==p.owner||work.key!==p.owner+"/"+work.id||typeof work.id!=="string"||!/^[a-z][a-z0-9-]*$/.test(work.id)||typeof work.source!=="string"||!work.source||typeof work.title!=="string"||!work.title.trim()||!["lab","seminar","practical","test"].includes(work.kind)||work.relatedExercise!==undefined&&(typeof work.relatedExercise!=="string"||!/^exr-[a-z0-9][a-z0-9-]*$/.test(work.relatedExercise))||work.theoryTime!==undefined&&(typeof work.theoryTime!=="number"||!Number.isFinite(work.theoryTime)||work.theoryTime<=0))refuse("Неверные поля работы v2","works");
   try {validateSlots(work.slots,p.owner,work.id,true);} catch(error){refuse("Неверные позиции Body v2: "+String(error),"works.slots");}
   const candidates=work.slots.flatMap((slot:any)=>slot.candidates);
   if(candidates.length!==p.questions.length||p.questions.some((q:any)=>!candidates.includes(q?.key)))refuse("Каталог должен содержать всех кандидатов","works.slots");
@@ -226,6 +377,7 @@ export async function exportPrairieLearn(
         "owner",
         "id",
         "key",
+        "title",
         "source",
         "visibility",
         "statementVisibility",
@@ -233,8 +385,11 @@ export async function exportPrairieLearn(
         "answerType",
         "condition",
         "publicAnswer",
-      ], ["purpose"]) || q.owner !== p.owner ||
+      ], ["purpose", "difficulty", "time"]) || q.owner !== p.owner ||
       q.key !== p.owner + "/" + q.id ||
+      typeof q.title !== "string" || !q.title.trim() ||
+      q.difficulty !== undefined && !["introductory", "intermediate", "advanced"].includes(q.difficulty) ||
+      q.time !== undefined && (typeof q.time !== "number" || !Number.isFinite(q.time) || q.time <= 0) ||
       !/^exr-[a-z0-9][a-z0-9-]*$/.test(q.id) || keys.has(q.key) ||
       q.visibility !== "public" ||
       !["open", "restricted"].includes(q.statementVisibility) ||
@@ -374,133 +529,10 @@ export async function exportPrairieLearn(
     for (const f of tests) {
       prepared.push({ name: base + "/tests/" + f.name, data: f.data });
     }
-    const blocks = structuredClone(q.condition);
-    const resources = new Map<string, any>();
-    const anchorPrefix = "pl-" + await uuid(q.key) + "-";
-    const anchors = new Map<string, string>();
-    // TableHead/Body/Foot, Row and Cell carry semantic Attr arrays, not t nodes.
-    const nodeAttrs = (node:any):any[] => {
-      if(node.t === "Header")return [node.c[1]];
-      if(node.t === "Table"){
-        const [, , , head, bodies, foot]=node.c;
-        const rows=[...head[1],...bodies.flatMap((body:any)=>[...body[2],...body[3]]),...foot[1]];
-        return [node.c[0],head[0],...bodies.map((body:any)=>body[0]),foot[0],...rows.flatMap((row:any)=>[row[0],...row[1].map((cell:any)=>cell[0])])];
-      }
-      return ["Div","Span","CodeBlock","Code","Link","Image","Figure"].includes(node.t)?[node.c[0]]:[];
-    };
-    const indexAnchors = (value: any) => {
-      if (Array.isArray(value)) {
-        value.forEach(indexAnchors);
-        return;
-      }
-      if (!value || typeof value !== "object") return;
-      for(const attr of nodeAttrs(value)){
-        if (attr?.[0]) {
-          if (anchors.has(attr[0])) {
-            questionFail("Повторная цель в публичном вопросе: " + attr[0], "condition.reference");
-          }
-          anchors.set(attr[0], anchorPrefix + attr[0]);
-        }
-      }
-      Object.values(value).forEach(indexAnchors);
-    };
-    indexAnchors(blocks);
-    const map = (node: any) => {
-      if (!node || typeof node !== "object") return;
-      if (["RawBlock", "RawInline", "Cite", "Note"].includes(node.t)) {
-        questionFail("Неподдерживаемый узел условия: " + node.t, "condition");
-      }
-      for(const attr of nodeAttrs(node)){
-        if(attr?.[0])attr[0]=anchors.get(attr[0]);
-      }
-      if (
-        ["Div", "Span", "CodeBlock", "Code"].includes(node.t) &&
-        node.c[0][1].some((c: string) =>
-          ["answer", "answer-spec", "correct", "solution", "grading-notes"]
-            .includes(c)
-        )
-      ) questionFail("Закрытая отметка в публичном условии", "condition");
-      if (node.t === "Image" || node.t === "Link") {
-        const href = node.c[2][0],
-          resource = p.resources.find((r: any) => r.target === href);
-        if (node.t === "Link" && href.startsWith("#")) {
-          let target: string;
-          try {
-            target = decodeURIComponent(href.slice(1));
-          } catch (cause) {
-            questionFail("Неверная fragment ссылка: " + href, "condition.reference", cause);
-          }
-          const actual = anchors.get(target!);
-          if (!actual) {
-            questionFail("Цель ссылки отсутствует в публичном вопросе: " + href, "condition.reference");
-          }
-          node.c[2][0] = "#" + actual;
-        } else if (resource) {
-          if (
-            !safe(resource.target) || resource.owner !== p.owner ||
-            resource.visibility !== "public" ||
-            typeof resource.data !== "string"
-          ) {
-            questionFail(
-              "Неверный публичный ресурс: " + href,
-              "condition.resource",
-            );
-          }
-          resources.set(resource.target, resource);
-          node.c[2][0] = "PL_CLIENT_FILE_URL_TOKEN/" + resource.target;
-        } else if (!(node.t === "Link" && /^https?:\/\//.test(href))) {
-          questionFail(
-            "Ресурс условия отсутствует в публичной поставке: " + href,
-            "condition.resource",
-          );
-        }
-      }
-      Object.values(node).forEach((value) => {
-        if (Array.isArray(value)) value.forEach(map);
-        else map(value);
-      });
-    };
-    blocks.forEach(map);
-    for (const r of resources.values()) {
-      let bytes: Uint8Array;
-      try {
-        bytes = Uint8Array.from(atob(r.data), (c) => c.charCodeAt(0));
-      } catch (cause) {
-        questionFail(
-          "Неверная кодировка ресурса: " + r.target,
-          "resources.data",
-          cause,
-        );
-      }
-      const hash = Array.from(
-        new Uint8Array(
-          await crypto.subtle.digest("SHA-256", new Uint8Array(bytes!)),
-        ),
-        (x) => x.toString(16).padStart(2, "0"),
-      ).join("");
-      if (hash !== r.sha256) {
-        questionFail(
-          "Контрольная сумма ресурса не совпадает: " + r.target,
-          "resources.sha256",
-        );
-      }
-      prepared.push({
-        name: base + "/clientFilesQuestion/" + r.target,
-        data: bytes!,
-      });
-    }
-    const authoredHtml = await command(
-      ["pandoc", "--from=json", "--to=html5", "--mathml"],
-      JSON.stringify({ "pandoc-api-version": p.apiVersion, meta: {}, blocks }),
-      questionContext,
-    );
-    const html = authoredHtml.replaceAll("{{", "&#123;&#123;").replaceAll(
-      "}}",
-      "&#125;&#125;",
-    ).replaceAll(
-      "PL_CLIENT_FILE_URL_TOKEN",
-      "{{options.client_files_question_url}}",
-    );
+    const rendered = await renderPublicBody(p, q.condition, q.key, questionContext,
+      base + "/clientFilesQuestion", "{{options.client_files_question_url}}");
+    prepared.push(...rendered.files);
+    const html = rendered.html;
     const escape = (v: string) =>
       v.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll(
         "<",
@@ -550,7 +582,7 @@ export async function exportPrairieLearn(
     }
     text(
       base + "/question.html",
-      "<pl-question-panel>\n" + html + "\n" + controls +
+      "<pl-question-panel>\n" + metadata(q) + html + "\n" + controls +
         "\n</pl-question-panel>\n<pl-submission-panel><pl-external-grader-results></pl-external-grader-results></pl-submission-panel>\n",
     );
     text(
@@ -559,7 +591,7 @@ export async function exportPrairieLearn(
         {
           uuid: await uuid(q.key),
           type: "v3",
-          title: q.id,
+          title: q.title,
           topic: b.topic,
           gradingMethod: "External",
           ...(b.singleVariant !== undefined
@@ -606,3 +638,11 @@ export async function exportPrairieLearn(
     throw e;
   }
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+uuid=__metrics.wrapAsync({id:"course-prairielearn.application.export.uuid",kind:"phase"},uuid);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+exportPrairieLearn=__metrics.wrapAsync({id:"course-prairielearn.application.export.exportPrairieLearn",kind:"phase"},exportPrairieLearn);
+
+// @ts-expect-error JS допускает замену function binding; публичная сигнатура сохраняется.
+command=__metrics.wrapAsync({id:"course-prairielearn.application.export.command",kind:"command"},command);

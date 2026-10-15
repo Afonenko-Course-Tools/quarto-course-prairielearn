@@ -12,6 +12,9 @@ const p = () => ({
     owner: "demo",
     id: "exr-clamp",
     key: "demo/exr-clamp",
+    title: "Ограничение диапазона",
+    difficulty: "introductory",
+    time: 15,
     source: "tasks.qmd",
     visibility: "public",
     statementVisibility: "restricted",
@@ -93,6 +96,8 @@ Deno.test("native PL delivery separates public starter and private tests and kee
     }
     assert(absent, "reference became public");
     const info = JSON.parse(await Deno.readTextFile(q + "/info.json"));
+    assert(info.title === "Ограничение диапазона", "Native title должен сохранять авторское название");
+    assert(html.includes("Начальный") && html.includes("15 мин"), "Отсутствуют авторские сложность и время");
     assert(
       info.gradingMethod === "External" && !info.partialCredit &&
         info.type === "v3",

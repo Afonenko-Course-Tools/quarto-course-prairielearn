@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 import { closed } from './declarations.ts';
 import { qualifiedSlots } from './slots.ts';
 export interface CompletionPolicy {schemaVersion:2;mode:'required-slot-completion';source:'per-slot-results-v2';slotIds:string[];requiredSlotIds:string[];atLeast:number;fullyCompletedScore:1}
@@ -17,3 +19,10 @@ export function evaluateCompletion(policy:CompletionPolicy,results:any){
  const completedRequired=policy.requiredSlotIds.filter(id=>rows.get(id)?.status==='complete'&&rows.get(id).score===1).length;const passed=completedRequired>=policy.atLeast;
  return {completedRequired,requiredTotal:policy.requiredSlotIds.length,atLeast:policy.atLeast,passed,score:passed?1:0};
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+validateCompletionPolicy=__metrics.wrapSync({id:"course-prairielearn.application.completion.validateCompletionPolicy",kind:"phase"},validateCompletionPolicy);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+completionPolicy=__metrics.wrapSync({id:"course-prairielearn.application.completion.completionPolicy",kind:"phase"},completionPolicy);
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+evaluateCompletion=__metrics.wrapSync({id:"course-prairielearn.application.completion.evaluateCompletion",kind:"phase"},evaluateCompletion);

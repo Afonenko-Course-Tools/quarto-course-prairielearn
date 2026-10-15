@@ -109,6 +109,18 @@ Deno.test("closed delivery defaults and selected instance", () => {
     assert(rejected, "invalid instance publishing accepted");
   }
   assert(d.instance.works[0] === "sec-lab", "work lost");
+  const semester = structuredClone(d.raw);
+  semester.delivery.instances["2026-2027-s1"] = structuredClone(semester.delivery.instances.pilot);
+  const next = declarations(semester, "2026-2027-s1");
+  assert(next.instance.works[0] === "sec-lab", "Семестр с годом в начале должен сохранять назначенные работы");
+  assert(declarations(semester, "pilot").instance.works[0] === "sec-lab", "Добавление семестра не должно менять старый pilot");
+  for (const key of ["../2026", "/2026", "2026/2027", "-2026", "2026 S1", "2026_S1"]) {
+    const unsafe = structuredClone(d.raw);
+    unsafe.delivery.instances[key] = structuredClone(unsafe.delivery.instances.pilot);
+    let rejected = false;
+    try {declarations(unsafe, key);} catch {rejected = true;}
+    assert(rejected, "Недопустимый ключ семестра принят: " + key);
+  }
   for (const field of ["unknown", "runtime", "sources"]) {
     let rejected = false;
     try {
@@ -280,6 +292,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         owner: "demo",
         id: "exr-a",
         key: "demo/exr-a",
+        title: "Задача A",
         source: "a.qmd",
         visibility: "public",
         statementVisibility: "open",
@@ -288,7 +301,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         condition: [{ t: "Para", c: [{ t: "Str", c: "PUBLIC_CONDITION" }] }],
         publicAnswer: [],
       }],
-      resources: [],
+      resources: [{owner: "demo", source: "lab.qmd", effectiveBase: root, target: "diagram.svg", visibility: "public", data: btoa("<svg>PUBLIC_DIAGRAM</svg>"), sha256: await hash("<svg>PUBLIC_DIAGRAM</svg>")}],
       works: [{
         owner: "demo",
         id: "sec-lab",
@@ -296,6 +309,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         source: "lab.qmd",
         kind: "lab",
         title: "Lab",
+        introduction: [{t: "Para", c: [{t: "Str", c: 'Подготовка к работе {{literal}} PL_CLIENT_FILE_URL_TOKEN src="PL_CLIENT_FILE_URL_TOKEN/example.png" href="PL_CLIENT_FILE_URL_TOKEN/example.png" PL_CLIENT_FILE_URL_TOKEN_0'}, {t: "Space"}, {t: "Link", c: [["", [], []], [{t: "Str", c: "Теория"}], ["https://example.test/theory.html", ""]]}, {t: "Image", c: [["", [], []], [{t: "Str", c: "Диаграмма"}], ["diagram.svg", ""]]}]}],
         slots: [{id:"demo/sec-lab/exr-a",selection:"fixed",candidates:["demo/exr-a"],assignment}],
       }],
     };
@@ -344,6 +358,15 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       checksOutput: root + "/checks2.json",
     });
     assert(canonical(a) === canonical(b), "exports differ");
+    const overview = JSON.parse(await Deno.readTextFile(root + "/one/courseInstances/pilot/assessments/sec-lab/infoAssessment.json")).text;
+    assert(overview.includes("Подготовка к работе") && overview.includes('target="_blank"') &&
+      !overview.includes("{{literal}}") && !overview.includes("PRIVATE_REFERENCE"),
+      "Native обзор потерял введение/ссылку или содержит приватные данные");
+    assert(overview.includes("{{ client_files_course }}/diagram.svg") &&
+      await Deno.readTextFile(root + "/one/clientFilesCourse/diagram.svg") === "<svg>PUBLIC_DIAGRAM</svg>",
+      "Обзор должен использовать штатный native токен и публичное вложение курса");
+    assert(overview.includes("PL_CLIENT_FILE_URL_TOKEN"), "Буквальный авторский текст маркера превратился в шаблон");
+    assert(overview.includes('src="PL_CLIENT_FILE_URL_TOKEN/example.png"') && overview.includes('href="PL_CLIENT_FILE_URL_TOKEN/example.png"') && overview.includes("PL_CLIENT_FILE_URL_TOKEN_0"), "Авторский текст, похожий на атрибут ресурса, превратился в шаблон");
     const fishSource = "echo ok\n";
     await Deno.mkdir(root + "/project/student", {recursive:true});
     await Deno.writeTextFile(root + "/project/student/commands.fish", fishSource);
@@ -792,6 +815,10 @@ Deno.test("course instance assessment UUIDs use approved stable namespaces", asy
       "6cbeb308-b0c5-51fc-bc0e-0f6bcbe75a45",
     "assessment UUID drift",
   );
+  const java = await identity("course/java-semester-one");
+  assert(java === "036dee22-0705-5c6d-abd5-30620afcce9b", "Java course UUID изменился");
+  assert(await identity("instance/pilot", java) === "18980649-6462-5ba4-a0c4-b5bcd1634fef", "Java pilot UUID изменился");
+  assert(await identity("instance/2026-2027-s1", java) === "4141f9c0-8233-591f-ac1c-53275f3b8c02", "UUID нового семестра вычислен вне утверждённого namespace");
 });
 Deno.test("multiple_selected_defenses_for_one_essay reject before source collection", async () => {
   const root = await Deno.makeTempDir();

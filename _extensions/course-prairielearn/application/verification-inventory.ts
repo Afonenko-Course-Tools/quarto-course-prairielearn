@@ -1,3 +1,5 @@
+import {createMetrics as __createMetrics} from "../observability/bridge.ts";
+const __metrics=__createMetrics("course-prairielearn");
 import { resolve } from "node:path";
 import { canonical, hash, readSelected, safePath } from "./source-selection.ts";
 /** Public hash only; private references, fixtures and expectation documents remain outside native output. */
@@ -70,3 +72,6 @@ export async function verificationInventoryHash(
   ) throw new Error("PL duplicate verification scenario");
   return await hash(canonical(records));
 }
+
+// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
+verificationInventoryHash=__metrics.wrapAsync({id:"course-prairielearn.application.verification-inventory.verificationInventoryHash",kind:"phase"},verificationInventoryHash);
