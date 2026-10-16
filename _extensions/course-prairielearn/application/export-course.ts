@@ -291,6 +291,7 @@ export async function exportCourse(
         binding.questions[q.id] = {
           ...settings,
           files: sources.map((s) => s.name),
+          ...(descriptor.additionalJavaSources?{additionalJavaSources:descriptor.additionalJavaSources}:{}),
           externalGradingOptions: {
             image,
             timeout: c.limits?.["outer-seconds"] ?? 30,

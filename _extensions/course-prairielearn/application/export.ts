@@ -1,5 +1,6 @@
 import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
+import { validateAdditionalJavaSources } from "./runtime-descriptor.ts";
 import { validateSlots } from "./slots.ts";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { diagnostic, type DiagnosticContext } from "./diagnostics.ts";
@@ -425,6 +426,7 @@ export async function exportPrairieLearn(
       !fields(b, ["topic", "files", "externalGradingOptions"], [
         "submission",
         "singleVariant",
+        "additionalJavaSources",
       ]) ||
       b.singleVariant !== undefined && typeof b.singleVariant !== "boolean" ||
       typeof b.topic !== "string" || !b.topic.trim() ||
@@ -541,6 +543,7 @@ export async function exportPrairieLearn(
         "}}",
         "&#125;&#125;",
       );
+    const extras=b.additionalJavaSources===undefined?undefined:validateAdditionalJavaSources(b.additionalJavaSources,b.files,tests.map(f=>f.name));
     let controls: string;
     if (submission.mode === "editor") {
       controls = b.files.map((name: string) => {
@@ -578,7 +581,11 @@ export async function exportPrairieLearn(
         '"></pl-file-download>'
       ).join("\n");
       controls = downloads + '\n<pl-file-upload file-names="' +
-        escape(b.files.join(",")) + '"></pl-file-upload>';
+        escape(b.files.join(",")) + '"' + (extras?' optional-file-names="'+escape(extras.archive)+'"':'') + '></pl-file-upload>';
+    }
+    if(extras){
+      if(submission.mode==='editor')controls+='\n<pl-file-upload optional-file-names="'+escape(extras.archive)+'"></pl-file-upload>';
+      controls+='\n<p>Необязательный ZIP дополнительных .java: '+escape(extras.archive)+'. Основные файлы остаются в '+(submission.mode==='editor'?'редакторах':'обязательной загрузке')+'. Относительные пути пакетов допускаются; основные и доверенные файлы перезаписывать нельзя. Пределы: '+extras.maxFiles+' файлов, '+extras.maxFileBytes+' байт на файл, '+extras.maxTotalBytes+' байт распакованных исходников, '+extras.maxArchiveBytes+' байт ZIP. Штатный общий предел PrairieLearn — 5 MB на весь ответ, включая редакторные файлы; доступный размер ZIP зависит от остального ответа. При превышении используйте ручную сдачу.</p>';
     }
     text(
       base + "/question.html",

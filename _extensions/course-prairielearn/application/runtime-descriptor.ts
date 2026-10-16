@@ -2,12 +2,25 @@ import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
 import { normalizeDiscovery } from './grading-descriptor.ts';
 import { safePath } from './source-selection.ts';
+export interface AdditionalJavaSources {archive:string;maxFiles:number;maxFileBytes:number;maxTotalBytes:number;maxArchiveBytes:number}
+export function validateAdditionalJavaSources(value:any,sources:string[],tests:string[]):AdditionalJavaSources {
+  const caps={maxFiles:128,maxFileBytes:1048576,maxTotalBytes:4194304,maxArchiveBytes:2097152};
+  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==5||Object.keys(value).some(k=>!['archive',...Object.keys(caps)].includes(k))||typeof value.archive!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.zip$/.test(value.archive)||Object.entries(caps).some(([key,cap])=>!Number.isInteger(value[key])||value[key]<1||value[key]>cap))throw new Error('PL invalid additional Java sources policy');
+  if([...sources,...tests,'grading-job.json','tests/grading-job.json'].some(name=>name===value.archive||name.startsWith(value.archive+'/')||value.archive.startsWith(name+'/')))throw new Error('PL additional Java archive conflicts with primary/trusted path');
+  return {...value};
+}
 export interface ApiPrecheck {files:string[];entry:string}
 export function runtimeDescriptor(c: any, profile: any, sources: string[], tests: string[], api?:ApiPrecheck) {
   const javaRuntime = profile.javaRelease !== undefined || !profile.sourceExtensions;
   if (!javaRuntime && c.java !== undefined) throw new Error('PL non-Java runtime cannot declare Java compiler settings');
   if(Boolean(c['api-precheck'])!==Boolean(api))throw new Error('PL API precheck selection missing or undeclared');
   if(api&&(!javaRuntime||c.sourceProfile.mode!=='implementation'||!Array.isArray(api.files)||!api.files.length||new Set(api.files).size!==api.files.length||api.files.length>=tests.length||api.files.some(x=>!safePath(x)||!x.endsWith('.java')||!tests.includes(x))||!/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(api.entry)||api.entry!==c['api-precheck'].entry))throw new Error('PL API precheck must be a proper trusted Java subset');
+  const extra=c['additional-java-sources'];
+  let additionalJavaSources:AdditionalJavaSources|undefined;
+  if(extra!==undefined){
+    if(!extra||typeof extra!=='object'||Array.isArray(extra)||c.runtime!=='java25-junit-v1'||c.sourceProfile.mode!=='implementation'||Object.keys(extra).some(k=>!['archive','max-files','max-file-bytes','max-total-bytes','max-archive-bytes'].includes(k)))throw new Error('PL additional Java sources require closed Java implementation policy');
+    additionalJavaSources=validateAdditionalJavaSources({archive:extra.archive,maxFiles:extra['max-files'],maxFileBytes:extra['max-file-bytes'],maxTotalBytes:extra['max-total-bytes'],maxArchiveBytes:extra['max-archive-bytes']},sources,tests);
+  }
   return {
     schemaVersion:1, sourceFiles:sources, testFiles:tests,
     mode:c.sourceProfile.mode, runtime:c.runtime,
@@ -15,6 +28,7 @@ export function runtimeDescriptor(c: any, profile: any, sources: string[], tests
     limits:{'outer-seconds':30,'compile-seconds':15,'run-seconds':10,networking:false,'max-output-bytes':65536,...c.limits},
     scoring:c.scoring ?? {mode:'weighted'}, discovery:normalizeDiscovery(c.discovery),
     ...(c.variants ? {variants:c.variants} : {}),
+    ...(additionalJavaSources?{additionalJavaSources}:{}),
     ...(api ? {apiPrecheck:{files:[...api.files],entry:api.entry}} : {}),
   };
 }
