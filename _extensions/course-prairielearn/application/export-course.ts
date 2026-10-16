@@ -283,7 +283,7 @@ export async function exportCourse(
         }
         const c = fact.check;
         const descriptor = runtimeDescriptor(c, profile,
-          sources.map(s => s.name), fact.trustedTests.map((t: any) => t.submissionRelativePath));
+          sources.map(s => s.name), fact.trustedTests.map((t: any) => t.submissionRelativePath), fact.apiPrecheck);
         await Deno.writeTextFile(
           join(project, "tests/grading-job.json"),
           JSON.stringify(descriptor, null, 2) + "\n",

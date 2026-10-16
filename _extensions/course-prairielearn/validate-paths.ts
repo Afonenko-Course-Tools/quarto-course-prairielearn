@@ -9,13 +9,13 @@ async function main() {
       source,
       id,
       field: "project",
-      hint: "Укажите существующий каталог проекта внутри выбранной книги",
+      hint: "Укажите существующий каталог проекта внутри выбранного проекта",
     };
     const fail = (message: string, cause?: unknown): never => {
       throw diagnostic("PL.PROJECT_INVALID", message, context, cause);
     };
     if (!directory.startsWith("/") || directory.startsWith("//")) {
-      fail(`Путь должен идти от корня выбранной книги: ${directory}`);
+      fail(`Путь должен идти от корня выбранного проекта: ${directory}`);
     }
     let real: string;
     try {
@@ -29,7 +29,7 @@ async function main() {
       !path || path === ".." || path.startsWith("../") ||
       path.startsWith("..\\") || isAbsolute(path)
     ) {
-      fail(`Путь выходит за пределы выбранной книги: ${directory}`);
+      fail(`Путь выходит за пределы выбранного проекта: ${directory}`);
     }
     if (!(await Deno.stat(real!)).isDirectory) {
       fail(`Путь проекта не является каталогом: ${directory}`);

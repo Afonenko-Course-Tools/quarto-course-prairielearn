@@ -377,6 +377,19 @@ Deno.test("full native export is deterministic, closed and atomic across output 
     await exportCourse(fishInput);
     assert(await Deno.readTextFile(root+"/fish/questions/demo/exr-a/serverFilesQuestion/starter/commands.fish") === fishSource,"fish starter lost");
     assert(!Object.hasOwn(JSON.parse(await Deno.readTextFile(root+"/fish/questions/demo/exr-a/tests/grading-job.json")),"java"),"fish descriptor pretends Java");
+    const apiText="public class ApiContract {}";
+    await Deno.writeTextFile(root+"/project/tests/junit/ApiContract.java",apiText);
+    const apiSelection={projectRelativePath:"tests/junit/ApiContract.java",submissionRelativePath:"ApiContract.java",sha256:await hash(apiText)};
+    const apiFact={...fact,check:{...check,runtime:"java25-junit-v1","api-precheck":{files:["tests/junit/ApiContract.java"],entry:"ApiContract"}},trustedTests:[test,apiSelection],apiPrecheck:{files:["ApiContract.java"],entry:"ApiContract"}};
+    const apiInput={...input,checks:{...input.checks,projects:[apiFact]},registry:{schemaVersion:1,profiles:{"java25-junit-v1":{mode:"implementation",javaRelease:25,image:"registry/java@sha256:"+"c".repeat(64)}}},output:root+"/api",checksOutput:root+"/api-checks.json"};
+    await exportCourse(apiInput);
+    const apiDescriptor=JSON.parse(await Deno.readTextFile(root+"/api/questions/demo/exr-a/tests/grading-job.json"));
+    assert(canonical(apiDescriptor.apiPrecheck)===canonical({files:["ApiContract.java"],entry:"ApiContract"}),"native export lost normalized API precheck");
+    assert(await Deno.readTextFile(root+"/api/questions/demo/exr-a/tests/ApiContract.java")===apiText,"native API source bytes lost");
+    assert(!await Deno.stat(root+"/api/questions/demo/exr-a/clientFilesQuestion/ApiContract.java").then(()=>true,()=>false),"private API contract leaked into starter");
+    await Deno.writeTextFile(root+"/project/tests/junit/ApiContract.java","tampered");
+    let apiTamperDenied=false;try{await exportCourse({...apiInput,output:root+"/api-tamper",checksOutput:root+"/api-tamper-checks.json"});}catch{apiTamperDenied=true;}
+    assert(apiTamperDenied,"native API source hash ignored");
 
     const repeatInfo = JSON.parse(
       await Deno.readTextFile(root + "/one/questions/demo/exr-a/info.json"),

@@ -484,7 +484,7 @@ export async function exportPrairieLearn(
       !safe(project.slice(1))
     ) {
       questionFail(
-        "Требуется путь проекта от корня выбранной книги",
+        "Требуется путь проекта от корня выбранного проекта",
         "project",
       );
     }
@@ -501,7 +501,7 @@ export async function exportPrairieLearn(
     }
     if ((await Deno.realPath(source)) !== source) {
       questionFail(
-        "Проект выходит за пределы выбранной книги",
+        "Проект выходит за пределы выбранного проекта",
         "project",
       );
     }
