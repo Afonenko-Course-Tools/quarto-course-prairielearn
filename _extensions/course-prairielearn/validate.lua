@@ -73,7 +73,7 @@ function M.validate(doc, effective)
   end})
   __perfWalk6(doc,{Div = function(div)
     if native.target(effective, div) == "prairielearn" then
-      assert((div.attributes.project or ""):match("^/[^.]"), diagnostics.message("PL.PROJECT_INVALID", "Требуется project от корня выбранной книги", {source = source, id = div.identifier, field = "project", hint = "Укажите существующий каталог проекта, например /projects/clamp"}))
+      assert((div.attributes.project or ""):match("^/[^.]"), diagnostics.message("PL.PROJECT_INVALID", "Требуется project от корня выбранного проекта", {source = source, id = div.identifier, field = "project", hint = "Укажите существующий каталог проекта, например /projects/clamp"}))
       projects:insert({path = div.attributes.project, id = div.identifier})
     end
   end})

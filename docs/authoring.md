@@ -2,7 +2,7 @@
 type: specification
 component: course-prairielearn
 status: current
-updated: 2026-10-10
+updated: 2026-10-17
 ---
 
 # Спецификация заданий и контрольных работ
@@ -11,7 +11,7 @@ updated: 2026-10-10
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
-переключения версий схемы. Контракты этого ref: адаптер 7.0.0 и Core 7.0.0; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
+переключения версий схемы. Контракты этого ref: кандидат адаптера 7.1.0 и Core 7.2.0; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
 Канонические `#exr-*` имеют уникальные ID внутри явной области
 `exercise-bank: true`, собственные обязательные `difficulty` и положительное
 целое `time`. Эффективная `statement-visibility` берётся из атрибута задачи либо
@@ -440,3 +440,9 @@ Selected Body v2 передаёт вопросу читаемый `title`, не�
 вкладке, локальные anchors остаются внутри вопроса. Самостоятельный self-target
 убирается Core по canonical identity; остальные ссылки разрешаются через
 публичный QRC контракт. Неизвестные цели не становятся фиктивными URL.
+
+## Необязательные дополнительные исходники Java
+
+Локальный unreleased candidate переносит Core project-check `additional-java-sources` в закрытое `additionalJavaSources` runtime descriptor. Опция относится только к `java25-junit-v1` / implementation и не является новым PL submission option. Editor-режим сохраняет основные редакторы и добавляет один штатный `pl-file-upload optional-file-names`; upload-режим использует тот же единственный upload с обязательными основными и необязательным ZIP именем. Без policy UI прежний.
+
+Интерфейс сообщает maxFiles/maxFileBytes/maxTotalBytes/maxArchiveBytes и ручной fallback. Штатный общий предел PrairieLearn 5 MB включает весь ответ с редакторными файлами: номинальные 2 MiB ZIP не гарантируются при больших основных файлах. ZIP необязателен и не вводит student helper API. Безопасную инвентаризацию, sourcepath и API staging определяет Platform; student/trusted/reference partitions и exact delivery hashes сохраняются. Это локальная проверяемая поставка, без утверждения о live PL или опубликованном образе.

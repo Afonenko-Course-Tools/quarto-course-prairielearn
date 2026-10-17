@@ -40,13 +40,13 @@ async function main() {
   if (!core) {
     throw diagnostic(
       "PL.INPUT_INVALID",
-      "В выбранной книге требуется установленный Core",
+      "В выбранном проекте требуется установленный Core",
       {
         source: join(root, book),
         id: work,
         field: "book",
         hint:
-          "Установите совместимый Core в выбранную книгу командой quarto add",
+          "Установите совместимый Core в выбранный проект командой quarto add",
       },
     );
   }

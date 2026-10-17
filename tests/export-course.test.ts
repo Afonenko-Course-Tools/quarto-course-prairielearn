@@ -1,3 +1,4 @@
+import {runtimeDescriptor} from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
 import {
   declarations,
   question,
@@ -377,6 +378,36 @@ Deno.test("full native export is deterministic, closed and atomic across output 
     await exportCourse(fishInput);
     assert(await Deno.readTextFile(root+"/fish/questions/demo/exr-a/serverFilesQuestion/starter/commands.fish") === fishSource,"fish starter lost");
     assert(!Object.hasOwn(JSON.parse(await Deno.readTextFile(root+"/fish/questions/demo/exr-a/tests/grading-job.json")),"java"),"fish descriptor pretends Java");
+    const apiText="public class ApiContract {}";
+    await Deno.writeTextFile(root+"/project/tests/junit/ApiContract.java",apiText);
+    const apiSelection={projectRelativePath:"tests/junit/ApiContract.java",submissionRelativePath:"ApiContract.java",sha256:await hash(apiText)};
+    const apiFact={...fact,check:{...check,runtime:"java25-junit-v1","api-precheck":{files:["tests/junit/ApiContract.java"],entry:"ApiContract"}},trustedTests:[test,apiSelection],apiPrecheck:{files:["ApiContract.java"],entry:"ApiContract"}};
+    const apiInput={...input,checks:{...input.checks,projects:[apiFact]},registry:{schemaVersion:1,profiles:{"java25-junit-v1":{mode:"implementation",javaRelease:25,image:"registry/java@sha256:"+"c".repeat(64)}}},output:root+"/api",checksOutput:root+"/api-checks.json"};
+    await exportCourse(apiInput);
+    const apiDescriptor=JSON.parse(await Deno.readTextFile(root+"/api/questions/demo/exr-a/tests/grading-job.json"));
+    assert(canonical(apiDescriptor.apiPrecheck)===canonical({files:["ApiContract.java"],entry:"ApiContract"}),"native export lost normalized API precheck");
+    assert(await Deno.readTextFile(root+"/api/questions/demo/exr-a/tests/ApiContract.java")===apiText,"native API source bytes lost");
+    assert(!await Deno.stat(root+"/api/questions/demo/exr-a/clientFilesQuestion/ApiContract.java").then(()=>true,()=>false),"private API contract leaked into starter");
+    const extrasPolicy={archive:"additional-sources.zip","max-files":128,"max-file-bytes":1048576,"max-total-bytes":4194304,"max-archive-bytes":2097152};
+    const extrasFact={...apiFact,check:{...apiFact.check,"additional-java-sources":extrasPolicy}};
+    for(const mode of ["editor","upload"]){
+      const extraConfig:any=structuredClone(config);extraConfig["question-defaults"].submission={mode};
+      const out=root+"/extras-"+mode;
+      const delivery=await exportCourse({...apiInput,config:extraConfig,checks:{...input.checks,projects:[extrasFact]},output:out,checksOutput:out+"-checks.json"});
+      const dir=out+"/questions/demo/exr-a";
+      const descriptor=JSON.parse(await Deno.readTextFile(dir+"/tests/grading-job.json"));
+      assert(canonical(descriptor.additionalJavaSources)===canonical({archive:"additional-sources.zip",maxFiles:128,maxFileBytes:1048576,maxTotalBytes:4194304,maxArchiveBytes:2097152}),"optional Java sources lost from runtime descriptor");
+      const html=await Deno.readTextFile(dir+"/question.html");
+      assert(html.includes('optional-file-names="additional-sources.zip"'),"optional upload absent");
+      assert((html.match(/<pl-file-upload /g)??[]).length===1,"multiple upload controls");
+      assert((mode==="editor")===html.includes('<pl-file-editor '),"primary editor delivery changed");
+      assert(html.includes("5 MB")&&html.includes("ручн")&&html.includes("2097152"),"transport limits/manual fallback not disclosed");
+      assert(!html.includes("PRIVATE_REFERENCE")&&!html.includes(apiText),"private sources leaked into UI");
+      assert(delivery.files["questions/demo/exr-a/question.html"]===await hash(html),"optional controls absent from delivery hash");
+    }
+    await Deno.writeTextFile(root+"/project/tests/junit/ApiContract.java","tampered");
+    let apiTamperDenied=false;try{await exportCourse({...apiInput,output:root+"/api-tamper",checksOutput:root+"/api-tamper-checks.json"});}catch{apiTamperDenied=true;}
+    assert(apiTamperDenied,"native API source hash ignored");
 
     const repeatInfo = JSON.parse(
       await Deno.readTextFile(root + "/one/questions/demo/exr-a/info.json"),
@@ -943,4 +974,12 @@ Deno.test("question repeat declaration is closed and typed", () => {
     }
     assert(rejected, "invalid repeat scalar accepted");
   }
+});
+
+Deno.test("additional Java policy rejects present null/false and closed-field defects",()=>{
+ const policy={archive:"additional-sources.zip","max-files":128,"max-file-bytes":1048576,"max-total-bytes":4194304,"max-archive-bytes":2097152};
+ for(const value of [null,false,0,{...policy,commands:[]},{...policy,"max-files":129},{...policy,"max-files":true}]){
+  let denied=false;try{runtimeDescriptor({runtime:"java25-junit-v1",sourceProfile:{mode:"implementation"},"additional-java-sources":value},{javaRelease:25},["Main.java"],["ExampleTest.java"]);}catch{denied=true;}
+  assert(denied,"invalid present Java policy silently disabled: "+JSON.stringify(value));
+ }
 });
