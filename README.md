@@ -2,7 +2,7 @@
 type: documentation
 component: course-prairielearn
 status: current
-updated: 2026-10-10
+updated: 2026-10-17
 ---
 
 # Задания курса в PrairieLearn
@@ -17,7 +17,9 @@ updated: 2026-10-10
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Контракт этого ref — **7.0.0**, совместимый с Core **7.0.0**.
+Контракт этого ref — кандидат **7.1.0**, требующий Core **7.2.0**.
+Теги этой пары ещё не выпущены. Core 7.2.0 собирает факты API-предпроверки
+и политики дополнительных Java-исходников, которые переносит этот exporter.
 Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
 создаёт source editor с отдельной закрытой поставкой проверок. Для разработки
 устанавливайте целые локальные checkout или архивы закреплённых commits:
@@ -31,12 +33,12 @@ quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 Выпущенные версии устанавливайте по неизменяемым тегам после их публикации:
 
 ```sh
-quarto add Afonenko-Course-Tools/quarto-course@v7.0.0 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v7.0.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v7.2.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v7.1.0 --no-prompt
 ```
 
-Матрица совместимости задаёт контракты Core 7.0.0, exporter 7.0.0 и
-Platform2.1.0/Gateway2.0.2, delivery/results v2. Наличие тегов проверяется в репозиториях владельцев,
+Матрица совместимости задаёт контракты Core 7.2.0, exporter 7.1.0 и
+Platform2.2.0/Gateway2.0.2, delivery/results v2. Наличие тегов проверяется в репозиториях владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
 подтверждает публикацию или готовность курса. Выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases); история исполнения сохраняется в Git.
 
@@ -184,7 +186,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует PrairieLearn `7.0.0` и Core `7.0.0`, Quarto 1.11.5
+Контракт этого ref использует PrairieLearn `7.1.0` и Core `7.2.0`, Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
 `statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
@@ -200,8 +202,8 @@ Quarto `--profile`, сохраняются при экспорте.
 default 1, который можно заменить в course/directory/document metadata. Баллы,
 ceiling и повторные попытки описаны в [контракте](docs/authoring.md#авторские-баллы-и-повторные-попытки-exporter-500);
 `inspect-grading.ts` показывает effective policy до создания native delivery.
-Текущий контракт7.0.0 несовместим с прежним Body; после публикации устанавливается по тегу
-после публикации и явного обновления metadata курса.
+Текущий контракт 7.1.0 сохраняет Body v2; установка нового тега требует
+фактической публикации и явного обновления metadata курса.
 
 Question variant repetition is also authored metadata. Normal Quarto course,
 `_*.yaml`/directory metadata, and document inheritance apply:
@@ -237,8 +239,8 @@ Counters обходов не являются числом посещённых 
 
 ## Совместимое обновление producer и consumer
 
-Выпуск 7.0.0 подготавливает отдельные `title`, необязательные `difficulty`/`time`
+Выпуск 7.0.0 ввёл отдельные `title`, необязательные `difficulty`/`time`
 и публичное `introduction` Body v2. Старый закрытый consumer не принимает
 новые поля; новый native consumer требует читаемое название. Устанавливайте
-Core7.0.0 и exporter7.0.0 вместе после фактической публикации; до неё используйте
+Core7.2.0 и exporter7.1.0 вместе после фактической публикации; до неё используйте
 полные локальные кандидаты. `slots`, UUID и правила оценивания сохраняются.
