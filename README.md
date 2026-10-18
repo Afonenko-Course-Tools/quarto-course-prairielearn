@@ -17,8 +17,8 @@ updated: 2026-10-17
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Контракт этого ref — кандидат **7.1.0**, требующий Core **7.2.0**.
-Теги этой пары ещё не выпущены. Core 7.2.0 собирает факты API-предпроверки
+Выпуск этого ref — **7.1.1**, согласованный с Core **7.3.0**.
+Предыдущие Core 7.2.0 и exporter 7.1.0 опубликованы. Core 7.2.0 собирает факты API-предпроверки
 и политики дополнительных Java-исходников, которые переносит этот exporter.
 Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
 создаёт source editor с отдельной закрытой поставкой проверок. Для разработки
@@ -33,11 +33,11 @@ quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 Выпущенные версии устанавливайте по неизменяемым тегам после их публикации:
 
 ```sh
-quarto add Afonenko-Course-Tools/quarto-course@v7.2.0 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v7.1.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v7.3.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v7.1.1 --no-prompt
 ```
 
-Матрица совместимости задаёт контракты Core 7.2.0, exporter 7.1.0 и
+Матрица совместимости задаёт контракты Core 7.3.0, exporter 7.1.1 и
 Platform2.2.0/Gateway2.0.2, delivery/results v2. Наличие тегов проверяется в репозиториях владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
 подтверждает публикацию или готовность курса. Выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases); история исполнения сохраняется в Git.
@@ -186,7 +186,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует PrairieLearn `7.1.0` и Core `7.2.0`, Quarto 1.11.5
+Контракт этого ref использует PrairieLearn `7.1.1` и Core `7.3.0`, Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
 `statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
@@ -242,5 +242,9 @@ Counters обходов не являются числом посещённых 
 Выпуск 7.0.0 ввёл отдельные `title`, необязательные `difficulty`/`time`
 и публичное `introduction` Body v2. Старый закрытый consumer не принимает
 новые поля; новый native consumer требует читаемое название. Устанавливайте
-Core7.2.0 и exporter7.1.0 вместе после фактической публикации; до неё используйте
-полные локальные кандидаты. `slots`, UUID и правила оценивания сохраняются.
+Core 7.3.0 и exporter 7.1.1 вместе по опубликованным точным тегам. `slots`, UUID и правила оценивания сохраняются.
+
+## Выпуск совместимости 7.1.1
+
+Descriptor закрепляет Core 7.3.0. Исполняемые файлы экспортёра и форматы
+экспорта сохранены; новое поле показа времени Core не меняет Body v2.
