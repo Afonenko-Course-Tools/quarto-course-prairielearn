@@ -31,3 +31,8 @@ course and independent private checks inventory; IDs derive from stable Core key
 Pinned official PrairieLearn JSON schemas and bundled offline Ajv validators are
 recorded in `spec/upstream/provenance.json`. The runner descriptor is Platform-owned,
 not a second author configuration or a private GradingJob.
+
+## Совместимость 7.1.1
+
+Экспортёр 7.1.1 использует Core 7.3.0 и прежний Body v2. Изменён descriptor,
+исполняемые файлы сохранены. Версии Core 7.2.0 / exporter 7.1.0 опубликованы.
