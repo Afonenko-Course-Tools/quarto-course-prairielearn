@@ -34,13 +34,29 @@ prairielearn:
  await Deno.writeTextFile(join(root,'_quarto-full.yml'),'course: {view: full}\n');
  await Deno.mkdir(join(root,'projects/a/student'),{recursive:true});
  await Deno.writeTextFile(join(root,'projects/a/student/README.md'),'Публичный комплект для ручного наблюдения.\n');
- await Deno.writeTextFile(join(root,'index.qmd'),'# Банк\n\n::: {#exr-pointer difficulty=introductory time=10 target=prairielearn project="/projects/a"}\n## Наблюдение\nПокажите результат преподавателю.\n:::\n');
+ const authored='# Банк\n\n::: {#exr-pointer difficulty=introductory time=10 target=prairielearn project="/projects/a"}\n## Наблюдение\nПокажите результат преподавателю.\n:::\n';
+ await Deno.writeTextFile(join(root,'index.qmd'),authored);
  const positive=await renderNative(root,'full');assert(positive.ok,positive.text);
  const pointer=JSON.parse(await Deno.readTextFile(join(root,'_generated/course-spec/active-native-run.json')));
  assert(pointer.schema==='course-native-run-pointer-v2'&&pointer.commonPathBinding,'Expected fresh Core v2 witness');
  const run=JSON.parse(await Deno.readTextFile(join(root,'_generated/course-spec/native-run.json')));
  assert(run.adapters.length===1,'Installed adapter fragment missing from current run');
  console.log('PASS actual installed Core pointer-v2 and Exporter adapter context');
+ for(const method of ['mixed','manual','external']){
+  await Deno.writeTextFile(join(root,'index.qmd'),authored.replace('target=prairielearn','target=prairielearn prairielearn-grading="'+method+'"'));
+  const capture=await renderNative(root,'full');assert(capture.ok,capture.text);
+  const model=JSON.parse(await Deno.readTextFile(join(root,'_generated/course-spec/course.json'))),grading=model.exercises.find((e:any)=>e.id==='exr-pointer').extensions.prairielearn.grading;
+  assert(method==='external'?grading==='external':grading.method===method,'Captured grading override differs: '+method);
+  console.log('PASS actual installed grading override',method);
+ }
+ for(const attr of ['prairielearn-grading="unsupported"','prairielearn-gradign="mixed"']){
+  await Deno.writeTextFile(join(root,'index.qmd'),authored.replace('target=prairielearn','target=prairielearn '+attr));
+  const invalid=await command(['render','--profile','full','--to','html']);
+  assert(!invalid.ok&&invalid.text.includes('PL.DECLARATION_INVALID'),'Invalid grading value/key accepted: '+attr+'\n'+invalid.text);
+  console.log('REFUSED',attr);
+ }
+ await Deno.writeTextFile(join(root,'index.qmd'),authored);
+ if(Deno.env.get('GRADING_OVERRIDE_ONLY')){console.log('PASS strict grading override boundary');if(Deno.env.get('POINTER_PROBE_KEEP'))console.log('FIXTURE',root);else await Deno.remove(root,{recursive:true});Deno.exit(0)}
  const file=join(root,'_extensions/course-prairielearn/pointer-probe.lua');
  const mutations=[
   ['old pointer-v1',"run.schema='course-native-run-pointer-v1'"],
