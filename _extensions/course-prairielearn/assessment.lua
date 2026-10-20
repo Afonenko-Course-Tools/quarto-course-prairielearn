@@ -42,7 +42,7 @@ end
 local normalize_policy
 normalize_policy = function(value)
   if type(value) ~= "table" or pandoc.utils.type(value) == "List" then return value end
-  for _, key in ipairs({"attempts", "question-points", "question-max-points", "max-points", "grade-rate-minutes", "advance-score-perc"}) do
+  for _, key in ipairs({"attempts", "question-points", "question-max-points", "max-points", "grade-rate-minutes", "advance-score-perc", "auto-points", "manual-points"}) do
     if key == "question-points" and type(value[key]) == "table" and pandoc.utils.type(value[key]) == "List" then
       for i, point in ipairs(value[key]) do value[key][i] = number(point) end
     else value[key] = number(value[key]) end

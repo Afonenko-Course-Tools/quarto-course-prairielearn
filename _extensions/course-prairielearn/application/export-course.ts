@@ -1,15 +1,15 @@
 import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
-import { qualifiedSlots, nativeSlotBlocks } from "./slots.ts";
+import { qualifiedSlots, nativeSlotZones } from "./slots.ts";
 import { dirname, join, relative, resolve } from "node:path";
 import { verificationInventoryHash } from "./verification-inventory.ts";
-import { gradingPolicy } from "./grading-policy.ts";
+import { gradingPolicy,validateGradingComponents } from "./grading-policy.ts";
 import { completionPolicy } from "./completion.ts";
 import { runtimeDescriptor } from "./runtime-descriptor.ts";
 import * as validators from "./native-validators.js";
 import { validateAssessmentSemantics } from "./native-semantics.ts";
-import { exportPrairieLearn, renderPublicBody, uuid } from "./export.ts";
-import { declarations, question } from "./declarations.ts";
+import { exportPrairieLearn, renderPublicBody, uuid, publicProjectFiles } from "./export.ts";
+import { declarations, question, gradingMethod } from "./declarations.ts";
 import {
   canonical,
   hash,
@@ -82,6 +82,7 @@ export async function exportCourse(
     checksOutput: string;
     body: (work: string) => Promise<any>;
     candidateImage?: string;
+    studentArtifact?:(fact:any)=>Promise<{files:{name:string;bytes:Uint8Array}[];archive:Uint8Array}>;
   },
 ) {
   const d = declarations(input.config, input.instance),
@@ -109,7 +110,9 @@ export async function exportCourse(
       active.add(w.relatedExercise);
     }
   }
-  for (const work of works) gradingPolicy(work);
+  const methods:Record<string,'external'|'manual'|'mixed'>={};
+  for(const exercise of input.result.model.exercises)methods[exercise.id]=gradingMethod(exercise.extensions?.prairielearn?.grading??input.config['question-defaults'].grading).method;
+  for (const work of works) validateGradingComponents(work,methods);
   const stage = await Deno.makeTempDir({
       dir: dirname(out),
       prefix: ".pl-course-",
@@ -180,7 +183,8 @@ export async function exportCourse(
       const work = works[index],
         p = await input.body(work.id),
         binding: any = { questions: {} },
-        projects: Record<string, string> = {};
+        projects: Record<string, string> = {},
+        studentArtifacts:Record<string,{files:{name:string;bytes:Uint8Array}[];archive:Uint8Array}>={};
       const publicWork = p.works?.[0];
       if (!publicWork || publicWork.key !== input.courseId + "/" + work.id ||
           publicWork.introduction !== undefined && !Array.isArray(publicWork.introduction)) {
@@ -205,6 +209,29 @@ export async function exportCourse(
         const e = input.result.model.exercises.find((e: any) => e.id === q.id);
         if (e?.target !== "prairielearn") {
           throw new Error("PL selected member target mismatch");
+        }
+        const settings=question({topic:e.extensions?.prairielearn?.topic??d.defaults.topic,submission:e.extensions?.prairielearn?.submission??input.config['question-defaults'].submission,
+          ...(e.extensions?.prairielearn?.grading!==undefined?{grading:e.extensions.prairielearn.grading}:input.config['question-defaults'].grading?{grading:input.config['question-defaults'].grading}:{}),
+          ...(Object.hasOwn(e.extensions?.prairielearn??{},'single-variant')?{'single-variant':e.extensions.prairielearn['single-variant']}:Object.hasOwn(input.config['question-defaults'],'single-variant')?{'single-variant':input.config['question-defaults']['single-variant']}:{}),
+        });
+        const method=gradingMethod(settings.grading).method;
+        if(input.studentArtifact){
+          const fact=input.result.model.projects?.find((f:any)=>f.exerciseId===q.id&&f.bankMember);
+          if(!fact)throw Error('PL student artifact project fact missing');
+          studentArtifacts[q.id]=await input.studentArtifact(fact);
+        }
+        if(method==='manual'){
+          const fact=input.result.model.projects?.find((f:any)=>f.exerciseId===q.id&&f.bankMember);
+          if(!fact||fact.check||!safePath(fact.projectRoot))throw Error('PL.MANUAL_INVALID: manual требует project без project-check');
+          let actual=input.projectRoot;
+          for(const part of fact.projectRoot.split('/')){actual=join(actual,part);if((await Deno.lstat(actual)).isSymlink)throw Error('PL manual project symlink forbidden')}
+          const files=studentArtifacts[q.id]?studentArtifacts[q.id].files.map(f=>({name:f.name,data:f.bytes})):await publicProjectFiles(join(actual,'student'));
+          if(!files.length)throw Error('PL manual student files missing');
+          const project=join(scratch,q.id);projects[q.id]='/'+q.id;
+          for(const file of files){const path=join(project,'student',file.name);await Deno.mkdir(dirname(path),{recursive:true});await Deno.writeFile(path,file.data)}
+          binding.questions[q.id]={...settings,files:[]};
+          questions[input.courseId+'/'+q.id]={uuid:await uuid(input.courseId+'/'+q.id),grading:{method:'manual'},submission:{...settings.submission},sourceRoot:fact.projectRoot};
+          continue;
         }
         const fact = input.checks.projects.find((p: any) =>
           p.exerciseId === q.id && p.bankMember
@@ -239,18 +266,6 @@ export async function exportCourse(
             "PL production runtime pin unavailable: " + fact.check.runtime,
           );
         }
-        const settings = e.extensions?.prairielearn?.topic
-          ? question({
-            topic: e.extensions.prairielearn.topic,
-            ...(Object.hasOwn(e.extensions.prairielearn, "single-variant")
-              ? {
-                "single-variant": e.extensions.prairielearn["single-variant"],
-              }
-              : {}),
-            submission: e.extensions.prairielearn.submission ??
-              input.config["question-defaults"].submission,
-          })
-          : d.defaults;
         const project = join(scratch, q.id);
         await Deno.mkdir(join(project, "student"), { recursive: true });
         await Deno.mkdir(join(project, "tests"), { recursive: true });
@@ -301,6 +316,7 @@ export async function exportCourse(
         const key = input.courseId + "/" + q.id;
         questions[key] = {
           uuid: await uuid(key),
+          grading:{method},submission:{...settings.submission},
           projectCheck: c.profile,
           runtime: c.runtime,
           sources: fact.sources,
@@ -310,7 +326,7 @@ export async function exportCourse(
       const partial = join(scratch, "work-" + index);
       await exportPrairieLearn(
         p,
-        { projectRoot: scratch, projects },
+        { projectRoot: scratch, projects,studentArtifacts },
         binding,
         partial,
       );
@@ -324,11 +340,11 @@ export async function exportCourse(
         }
         const c = input.checks.projects.find((f: any) =>
           f.exerciseId === q.id
-        ).check;
+        )?.check;
         const info = JSON.parse(
           await Deno.readTextFile(join(stage, base, "info.json")),
         );
-        info.partialCredit = c.scoring.mode !== "all-pass";
+        info.partialCredit = c?c.scoring.mode !== "all-pass":false;
         // Pinned Community validates assessment overrides against this embedded
         // question schema. A sidecar preferences.schema.json is not loaded.
         info.preferences = {
@@ -340,6 +356,7 @@ export async function exportCourse(
         };
         await write(base + "/info.json", info);
         const f = input.checks.projects.find((f: any) => f.exerciseId === q.id);
+        if(!f?.check)continue;
         for (
           const s of await selectedSources(
             resolve(input.projectRoot, f.projectRoot),
@@ -394,16 +411,13 @@ export async function exportCourse(
                 due: { date: null },
               },
             }],
-          zones: [{
-            title: work.title,
-            questions: nativeSlotBlocks(input.courseId,work,grading),
-          }],
+          zones: nativeSlotZones(input.courseId,work,grading),
         },
       );
     }
     const files = await inventory(stage);
     const delivery: any = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       courseId: input.courseId,
       bookRoot: input.checks.bookRoot,
       sourceSnapshotHash: input.checks.sourceSnapshotHash,
@@ -411,7 +425,7 @@ export async function exportCourse(
       verificationInventoryHash: await verificationInventoryHash(
         input.checks,
         input.projectRoot,
-        Object.keys(questions),
+        Object.keys(questions).filter(key=>questions[key].grading?.method!=='manual'),
       ),
       questions: Object.keys(questions).sort(),
       gradingPayloads: questions,

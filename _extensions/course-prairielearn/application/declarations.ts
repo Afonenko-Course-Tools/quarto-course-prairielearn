@@ -18,7 +18,7 @@ export function closed(v: any, required: string[], optional: string[] = []) {
   }
 }
 export function question(v: any) {
-  closed(v, ["topic", "submission"], ["single-variant"]);
+  closed(v, ["topic", "submission"], ["single-variant","grading"]);
   if (
     Object.hasOwn(v, "single-variant") &&
     typeof v["single-variant"] !== "boolean"
@@ -35,6 +35,7 @@ export function question(v: any) {
   ) throw new Error("PL submission invalid");
   return {
     topic: v.topic,
+    ...(v.grading!==undefined&&v.grading!=='external'?{grading:gradingMethod(v.grading)}:{}),
     ...(Object.hasOwn(v, "single-variant")
       ? { singleVariant: v["single-variant"] }
       : {}),
@@ -45,6 +46,12 @@ export function question(v: any) {
         : {}),
     },
   };
+}
+export function gradingMethod(value:any):{method:'external'|'manual'|'mixed'}{
+  if(value===undefined||value==='external')return {method:'external'};
+  closed(value,['method']);
+  if(!['manual','mixed'].includes(value.method))throw Error('PL.GRADING_INVALID: grading.method должен быть manual или mixed');
+  return {method:value.method};
 }
 export function declarations(raw: any, key: string) {
   closed(raw, ["delivery", "question-defaults"], ["assessment-defaults"]);

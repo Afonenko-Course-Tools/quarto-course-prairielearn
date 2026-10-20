@@ -9,6 +9,8 @@ const questionFields = [
   "question-max-points",
   "attempts",
   "advance-score-perc",
+  "auto-points",
+  "manual-points",
 ];
 export function gradingPolicy(work: any) {
   const policy = work.extensions.prairielearn;
@@ -27,6 +29,8 @@ export function gradingPolicy(work: any) {
     "grade-rate-minutes",
     "advance-score-perc",
     "allow-multiple-instances",
+    "auto-points",
+    "manual-points",
   ]);
   if (!attempts(policy.attempts)) {
     fail("attempts", "expected positive integer (native triesPerVariant)");
@@ -66,6 +70,17 @@ export function gradingPolicy(work: any) {
       ),
       ...override,
     };
+    const components=Object.hasOwn(effective,'auto-points')||Object.hasOwn(effective,'manual-points');
+    if(components){
+      if(Object.hasOwn(effective,'question-points')||effective['question-max-points']!=null)fail(`points (${id})`,'Не смешивайте question-points/ceiling с auto-points/manual-points');
+      const auto=effective['auto-points']??0,manual=effective['manual-points'];
+      if(!scalar(auto)||!scalar(manual)||manual<=0)fail(`manual-points (${id})`,'Нужны неотрицательные auto-points и положительные manual-points');
+      if(!attempts(effective.attempts))fail(`attempts (${id})`,'Требуется положительное число попыток');
+      const advance=effective['advance-score-perc'];
+      if(advance!==undefined&&(!scalar(advance)||advance>100))fail(`advance-score-perc (${id})`,'Требуется число от 0 до 100');
+      slots[id]={autoPoints:auto,manualPoints:manual,triesPerVariant:effective.attempts,...(advance!==undefined?{advanceScorePerc:advance}:{})};
+      continue;
+    }
     const points = effective["question-points"];
     if (points === undefined) {
       fail(`question-points (${id})`, "missing explicit authored points");
@@ -142,6 +157,17 @@ export function gradingPolicy(work: any) {
         : {}),
     },
   };
+}
+export function validateGradingComponents(work:any,methods:Record<string,'external'|'manual'|'mixed'>){
+ const policy=gradingPolicy(work);
+ for(const slot of work.slots)for(const id of slot.candidates){
+  const method=methods[id],points=policy.slots[slot.id];
+  const valid=method==='manual'?points.autoPoints===0&&points.manualPoints>0:
+    method==='mixed'?points.autoPoints>0&&points.manualPoints>0:
+    method==='external'?points.manualPoints===undefined:false;
+  if(!valid)throw Error('PL.GRADING_INVALID: '+id+' — native компоненты оценки не соответствуют grading.method');
+ }
+ return policy;
 }
 
 // @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.

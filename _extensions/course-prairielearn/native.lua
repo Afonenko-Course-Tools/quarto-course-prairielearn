@@ -36,6 +36,10 @@ function M.read(doc, effective)
       if doc.meta.prairielearn and doc.meta.prairielearn["question-defaults"] then
         local defaults = doc.meta.prairielearn["question-defaults"]
         payload.topic = pandoc.utils.stringify(defaults.topic)
+        if defaults.grading then
+          payload.grading={}
+          for key,value in pairs(defaults.grading) do payload.grading[key]=pandoc.utils.stringify(value) end
+        end
         if defaults["single-variant"] ~= nil then payload["single-variant"] = defaults["single-variant"] end
         local submission = defaults.submission
         if submission then
@@ -44,6 +48,9 @@ function M.read(doc, effective)
         end
       end
       if d.attributes["prairielearn-single-variant"] ~= nil then payload["single-variant"] = d.attributes["prairielearn-single-variant"] == "true" end
+      if d.attributes['prairielearn-grading'] then
+        local method=d.attributes['prairielearn-grading'];payload.grading=method=='external' and 'external' or {method=method}
+      end
       if d.attributes["prairielearn-topic"] then payload.topic = d.attributes["prairielearn-topic"] end
       if d.attributes["prairielearn-submission"] then payload.submission = payload.submission or {}; payload.submission.mode = d.attributes["prairielearn-submission"]; if payload.submission.mode == "upload" then payload.submission["ace-mode"] = nil end end
       value.exercises:insert({id = d.identifier, payload = payload})

@@ -1025,7 +1025,7 @@ Deno.test('Body v2 rejects non-string relatedExercise without publishing output'
  }finally{await Deno.remove(root,{recursive:true});}
 });
 
-Deno.test('PL standalone native anchors preserve headers and namespace question targets', async()=>{
+Deno.test('PL native projection omits bibliography and preserves namespaced semantic targets', async()=>{
  const root=await Deno.makeTempDir();
  try{
   await Deno.mkdir(root+'/projects/clamp/student',{recursive:true});await Deno.mkdir(root+'/projects/clamp/tests',{recursive:true});
@@ -1039,7 +1039,7 @@ Deno.test('PL standalone native anchors preserve headers and namespace question 
   const first=await Deno.readTextFile(root+'/out/questions/demo/exr-clamp/question.html'),second=await Deno.readTextFile(root+'/out/questions/demo/exr-other/question.html');
   const ids=(html:string)=>[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
   const links=(html:string)=>[...html.matchAll(/href="#([^"]+)"/g)].map(m=>m[1]);
-  for(const html of [first,second])assert(html.includes('NATIVE_ATTRIBUTION')&&html.includes('LOCAL_HEADER')&&links(html).length===2&&links(html).every(id=>ids(html).includes(id)),'standalone native references or Header target lost');
+  for(const html of [first,second])assert(!html.includes('NATIVE_ATTRIBUTION')&&!html.includes('[1]')&&html.includes('LOCAL_HEADER')&&links(html).length===1&&links(html).every(id=>ids(html).includes(id)),'bibliographic node/link retained or semantic Header target lost');
   assert(ids(first).every(id=>!ids(second).includes(id)),'two questions with identical native IDs collide');
  }finally{await Deno.remove(root,{recursive:true})}
 });
