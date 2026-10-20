@@ -93,7 +93,7 @@ function M.write(doc, value)
   local pointer = io.open(root .. "/_generated/course-spec/active-native-run.json", "r")
   if pointer then
     local run = pandoc.json.decode(pointer:read("*a")); pointer:close()
-    assert(run.schema == "course-native-run-pointer-v1" and run.projectRoot == root, diagnostics.message("PL.NATIVE_INVALID", "Неверный указатель native-сборки", {source = value.source, field = "active-native-run"}))
+    assert(run.schema == "course-native-run-pointer-v2" and run.projectRoot == root, diagnostics.message("PL.NATIVE_INVALID", "Неверный указатель native-сборки", {source = value.source, field = "active-native-run"}))
     assert(pandoc.path.directory(run.directory) == root .. "/_generated/course-spec/native-runs", diagnostics.message("PL.NATIVE_INVALID", "Неверный каталог native-сборки", {source = value.source, field = "active-native-run.directory"}))
     assert(pandoc.json.encode(run.profiles) == pandoc.json.encode(profiles), diagnostics.message("PL.NATIVE_INVALID", "Профили адаптера расходятся с native-сборкой", {source = value.source, field = "active-native-run.profiles"}))
     local folder = run.directory .. "/adapters/" .. contract.name

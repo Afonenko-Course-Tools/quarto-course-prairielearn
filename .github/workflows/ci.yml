@@ -34,7 +34,7 @@ jobs:
           repository: Afonenko-Course-Tools/quarto-course
           # Точный кандидат Core 7.2.0; эту ветку публикуют до PR exporter.
           # Commit не означает существование release tag.
-          ref: ${{ vars.COURSE_CORE_REF || '330cf1cbc4fa9eb29218a47fe8585267537bce23' }}
+          ref: ${{ vars.COURSE_CORE_REF || '228d3e7fc5c394d474aabc72c9280f220d01d63c' }}
           path: .ci-deps/core
           persist-credentials: false
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
@@ -46,6 +46,7 @@ jobs:
       - name: Проверка единого словаря контракта
         run: quarto run tools/sync-contract.ts --check
       - run: quarto run tests/native-model.ts .ci-deps/core
+      - run: quarto run tests/native-pointer.ts .ci-deps/core
       - run: quarto run tests/native-manual.ts .ci-deps/core
       - run: quarto run tests/native-ordinary.ts .ci-deps/core
       - run: quarto run tests/native-references.ts .ci-deps/core
@@ -68,7 +69,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: ${{ vars.COURSE_CORE_REF || '330cf1cbc4fa9eb29218a47fe8585267537bce23' }}
+          ref: ${{ vars.COURSE_CORE_REF || '228d3e7fc5c394d474aabc72c9280f220d01d63c' }}
           path: .ci-deps/core
           persist-credentials: false
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
