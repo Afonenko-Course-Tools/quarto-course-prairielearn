@@ -7,11 +7,11 @@ updated: 2026-10-21
 
 # Спецификация заданий и контрольных работ
 
-Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/438c1477672895df12297dbdeab507927ab9cfcd/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
+Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0a44ba5746b93731ee6fdf6486b923c36e5578f9/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
-переключения версий схемы. Контракты этого ref: адаптер 8.0.0 и Core 8.0.0, delivery v3, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
+переключения версий схемы. Контракты этого ref: адаптер candidate8.1.0 и Core candidate8.1.0, delivery v3, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
 Канонические `#exr-*` имеют уникальные ID внутри явной области
 `exercise-bank: true`, собственные обязательные `difficulty` и положительное
 целое `time`. Эффективная `statement-visibility` берётся из атрибута задачи либо
@@ -446,3 +446,20 @@ Selected Body v2 передаёт вопросу читаемый `title`, не�
 Локальный unreleased candidate переносит Core project-check `additional-java-sources` в закрытое `additionalJavaSources` runtime descriptor. Опция относится только к `java25-junit-v1` / implementation и не является новым PL submission option. Editor-режим сохраняет основные редакторы и добавляет один штатный `pl-file-upload optional-file-names`; upload-режим использует тот же единственный upload с обязательными основными и необязательным ZIP именем. Без policy UI прежний.
 
 Интерфейс сообщает maxFiles/maxFileBytes/maxTotalBytes/maxArchiveBytes и ручной fallback. Штатный общий предел PrairieLearn 5 MB включает весь ответ с редакторными файлами: номинальные 2 MiB ZIP не гарантируются при больших основных файлах. ZIP необязателен и не вводит student helper API. Безопасную инвентаризацию, sourcepath и API staging определяет Platform; student/trusted/reference partitions и exact delivery hashes сохраняются. Это локальная проверяемая поставка, без утверждения о live PL или опубликованном образе.
+
+## Закрытый native Gradle build record
+
+В Core 8.1.0 `java-build` содержит ровно `kind: gradle-jar-v1`, `main-class`
+и `artifact`. Имя класса соответствует
+`^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$`, имя JAR —
+`^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.jar$` (до105 ASCII bytes).
+Только exact `java25-gradle-junit-v1` в implementation требует и допускает
+этот record; runtime profile должен явно задавать Java25 implementation.
+Exporter преобразует только имя `main-class` в `mainClass` внутри
+`javaBuild`. Некорректный или отсутствующий record отвергается до публикации
+payload, не заменяется старым Java runtime/image. `sourceFiles/testFiles`,
+selected byte hashes и API/extras boundary сохраняются. Student Gradle scripts,
+публичные tests и заранее собранные JAR не становятся production sources.
+
+Descriptor остаётся schemaVersion1. Рецепт и реальная сборка принадлежат
+Platform; source candidate не доказывает archive/image/runtime/course readiness.

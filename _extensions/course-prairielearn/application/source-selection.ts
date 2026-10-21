@@ -1,5 +1,6 @@
 import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
+import { javaBuild } from './java-build.ts';
 import { join, relative, resolve } from "node:path";
 export const safePath = (p: string) =>
   typeof p === "string" && !!p && !/^(?:[\/\\]|[A-Za-z]:)/.test(p) &&
@@ -58,10 +59,11 @@ export async function readSelected(root: string, s: any) {
   }
   return data;
 }
-export async function selectedSources(root: string, p: any, runtime?: {sourceExtensions?: string[];javaRelease?: number}) {
+export async function selectedSources(root: string, p: any, runtime?: {mode?:string;sourceExtensions?: string[];javaRelease?: number}) {
   if (!p.check || !p.sources?.length) {
     throw new Error("PL selected question requires project-check and sources");
   }
+  javaBuild(p.check,runtime);
   const profile = p.check.sourceProfile;
   if (
     !profile || !safePath(profile.root) ||

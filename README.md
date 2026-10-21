@@ -17,7 +17,7 @@ updated: 2026-10-21
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Кандидат выпуска этого ref — **8.0.0**, согласованный с Core **8.0.0**.
+Кандидат выпуска этого ref — **8.1.0**, согласованный с Core **8.1.0**.
 Предыдущие Core 7.2.0 и exporter 7.1.0 опубликованы. Core 7.2.0 собирает факты API-предпроверки
 и политики дополнительных Java-исходников, которые переносит этот exporter.
 Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
@@ -37,7 +37,7 @@ quarto add Afonenko-Course-Tools/quarto-course@v8.0.0 --no-prompt
 quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.0.0 --no-prompt
 ```
 
-Матрица задаёт Core 8.0.0 и exporter 8.0.0: delivery v3, Body v2 и public results v2.
+Candidate матрица задаёт Core 8.1.0 и exporter 8.1.0: delivery v3, Body v2 и public results v2.
 Platform/Gateway требуют отдельной проверки exact source/digest/interface; прежние
 service releases не объявляются совместимыми. Наличие тегов проверяется у владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
@@ -187,7 +187,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует exporter `8.0.0` и Core `8.0.0`, Quarto 1.11.5
+Контракт этого ref использует exporter `8.1.0` и Core `8.1.0`, Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
 `statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
@@ -242,23 +242,42 @@ Counters обходов не являются числом посещённых 
 
 Выпуск 7.0.0 ввёл отдельные `title`, необязательные `difficulty`/`time`
 и публичное `introduction` Body v2. Старый закрытый consumer не принимает
-новые поля; новый native consumer требует читаемое название. Устанавливайте
-Core 8.0.0 и exporter 8.0.0 вместе по опубликованным точным тегам. Стабильные UUID
+новые поля; новый native consumer требует читаемое название. Для опубликованного 8.0.0 устанавливайте
+Core 8.0.0 и exporter 8.0.0 вместе по точным неизменяемым тегам. Стабильные UUID
 сохраняются; delivery v3 требует согласованного reader.
 
-## Подготовка выпуска 8.0.0
+## Подготовка кандидата 8.1.0
 
 Delivery v3 описывает `external`/`manual`/`mixed` и `selection=choice`. Полностью ручная
 задача не получает фиктивную автоматическую оценку; `mixed` сохраняет реальные
 автоматический и преподавательский компоненты. Студенческие ресурсы и текущий закрытый pointer проверяются
-совместимым Core 8.0.0. Закрытые материалы не входят в student ZIP/site.
+совместимым Core 8.1.0. Закрытые материалы не входят в student ZIP/site.
 Body остаётся `course-body-package-v2`, public results projection — v2.
 
 Обе задачи CI закрепляют один полный Core commit, без переопределения repository variable.
 Экспортёр использует готовый Core inventory и не требует Download assembler.
-До публикации `v8.0.0` это кандидат исходников; готовность курса и native service проверяется отдельно.
+До публикации `v8.1.0` это кандидат исходников; готовность курса и native service проверяется отдельно.
 
 ## Исторический выпуск совместимости 7.1.1
 
 В выпуске 7.1.1 descriptor закреплял Core 7.3.0. Исполняемые файлы экспортёра и форматы
 экспорта были сохранены; новое поле показа времени Core не меняет Body v2.
+
+## Native Gradle JAR в кандидате 8.1.0
+
+Закрытый captured `java-build` разрешён только для exact
+`java25-gradle-junit-v1` / implementation и обязателен для этого runtime.
+Exporter передаёт `javaBuild: {kind, mainClass, artifact}` без потери metadata;
+kind равен `gradle-jar-v1`. Запрещены unknown fields, другой runtime/mode и
+небезопасные имена. Sources остаются выбранными Java bytes: build scripts,
+готовый JAR и student public tests не входят в native payload. API-precheck и
+optional дополнительные Java sources сохраняют собственные границы.
+
+Это локальный source candidate с Core 8.1.0. Полный Platform candidate, exact
+registry/image и реальные build/archive/install/course proofs принимаются
+отдельно; unit fixture digest не является опубликованным OCI pin. Старые
+Core/Exporter 8.0.0 и immutable assets не меняются.
+
+Exact локальная source dependency Core candidate: `0a44ba5746b93731ee6fdf6486b923c36e5578f9`.
+Оба CI jobs закрепляют этот commit; hosted exact-head CI ещё должен выполниться
+после отдельного разрешённого push. Локальная установка не подтверждает published tag.

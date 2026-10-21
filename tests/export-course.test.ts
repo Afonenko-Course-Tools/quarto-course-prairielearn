@@ -413,6 +413,20 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       assert(!html.includes("PRIVATE_REFERENCE")&&!html.includes(apiText),"private sources leaked into UI");
       assert(delivery.files["questions/demo/exr-a/question.html"]===await hash(html),"optional controls absent from delivery hash");
     }
+    const nativeFact={...extrasFact,check:{...extrasFact.check,runtime:"java25-gradle-junit-v1","java-build":{kind:"gradle-jar-v1","main-class":"grade.Main",artifact:"gradeapp.jar"}}};
+    const nativeInput={...apiInput,checks:{...input.checks,projects:[nativeFact]},registry:{schemaVersion:1,profiles:{"java25-gradle-junit-v1":{mode:"implementation",javaRelease:25,image:"registry/native-java@sha256:"+"e".repeat(64)}}},output:root+"/native-gradle",checksOutput:root+"/native-gradle-checks.json"};
+    await exportCourse(nativeInput);
+    const nativeDescriptor=JSON.parse(await Deno.readTextFile(root+"/native-gradle/questions/demo/exr-a/tests/grading-job.json"));
+    assert(canonical(nativeDescriptor.javaBuild)===canonical({kind:"gradle-jar-v1",mainClass:"grade.Main",artifact:"gradeapp.jar"}),"native full export dropped javaBuild");
+    assert(nativeDescriptor.runtime==='java25-gradle-junit-v1'&&canonical(nativeDescriptor.sourceFiles)===canonical(apiDescriptor.sourceFiles)&&canonical(nativeDescriptor.apiPrecheck)===canonical(apiDescriptor.apiPrecheck),"native export changed selected source/API boundary");
+    assert(await Deno.readTextFile(root+"/native-gradle/questions/demo/exr-a/tests/ApiContract.java")===apiText,"native private API bytes lost");
+    const nativeInfo=JSON.parse(await Deno.readTextFile(root+"/native-gradle/questions/demo/exr-a/info.json"));
+    assert(nativeInfo.externalGradingOptions.image==='registry/native-java@sha256:'+"e".repeat(64),"native image pin replaced with old/demo image");
+    for(const patch of [{"java-build":undefined},{runtime:"java25-junit-v1"},{"java-build":{kind:"gradle-jar-v1","main-class":"grade.Main",artifact:"gradeapp.jar",command:"run"}}]){
+      let denied=false;try{await exportCourse({...nativeInput,checks:{...input.checks,projects:[{...nativeFact,check:{...nativeFact.check,...patch}}]},output:root+"/native-invalid",checksOutput:root+"/native-invalid-checks.json"});}catch{denied=true;}
+      assert(denied,"full native export silently discarded invalid java-build");
+      assert(!await Deno.stat(root+"/native-invalid").then(()=>true,()=>false),"invalid native export published partial output");
+    }
     await Deno.writeTextFile(root+"/project/tests/junit/ApiContract.java","tampered");
     let apiTamperDenied=false;try{await exportCourse({...apiInput,output:root+"/api-tamper",checksOutput:root+"/api-tamper-checks.json"});}catch{apiTamperDenied=true;}
     assert(apiTamperDenied,"native API source hash ignored");
