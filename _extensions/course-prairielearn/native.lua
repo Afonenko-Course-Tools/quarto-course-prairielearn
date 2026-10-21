@@ -35,7 +35,7 @@ function M.read(doc, effective)
       local payload = {grading = contract.vocabulary.grading[1]}
       if doc.meta.prairielearn and doc.meta.prairielearn["question-defaults"] then
         local defaults = doc.meta.prairielearn["question-defaults"]
-        payload.topic = pandoc.utils.stringify(defaults.topic)
+        if defaults.topic ~= nil then payload.topic = pandoc.utils.stringify(defaults.topic) end
         if defaults.grading then
           payload.grading={}
           for key,value in pairs(defaults.grading) do payload.grading[key]=pandoc.utils.stringify(value) end
