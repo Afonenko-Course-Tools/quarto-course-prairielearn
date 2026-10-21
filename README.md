@@ -2,7 +2,7 @@
 type: documentation
 component: course-prairielearn
 status: current
-updated: 2026-10-17
+updated: 2026-10-21
 ---
 
 # Задания курса в PrairieLearn
@@ -17,7 +17,7 @@ updated: 2026-10-17
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Выпуск этого ref — **7.1.1**, согласованный с Core **7.3.0**.
+Кандидат выпуска этого ref — **8.0.0**, согласованный с Core **8.0.0**.
 Предыдущие Core 7.2.0 и exporter 7.1.0 опубликованы. Core 7.2.0 собирает факты API-предпроверки
 и политики дополнительных Java-исходников, которые переносит этот exporter.
 Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
@@ -33,12 +33,13 @@ quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 Выпущенные версии устанавливайте по неизменяемым тегам после их публикации:
 
 ```sh
-quarto add Afonenko-Course-Tools/quarto-course@v7.3.0 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v7.1.1 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v8.0.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.0.0 --no-prompt
 ```
 
-Матрица совместимости задаёт контракты Core 7.3.0, exporter 7.1.1 и
-Platform2.2.0/Gateway2.0.2, delivery/results v2. Наличие тегов проверяется в репозиториях владельцев,
+Матрица задаёт Core 8.0.0 и exporter 8.0.0: delivery v3, Body v2 и public results v2.
+Platform/Gateway требуют отдельной проверки exact source/digest/interface; прежние
+service releases не объявляются совместимыми. Наличие тегов проверяется у владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
 подтверждает публикацию или готовность курса. Выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases); история исполнения сохраняется в Git.
 
@@ -186,7 +187,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует PrairieLearn `7.1.1` и Core `7.3.0`, Quarto 1.11.5
+Контракт этого ref использует exporter `8.0.0` и Core `8.0.0`, Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
 `statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
@@ -242,9 +243,22 @@ Counters обходов не являются числом посещённых 
 Выпуск 7.0.0 ввёл отдельные `title`, необязательные `difficulty`/`time`
 и публичное `introduction` Body v2. Старый закрытый consumer не принимает
 новые поля; новый native consumer требует читаемое название. Устанавливайте
-Core 7.3.0 и exporter 7.1.1 вместе по опубликованным точным тегам. `slots`, UUID и правила оценивания сохраняются.
+Core 8.0.0 и exporter 8.0.0 вместе по опубликованным точным тегам. Стабильные UUID
+сохраняются; delivery v3 требует согласованного reader.
 
-## Выпуск совместимости 7.1.1
+## Подготовка выпуска 8.0.0
 
-Descriptor закрепляет Core 7.3.0. Исполняемые файлы экспортёра и форматы
-экспорта сохранены; новое поле показа времени Core не меняет Body v2.
+Delivery v3 описывает `external`/`manual`/`mixed` и `selection=choice`. Полностью ручная
+задача не получает фиктивную автоматическую оценку; `mixed` сохраняет реальные
+автоматический и преподавательский компоненты. Студенческие ресурсы и текущий закрытый pointer проверяются
+совместимым Core 8.0.0. Закрытые материалы не входят в student ZIP/site.
+Body остаётся `course-body-package-v2`, public results projection — v2.
+
+Обе задачи CI закрепляют один полный Core commit, без переопределения repository variable.
+Экспортёр использует готовый Core inventory и не требует Download assembler.
+До публикации `v8.0.0` это кандидат исходников; готовность курса и native service проверяется отдельно.
+
+## Исторический выпуск совместимости 7.1.1
+
+В выпуске 7.1.1 descriptor закреплял Core 7.3.0. Исполняемые файлы экспортёра и форматы
+экспорта были сохранены; новое поле показа времени Core не меняет Body v2.

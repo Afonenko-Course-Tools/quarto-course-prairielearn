@@ -27,16 +27,27 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Проверить точный commit исходников
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
       - name: Получение проверяемого ядра курса
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          # Точный кандидат Core 7.2.0; эту ветку публикуют до PR exporter.
+          # Точный Core 8.0.0; тот же commit используется обоими CI jobs.
           # Commit не означает существование release tag.
-          ref: ${{ vars.COURSE_CORE_REF || '228d3e7fc5c394d474aabc72c9280f220d01d63c' }}
+          ref: 438c1477672895df12297dbdeab507927ab9cfcd
           path: .ci-deps/core
           persist-credentials: false
+      - name: Проверить закреплённый Core
+        run: |
+          git -C .ci-deps/core rev-parse HEAD
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "438c1477672895df12297dbdeab507927ab9cfcd"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -66,12 +77,25 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Проверить точный commit исходников
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: ${{ vars.COURSE_CORE_REF || '228d3e7fc5c394d474aabc72c9280f220d01d63c' }}
+          ref: 438c1477672895df12297dbdeab507927ab9cfcd
           path: .ci-deps/core
           persist-credentials: false
+      - name: Проверить закреплённый Core
+        run: |
+          git -C .ci-deps/core rev-parse HEAD
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "438c1477672895df12297dbdeab507927ab9cfcd"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5
