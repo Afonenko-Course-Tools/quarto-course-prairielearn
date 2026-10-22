@@ -222,6 +222,10 @@ export async function exportCourse(
             publicWork.introduction !== undefined && !Array.isArray(publicWork.introduction)) {
           throw new Error("PL публичное введение не соответствует работе: " + context.work.id);
         }
+        if ((context.menu || unitMenus.has(context.work.id)) &&
+            canonical(publicWork.slots) !== canonical(qualifiedSlots(input.courseId, context.work))) {
+          throw Error("PL публичный состав не соответствует source unit/menu: " + context.work.id);
+        }
         // Only the independent public projection; never raw menu.body/full AST.
         const rendered = await renderPublicBody(context.body, publicWork.introduction ?? [], publicWork.key,
           {source: publicWork.source, id: context.work.id, field: "introduction"},

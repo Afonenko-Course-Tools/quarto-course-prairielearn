@@ -564,3 +564,29 @@ Deno.test("whole-bank: matching mixed duplicate retains complete starter and tea
       "Повторный mixed потерял teacher30",
     );
   }));
+Deno.test("whole-bank: internally valid public Body cannot substitute another unit member", async () =>
+  fixture(async (input, root, body) => {
+    input.result.model.exercises.push({
+      id: "exr-b",
+      target: "prairielearn",
+      extensions: { prairielearn: { grading: { method: "manual" } } },
+    });
+    input.result.model.projects.push({
+      exerciseId: "exr-b",
+      bankMember: true,
+      projectRoot: "project",
+    });
+    input.body = async (id: string) => {
+      const p = body(
+        input.result.model.assessments.find((w: any) => w.id === id),
+      );
+      if (id === "sec-unit-a") {
+        p.questions[0].id = "exr-b";
+        p.questions[0].key = "fixture/exr-b";
+        p.works[0].slots[0].id = "fixture/sec-unit-a/exr-b";
+        p.works[0].slots[0].candidates = ["fixture/exr-b"];
+      }
+      return p;
+    };
+    await refuses(input);
+  }));
