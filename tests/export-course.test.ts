@@ -348,11 +348,19 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       instance: "pilot",
       body: async () => body,
     };
+    const mixedWork=structuredClone(work);
+    const mixedPolicy:any=mixedWork.extensions.prairielearn;
+    delete mixedPolicy['question-points'];delete mixedPolicy['question-max-points'];mixedPolicy['auto-points']=1;mixedPolicy['manual-points']=2;
+    await exportCourse({...input,result:{model:{...input.result.model,assessments:[mixedWork],exercises:[{id:'exr-a',target:'prairielearn',extensions:{prairielearn:{grading:{method:'mixed'}}}}]}},output:root+'/mixed',checksOutput:root+'/mixed-checks.json'});
+    const mixedAssessment=JSON.parse(await Deno.readTextFile(root+'/mixed/courseInstances/pilot/assessments/sec-lab/infoAssessment.json'));
+    const mixedInfo=JSON.parse(await Deno.readTextFile(root+'/mixed/questions/demo/exr-a/info.json'));
+    assert(mixedInfo.gradingMethod==='External'&&mixedInfo.externalGradingOptions&&mixedAssessment.zones[0].questions[0].autoPoints===1&&mixedAssessment.zones[0].questions[0].manualPoints===2,'Mixed lost actual External runtime or explicit teacher component');
     const a = await exportCourse({
       ...input,
       output: root + "/one",
       checksOutput: root + "/checks1.json",
     });
+    assert(a.schemaVersion===3&&a.gradingPayloads['demo/exr-a'].grading?.method==='external'&&a.gradingPayloads['demo/exr-a'].submission?.mode==='editor','Delivery v3 requires explicit normalized grading/submission bindings');
     const b = await exportCourse({
       ...input,
       output: root + "/two",
@@ -401,9 +409,23 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       assert(html.includes('optional-file-names="additional-sources.zip"'),"optional upload absent");
       assert((html.match(/<pl-file-upload /g)??[]).length===1,"multiple upload controls");
       assert((mode==="editor")===html.includes('<pl-file-editor '),"primary editor delivery changed");
-      assert(html.includes("5 MB")&&html.includes("ручн")&&html.includes("2097152"),"transport limits/manual fallback not disclosed");
+      assert(!html.includes("5 MB")&&!html.includes("При превышении используйте ручную сдачу")&&!html.includes("2097152"),"Generated infrastructure/manual fallback preamble leaked into condition");
       assert(!html.includes("PRIVATE_REFERENCE")&&!html.includes(apiText),"private sources leaked into UI");
       assert(delivery.files["questions/demo/exr-a/question.html"]===await hash(html),"optional controls absent from delivery hash");
+    }
+    const nativeFact={...extrasFact,check:{...extrasFact.check,runtime:"java25-gradle-junit-v1","java-build":{kind:"gradle-jar-v1","main-class":"grade.Main",artifact:"gradeapp.jar"}}};
+    const nativeInput={...apiInput,checks:{...input.checks,projects:[nativeFact]},registry:{schemaVersion:1,profiles:{"java25-gradle-junit-v1":{mode:"implementation",javaRelease:25,image:"registry/native-java@sha256:"+"e".repeat(64)}}},output:root+"/native-gradle",checksOutput:root+"/native-gradle-checks.json"};
+    await exportCourse(nativeInput);
+    const nativeDescriptor=JSON.parse(await Deno.readTextFile(root+"/native-gradle/questions/demo/exr-a/tests/grading-job.json"));
+    assert(canonical(nativeDescriptor.javaBuild)===canonical({kind:"gradle-jar-v1",mainClass:"grade.Main",artifact:"gradeapp.jar"}),"native full export dropped javaBuild");
+    assert(nativeDescriptor.runtime==='java25-gradle-junit-v1'&&canonical(nativeDescriptor.sourceFiles)===canonical(apiDescriptor.sourceFiles)&&canonical(nativeDescriptor.apiPrecheck)===canonical(apiDescriptor.apiPrecheck),"native export changed selected source/API boundary");
+    assert(await Deno.readTextFile(root+"/native-gradle/questions/demo/exr-a/tests/ApiContract.java")===apiText,"native private API bytes lost");
+    const nativeInfo=JSON.parse(await Deno.readTextFile(root+"/native-gradle/questions/demo/exr-a/info.json"));
+    assert(nativeInfo.externalGradingOptions.image==='registry/native-java@sha256:'+"e".repeat(64),"native image pin replaced with old/demo image");
+    for(const patch of [{"java-build":undefined},{runtime:"java25-junit-v1"},{"java-build":{kind:"gradle-jar-v1","main-class":"grade.Main",artifact:"gradeapp.jar",command:"run"}}]){
+      let denied=false;try{await exportCourse({...nativeInput,checks:{...input.checks,projects:[{...nativeFact,check:{...nativeFact.check,...patch}}]},output:root+"/native-invalid",checksOutput:root+"/native-invalid-checks.json"});}catch{denied=true;}
+      assert(denied,"full native export silently discarded invalid java-build");
+      assert(!await Deno.stat(root+"/native-invalid").then(()=>true,()=>false),"invalid native export published partial output");
     }
     await Deno.writeTextFile(root+"/project/tests/junit/ApiContract.java","tampered");
     let apiTamperDenied=false;try{await exportCourse({...apiInput,output:root+"/api-tamper",checksOutput:root+"/api-tamper-checks.json"});}catch{apiTamperDenied=true;}
@@ -556,7 +578,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
     const randomDelivery=await exportCourse({...randomInput,output:root+'/random',checksOutput:root+'/random-checks.json'});
     const randomAgain=await exportCourse({...randomInput,output:root+'/random-again',checksOutput:root+'/random-again-checks.json'});
     const randomNative=JSON.parse(await Deno.readTextFile(root+'/random/courseInstances/pilot/assessments/sec-lab/infoAssessment.json'));
-    assert(randomDelivery.schemaVersion===2&&randomDelivery.questions.length===3&&randomDelivery.works[0].slots.length===2&&randomDelivery.works[0].completion.requiredSlotIds.length===2,'random catalog/slots/completion not preserved');
+    assert(randomDelivery.schemaVersion===3&&randomDelivery.questions.length===3&&randomDelivery.works[0].slots.length===2&&randomDelivery.works[0].completion.requiredSlotIds.length===2,'random catalog/slots/completion not preserved');
     assert(randomDelivery.deliveryHash===randomAgain.deliveryHash,'random unchanged snapshot is not deterministic');
     const pool=randomNative.zones[0].questions[0];
     assert(pool.numberChoose===1&&pool.alternatives.length===2&&pool.points===2.5&&pool.maxPoints===6&&pool.triesPerVariant===2&&!('id' in pool),'random group native shape changed');

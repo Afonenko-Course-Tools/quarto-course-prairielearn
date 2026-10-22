@@ -35,7 +35,11 @@ function M.read(doc, effective)
       local payload = {grading = contract.vocabulary.grading[1]}
       if doc.meta.prairielearn and doc.meta.prairielearn["question-defaults"] then
         local defaults = doc.meta.prairielearn["question-defaults"]
-        payload.topic = pandoc.utils.stringify(defaults.topic)
+        if defaults.topic ~= nil then payload.topic = pandoc.utils.stringify(defaults.topic) end
+        if defaults.grading then
+          payload.grading={}
+          for key,value in pairs(defaults.grading) do payload.grading[key]=pandoc.utils.stringify(value) end
+        end
         if defaults["single-variant"] ~= nil then payload["single-variant"] = defaults["single-variant"] end
         local submission = defaults.submission
         if submission then
@@ -44,6 +48,9 @@ function M.read(doc, effective)
         end
       end
       if d.attributes["prairielearn-single-variant"] ~= nil then payload["single-variant"] = d.attributes["prairielearn-single-variant"] == "true" end
+      if d.attributes['prairielearn-grading'] then
+        local method=d.attributes['prairielearn-grading'];payload.grading=method=='external' and 'external' or {method=method}
+      end
       if d.attributes["prairielearn-topic"] then payload.topic = d.attributes["prairielearn-topic"] end
       if d.attributes["prairielearn-submission"] then payload.submission = payload.submission or {}; payload.submission.mode = d.attributes["prairielearn-submission"]; if payload.submission.mode == "upload" then payload.submission["ace-mode"] = nil end end
       value.exercises:insert({id = d.identifier, payload = payload})
@@ -86,7 +93,7 @@ function M.write(doc, value)
   local pointer = io.open(root .. "/_generated/course-spec/active-native-run.json", "r")
   if pointer then
     local run = pandoc.json.decode(pointer:read("*a")); pointer:close()
-    assert(run.schema == "course-native-run-pointer-v1" and run.projectRoot == root, diagnostics.message("PL.NATIVE_INVALID", "Неверный указатель native-сборки", {source = value.source, field = "active-native-run"}))
+    assert(run.schema == "course-native-run-pointer-v2" and run.projectRoot == root, diagnostics.message("PL.NATIVE_INVALID", "Неверный указатель native-сборки", {source = value.source, field = "active-native-run"}))
     assert(pandoc.path.directory(run.directory) == root .. "/_generated/course-spec/native-runs", diagnostics.message("PL.NATIVE_INVALID", "Неверный каталог native-сборки", {source = value.source, field = "active-native-run.directory"}))
     assert(pandoc.json.encode(run.profiles) == pandoc.json.encode(profiles), diagnostics.message("PL.NATIVE_INVALID", "Профили адаптера расходятся с native-сборкой", {source = value.source, field = "active-native-run.profiles"}))
     local folder = run.directory .. "/adapters/" .. contract.name

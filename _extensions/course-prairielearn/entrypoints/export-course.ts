@@ -2,6 +2,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { exportCourse } from "../application/export-course.ts";
 import { declarations } from "../application/declarations.ts";
+import {readMaterializedStudent} from '../application/materialized-student.ts';
 const args = Deno.args[0] === "--" ? Deno.args.slice(1) : Deno.args;
 const [rootArg, output, ...options] = args;
 const flags: Record<string, string> = {};
@@ -13,6 +14,7 @@ for (let i = 0; i < options.length; i += 2) {
       "--runtime-registry",
       "--book",
       "--candidate-image",
+      "--staging-receipt",
     ].includes(options[i]) || !options[i + 1] || flags[options[i]]
   ) throw new Error("PL unknown or duplicate CLI option");
   flags[options[i]] = options[i + 1];
@@ -83,6 +85,17 @@ const { buildBodies } = await import(
 );
 const collected = await collectNativeModel(root, { book });
 const checks = await collectProjectChecks(root, { book }, collected);
+let studentArtifact:undefined|((fact:any)=>Promise<{files:{name:string;bytes:Uint8Array}[];archive:Uint8Array}>);
+if(flags['--staging-receipt']){
+  const receipt=JSON.parse(await Deno.readTextFile(flags['--staging-receipt']));
+  let download:string|undefined;
+  for(const path of [join(root,book,'_extensions/project-download/domain/zip.ts'),join(root,book,'_extensions/Afonenko-Course-Tools/project-download/domain/zip.ts')]){
+    try{if((await Deno.lstat(path)).isFile){download=path;break}}catch(error){if(!(error instanceof Deno.errors.NotFound))throw error}
+  }
+  if(!download)throw Error('PL private export требует установленный Download ZIP API');
+  const {zip}=await import(pathToFileURL(download).href);
+  studentArtifact=async(fact:any)=>{const files=await readMaterializedStudent(root,book,fact.projectRoot,receipt);return {files,archive:zip(files)}};
+}
 await exportCourse({
   courseId: collected.courseId,
   projectRoot: collected.projectRoot,
@@ -94,6 +107,7 @@ await exportCourse({
   output,
   checksOutput: flags["--checks-output"],
   candidateImage: flags["--candidate-image"],
+  studentArtifact,
   body: async (work: string) =>
     (await buildBodies(collected.result, {
       projectRoot: collected.projectRoot,

@@ -27,16 +27,27 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Проверить точный commit исходников
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
       - name: Получение проверяемого ядра курса
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          # Точный кандидат Core 7.2.0; эту ветку публикуют до PR exporter.
+          # Точный локальный Core candidate 8.1.0; тот же commit используется обоими CI jobs.
           # Commit не означает существование release tag.
-          ref: ${{ vars.COURSE_CORE_REF || '08324a20dd676067b1f78627bdc811f17c195eb4' }}
+          ref: 0a44ba5746b93731ee6fdf6486b923c36e5578f9
           path: .ci-deps/core
           persist-credentials: false
+      - name: Проверить закреплённый Core
+        run: |
+          git -C .ci-deps/core rev-parse HEAD
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "0a44ba5746b93731ee6fdf6486b923c36e5578f9"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -46,6 +57,8 @@ jobs:
       - name: Проверка единого словаря контракта
         run: quarto run tools/sync-contract.ts --check
       - run: quarto run tests/native-model.ts .ci-deps/core
+      - run: quarto run tests/native-pointer.ts .ci-deps/core
+      - run: quarto run tests/native-manual.ts .ci-deps/core
       - run: quarto run tests/native-ordinary.ts .ci-deps/core
       - run: quarto run tests/native-references.ts .ci-deps/core
       - run: quarto run tests/native-declarations.ts .ci-deps/core
@@ -61,15 +74,28 @@ jobs:
   java-delivery:
     name: Installed native questions and Java/Gradle
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Проверить точный commit исходников
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: ${{ vars.COURSE_CORE_REF || '08324a20dd676067b1f78627bdc811f17c195eb4' }}
+          ref: 0a44ba5746b93731ee6fdf6486b923c36e5578f9
           path: .ci-deps/core
           persist-credentials: false
+      - name: Проверить закреплённый Core
+        run: |
+          git -C .ci-deps/core rev-parse HEAD
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "0a44ba5746b93731ee6fdf6486b923c36e5578f9"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5
@@ -86,7 +112,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
         with:
           gradle-version: '9.1.0'
-      - run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts
+      - run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts tests/manual-mixed.test.ts tests/materialized-student.test.ts tests/public-cases.test.ts tests/body-projection.test.ts tests/java-build.test.ts tests/whole-bank.test.ts
       - name: Атомарный экспорт между файловыми системами
         run: PL_EXDEV_TEST_DIR=/dev/shm deno test --no-config -A --filter "across output filesystems" tests/export-course.test.ts
       - run: CORE="$PWD/.ci-deps/core" bash tools/check-java.sh

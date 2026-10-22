@@ -2,6 +2,8 @@ import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
 import { validateAdditionalJavaSources } from "./runtime-descriptor.ts";
 import { validateSlots } from "./slots.ts";
+import {canonical} from "./source-selection.ts";
+import {gradingMethod} from './declarations.ts';
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { diagnostic, type DiagnosticContext } from "./diagnostics.ts";
 const fail = (
@@ -22,6 +24,12 @@ const fields = (v: any, required: string[], optional: string[] = []) =>
 export interface ProjectContext {
   projectRoot: string;
   projects: Record<string, string>;
+  studentArtifacts?:Record<string,{files:{name:string;bytes:Uint8Array}[];archive:Uint8Array}>;
+}
+export async function publicProjectFiles(root:string){
+ const result=await files(root,{field:'project.student'},true);
+ for(const file of result)if(file.name.split('/').some(part=>['private','reference','solution','solutions','grading-notes','rubric.md','contract.md'].includes(part))||/\.(?:qmd|rmd|ipynb|class|jar)$/i.test(file.name))fail('Закрытый или служебный файл в student partition',{field:'project.student',source:file.name});
+ return result;
 }
 async function command(
   args: string[],
@@ -155,12 +163,19 @@ export async function renderPublicBody(
   const questionFail = (message: string, field: string, cause?: unknown): never =>
     fail(message, {...questionContext, field}, cause);
   const files: {name: string; data: Uint8Array}[] = [];
-    const blocks = structuredClone(nodes);
     const authored = JSON.stringify(nodes);
     let markerIndex = 0;
     while (authored.includes("PL_CLIENT_FILE_URL_TOKEN_" + markerIndex)) markerIndex++;
     const resourceMarker = "PL_CLIENT_FILE_URL_TOKEN_" + markerIndex;
     const resources = new Map<string, any>();
+    const declaredResources = new Map<string, any>();
+    for (const resource of p.resources) {
+      const previous = declaredResources.get(resource.target);
+      if (previous && canonical(previous) !== canonical(resource)) {
+        questionFail("Неоднозначный публичный ресурс: " + resource.target, "condition.resource");
+      }
+      declaredResources.set(resource.target, resource);
+    }
     const anchorPrefix = "pl-" + await uuid(key) + "-";
     const anchors = new Map<string, string>();
     // TableHead/Body/Foot, Row and Cell carry semantic Attr arrays, not t nodes.
@@ -173,6 +188,25 @@ export async function renderPublicBody(
       }
       return ["Div","Span","CodeBlock","Code","Link","Image","Figure"].includes(node.t)?[node.c[0]]:[];
     };
+    const bibliographyTargets=new Set<string>();
+    const collectBibliographyTargets=(value:any)=>{
+      if(Array.isArray(value)){value.forEach(collectBibliographyTargets);return}
+      if(!value||typeof value!=='object')return;
+      for(const attr of nodeAttrs(value))if(attr?.[0])bibliographyTargets.add(attr[0]);
+      Object.values(value).forEach(collectBibliographyTargets);
+    };
+    const projectBibliography=(value:any,links=false):any=>{
+      if(Array.isArray(value))return value.flatMap(item=>{const next=projectBibliography(item,links);return next===undefined?[]:[next]});
+      if(!value||typeof value!=='object')return value;
+      if(!links&&(value.t==='Cite'||value.t==='Div'&&(value.c?.[0]?.[0]==='refs'||value.c?.[0]?.[1]?.some((c:string)=>['references','csl-bib-body'].includes(c))))){collectBibliographyTargets(value);return undefined}
+      if(links&&value.t==='Link'&&typeof value.c?.[2]?.[0]==='string'&&value.c[2][0].startsWith('#')){
+        let target:string;try{target=decodeURIComponent(value.c[2][0].slice(1))}catch{target=''}
+        if(bibliographyTargets.has(target))return undefined;
+      }
+      return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,projectBibliography(item,links)]));
+    };
+    // A copy; bibliography links are removed only for targets removed above.
+    const blocks=projectBibliography(projectBibliography(nodes),true);
     const indexAnchors = (value: any) => {
       if (Array.isArray(value)) {
         value.forEach(indexAnchors);
@@ -207,7 +241,7 @@ export async function renderPublicBody(
       ) questionFail("Закрытая отметка в публичном условии", "condition");
       if (node.t === "Image" || node.t === "Link") {
         const href = node.c[2][0],
-          resource = p.resources.find((r: any) => r.target === href);
+          resource = declaredResources.get(href);
         if (node.t === "Link" && href.startsWith("#")) {
           let target: string;
           try {
@@ -422,15 +456,17 @@ export async function exportPrairieLearn(
     }
     keys.add(q.key);
     const b = binding.questions[q.id];
+    const manual=gradingMethod(b?.grading).method==='manual';
     if (
-      !fields(b, ["topic", "files", "externalGradingOptions"], [
+      !fields(b, ["topic", "files",...(manual?[]:["externalGradingOptions"])], [
         "submission",
         "singleVariant",
         "additionalJavaSources",
+        "grading",
       ]) ||
       b.singleVariant !== undefined && typeof b.singleVariant !== "boolean" ||
       typeof b.topic !== "string" || !b.topic.trim() ||
-      !Array.isArray(b.files) || !b.files.length ||
+      !Array.isArray(b.files) || !manual&&!b.files.length ||
       new Set(b.files).size !== b.files.length || b.files.some((f: unknown) =>
         !safe(f) || /[",<>]/.test(String(f))
       )
@@ -441,6 +477,7 @@ export async function exportPrairieLearn(
       );
     }
     const submission = b.submission ?? { mode: "upload" };
+    if(manual&&(submission.mode!=='upload'||b.additionalJavaSources!==undefined))questionFail('Manual требует штатную загрузку файлов без автоматического runtime','submission');
     if (
       !fields(submission, ["mode"], ["aceMode"]) ||
       !["upload", "editor"].includes(submission.mode) ||
@@ -455,7 +492,7 @@ export async function exportPrairieLearn(
       );
     }
     const grading = b.externalGradingOptions;
-    if (
+    if (!manual&&(
       !fields(grading, ["image"], [
         "entrypoint",
         "timeout",
@@ -474,7 +511,7 @@ export async function exportPrairieLearn(
       grading.environment !== undefined &&
         (!record(grading.environment) ||
           Object.values(grading.environment).some((x) => typeof x !== "string"))
-    ) {
+    )) {
       questionFail(
         "Неверная привязка внешнего проверяющего инструмента",
         "binding.questions." + q.id + ".externalGradingOptions",
@@ -511,17 +548,26 @@ export async function exportPrairieLearn(
         ...questionContext,
         field: "project.student",
       }, true),
-      tests = await files(join(source, "tests"), {
+      tests = manual?[]:await files(join(source, "tests"), {
         ...questionContext,
         field: "project.tests",
       });
-    if (!student.length || !tests.length) {
+    if (!student.length || !manual&&!tests.length) {
       questionFail(
         "Требуются стартовые файлы student и проверяющие файлы tests",
         "project",
       );
     }
     const base = "questions/" + q.key;
+    const artifact=context.studentArtifacts?.[q.id];
+    if(artifact){
+      if(!Array.isArray(artifact.files)||!artifact.files.length||!(artifact.archive instanceof Uint8Array)||!artifact.archive.length)questionFail('Пустой комплект Core/Download','studentArtifact');
+      for(const file of artifact.files){
+        if(!safe(file.name)||!file.name.split('/').includes('.git')&&file.name.split('/').some(part=>['private','reference','solution','solutions','grading-notes','rubric.md','contract.md'].includes(part)))questionFail('Закрытый или небезопасный файл в student artifact','studentArtifact');
+        prepared.push({name:base+'/clientFilesQuestion/starter/'+file.name,data:file.bytes});
+      }
+      prepared.push({name:base+'/clientFilesQuestion/starter.zip',data:artifact.archive});
+    }
     for (const f of submission.mode === "editor" ? [] : student) {
       prepared.push({
         name: base + "/clientFilesQuestion/" + f.name,
@@ -580,17 +626,19 @@ export async function exportPrairieLearn(
         '<pl-file-download file-name="' + escape(f.name) +
         '"></pl-file-download>'
       ).join("\n");
-      controls = downloads + '\n<pl-file-upload file-names="' +
-        escape(b.files.join(",")) + '"' + (extras?' optional-file-names="'+escape(extras.archive)+'"':'') + '></pl-file-upload>';
+      controls = downloads + (manual?'\n<pl-file-upload file-patterns="*" optional-file-patterns="*"></pl-file-upload>':'\n<pl-file-upload file-names="' +
+        escape(b.files.join(",")) + '"' + (extras?' optional-file-names="'+escape(extras.archive)+'"':'') + '></pl-file-upload>');
     }
     if(extras){
       if(submission.mode==='editor')controls+='\n<pl-file-upload optional-file-names="'+escape(extras.archive)+'"></pl-file-upload>';
-      controls+='\n<p>Необязательный ZIP дополнительных .java: '+escape(extras.archive)+'. Основные файлы остаются в '+(submission.mode==='editor'?'редакторах':'обязательной загрузке')+'. Относительные пути пакетов допускаются; основные и доверенные файлы перезаписывать нельзя. Пределы: '+extras.maxFiles+' файлов, '+extras.maxFileBytes+' байт на файл, '+extras.maxTotalBytes+' байт распакованных исходников, '+extras.maxArchiveBytes+' байт ZIP. Штатный общий предел PrairieLearn — 5 MB на весь ответ, включая редакторные файлы; доступный размер ZIP зависит от остального ответа. При превышении используйте ручную сдачу.</p>';
+    }
+    if(artifact){
+      controls='<p><a href="{{options.client_files_question_url}}/starter.zip">Скачать заготовку</a>'+(artifact.files.some(f=>f.name==='README.md')?' · <a href="{{options.client_files_question_url}}/starter/README.md">README</a>':'')+'</p>\n'+controls;
     }
     text(
       base + "/question.html",
       "<pl-question-panel>\n" + metadata(q) + html + "\n" + controls +
-        "\n</pl-question-panel>\n<pl-submission-panel><pl-external-grader-results></pl-external-grader-results></pl-submission-panel>\n",
+        "\n</pl-question-panel>\n"+(manual?'':'<pl-submission-panel><pl-external-grader-results></pl-external-grader-results></pl-submission-panel>\n'),
     );
     text(
       base + "/info.json",
@@ -600,13 +648,13 @@ export async function exportPrairieLearn(
           type: "v3",
           title: q.title,
           topic: b.topic,
-          gradingMethod: "External",
+          gradingMethod: manual?"Manual":"External",
           ...(b.singleVariant !== undefined
             ? { singleVariant: b.singleVariant }
             : {}),
           showCorrectAnswer: false,
           partialCredit: false,
-          externalGradingOptions: grading,
+          ...(manual?{}:{externalGradingOptions: grading}),
         },
         null,
         2,

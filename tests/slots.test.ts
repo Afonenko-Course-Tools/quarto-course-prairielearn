@@ -35,3 +35,13 @@ Deno.test('pinned native semantic boundary rejects pool preferences even when sc
   assert(rejected,'schema-valid pool preferences passed the pinned sync boundary');
  }
 });
+import {nativeSlotZones} from '../_extensions/course-prairielearn/application/slots.ts';
+import {infoAssessment} from '../_extensions/course-prairielearn/application/native-validators.js';
+Deno.test('student choice emits two visible questions in one bestQuestions zone without randomness or double slot count',()=>{
+ const w={id:'sec-lab',title:'Выбор',kind:'lab',slots:[{id:'alt-choice',selection:'choice',candidates:['exr-a','exr-b'],assignment:{requirement:'required',workMode:'individual'}}],extensions:{prairielearn:{attempts:3,'question-points':2,pass:{'at-least':1}}}};
+ const zones=nativeSlotZones('demo',w,gradingPolicy(w)),zone=zones[0];
+ assert(zones.length===1&&zone.bestQuestions===1&&zone.numberChoose===undefined&&zone.questions.length===2,'choice became random or invisible');
+ assert(zone.questions.every((q:any)=>q.points===2&&q.numberChoose===undefined&&q.alternatives===undefined),'choice weight belongs to one best candidate');
+ assert(completionPolicy('demo',w).requiredSlotIds.length===1,'choice counted as two required tasks');
+ const assessment={uuid:'99aa8f0e-f6b2-4028-9a83-ea27f18b5abe',type:'Homework',title:'Synthetic',set:'Homework',number:'1',zones};assert(infoAssessment(assessment),'pinned native choice schema invalid');validateAssessmentSemantics(assessment,'choice/infoAssessment.json');
+});

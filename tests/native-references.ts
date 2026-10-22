@@ -35,7 +35,7 @@ try {
   );
   await Deno.writeTextFile(
     join(root, "index.qmd"),
-    '---\nexercise-bank: true\nexercise-statement-visibility: open\nassessment: {kind: lab, id: references}\n---\n# References\n\n::: {#exr-one target=prairielearn difficulty=introductory time=1 project="/projects/demo"}\n## Native question\n\nNative [@public]. See @sec-local.\n\n### Local section {#sec-local}\n\n::: {.grading-notes}\nSecret [@private].\n:::\n:::\n\n::: {.task-items stage=homework}\n1. @exr-one\n:::\n',
+    '---\nexercise-bank: true\nexercise-statement-visibility: open\nassessment: {kind: lab, id: references}\n---\n# References\n\n::: {#exr-one target=prairielearn difficulty=introductory time=1 project="/projects/demo"}\n## Native question\n\nNative [@public]. See @sec-local.\n\n[Полезный API](https://example.org/task-api).\n\n```text\n[1]\nPUBLIC_CODE_REFERENCE\n```\n\n### Local section {#sec-local}\n\n::: {.grading-notes}\nSecret [@private].\n:::\n:::\n\n::: {.task-items stage=homework}\n1. @exr-one\n:::\n',
   );
   await Deno.mkdir(join(root, "projects/demo/student"), { recursive: true });
   await Deno.mkdir(join(root, "projects/demo/tests"), { recursive: true });
@@ -75,22 +75,24 @@ try {
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]),
     links = [...html.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
   assert(
-    html.includes("NATIVE_PUBLIC_ATTRIBUTION") &&
-      html.includes("https://example.org/public") &&
-      !html.includes("PRIVATE_ATTRIBUTION"),
-    "native public bibliography changed or leaks private source",
+    !html.includes("NATIVE_PUBLIC_ATTRIBUTION") &&
+      !html.includes("https://example.org/public") &&
+      !html.includes("PRIVATE_ATTRIBUTION") &&
+      html.includes("https://example.org/task-api") &&
+      html.includes("PUBLIC_CODE_REFERENCE") && html.includes("[1]"),
+    "native projection must omit bibliography/private source and preserve useful links/literal code",
   );
   assert(
-    links.length === 2 && links.every((id) => ids.includes(id)) &&
+    links.length === 1 && links.every((id) => ids.includes(id)) &&
       new Set(ids).size === ids.length,
-    "native bibliography/Header links have missing or duplicate targets",
+    "native semantic Header link has missing or duplicate targets",
   );
   assert(
     ids.every((id) => id.startsWith("pl-")),
     "question IDs not namespaced",
   );
   console.log(
-    "PASS installed Core native bibliography/section crossref → namespaced standalone PrairieLearn HTML",
+    "PASS installed Core native projection: no bibliography, preserved semantic link/code/section target",
   );
 } finally {
   await Deno.remove(root, { recursive: true });
