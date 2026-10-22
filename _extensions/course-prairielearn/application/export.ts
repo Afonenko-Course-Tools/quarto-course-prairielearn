@@ -2,6 +2,7 @@ import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
 import { validateAdditionalJavaSources } from "./runtime-descriptor.ts";
 import { validateSlots } from "./slots.ts";
+import {canonical} from "./source-selection.ts";
 import {gradingMethod} from './declarations.ts';
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { diagnostic, type DiagnosticContext } from "./diagnostics.ts";
@@ -167,6 +168,14 @@ export async function renderPublicBody(
     while (authored.includes("PL_CLIENT_FILE_URL_TOKEN_" + markerIndex)) markerIndex++;
     const resourceMarker = "PL_CLIENT_FILE_URL_TOKEN_" + markerIndex;
     const resources = new Map<string, any>();
+    const declaredResources = new Map<string, any>();
+    for (const resource of p.resources) {
+      const previous = declaredResources.get(resource.target);
+      if (previous && canonical(previous) !== canonical(resource)) {
+        questionFail("Неоднозначный публичный ресурс: " + resource.target, "condition.resource");
+      }
+      declaredResources.set(resource.target, resource);
+    }
     const anchorPrefix = "pl-" + await uuid(key) + "-";
     const anchors = new Map<string, string>();
     // TableHead/Body/Foot, Row and Cell carry semantic Attr arrays, not t nodes.
@@ -232,7 +241,7 @@ export async function renderPublicBody(
       ) questionFail("Закрытая отметка в публичном условии", "condition");
       if (node.t === "Image" || node.t === "Link") {
         const href = node.c[2][0],
-          resource = p.resources.find((r: any) => r.target === href);
+          resource = declaredResources.get(href);
         if (node.t === "Link" && href.startsWith("#")) {
           let target: string;
           try {

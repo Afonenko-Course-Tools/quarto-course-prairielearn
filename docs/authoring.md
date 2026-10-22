@@ -2,7 +2,7 @@
 type: specification
 component: course-prairielearn
 status: current
-updated: 2026-10-21
+updated: 2026-10-22
 ---
 
 # Спецификация заданий и контрольных работ
@@ -11,7 +11,7 @@ updated: 2026-10-21
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
-переключения версий схемы. Контракты этого ref: адаптер candidate8.1.0 и Core candidate8.1.0, delivery v3, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
+переключения версий схемы. Контракты этого ref: адаптер-кандидат8.2.0 и опубликованный Core8.1.0, delivery v3, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
 Канонические `#exr-*` имеют уникальные ID внутри явной области
 `exercise-bank: true`, собственные обязательные `difficulty` и положительное
 целое `time`. Эффективная `statement-visibility` берётся из атрибута задачи либо
@@ -463,3 +463,33 @@ selected byte hashes и API/extras boundary сохраняются. Student Grad
 
 Descriptor остаётся schemaVersion1. Рецепт и реальная сборка принадлежат
 Platform; source candidate не доказывает archive/image/runtime/course readiness.
+
+## Reference-only work и публичный контекст меню (кандидат8.2.0)
+
+Обычная работа `sec-unit-<суффикс exr>` содержит ровно один fixed slot с
+`id: exr-<суффикс>`, одним таким же candidate и required local assignment.
+Это транспортная ссылка на существующую задачу, не копия условия или новый
+педагогический вид работы. Добровольность всей выбранной единицы, её100
+баллов и отдельный учёт задаются принятым содержательным договором и
+существующими downstream средствами; экспортёр не добавляет course-final-weight.
+
+Для такой единицы exporter находит optional memberships её exr в
+нормализованных исходных assessments. Их независимо проецированные
+`publicWork.introduction` получает через существующий `input.body(menu.id)` и
+тот же `renderPublicBody`, сохраняя исходные resources и clientFilesCourse.
+Меню не становится выбранным assessment и не получает completion/grading.
+Отсутствующая или чужая public projection отвергается; raw/full body не
+используется как запасной источник.
+
+Повторное использование course/exr сохраняет один question directory только
+при равенстве public question facts, grading/submission/source mapping,
+ресурсов и всех готовых файлов, включая student artifact. Разные байты либо
+семантика вызывают отказ до публикации каталога; первый payload не
+побеждает молча. Неоднозначные resource targets также отвергаются.
+Общая поддержка external-only вопросов вне конкретного учебного банка
+сохраняется. Mixed по-прежнему имеет native External и отдельные auto/manual
+компоненты; manual не получает фиктивных tests/runtime.
+
+Core8.1 API, Bodyv2, deliveryv3, public resultsv2 и pin CI Core0a44 сохранены.
+Новый whole-course capture/export, доступ Student, Moodle учёт и публикация
+кандидата8.2.0 — отдельные последующие проверки.

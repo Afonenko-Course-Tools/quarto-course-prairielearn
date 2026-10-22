@@ -2,8 +2,8 @@
 type: specification-index
 component: course-prairielearn
 status: current
-version: 8.1.0
-updated: 2026-10-21
+version: 8.2.0
+updated: 2026-10-22
 ---
 
 # Индекс спецификаций PrairieLearn
@@ -33,9 +33,9 @@ Pinned official PrairieLearn JSON schemas and bundled offline Ajv validators are
 recorded in `spec/upstream/provenance.json`. The runner descriptor is Platform-owned,
 not a second author configuration or a private GradingJob.
 
-## Текущая candidate совместимость 8.1.0
+## Текущая совместимость кандидата 8.2.0
 
-Exporter 8.1.0 использует Core 8.1.0 и delivery v3. Body v2 и public results v2
+Кандидат Exporter 8.2.0 использует опубликованный Core 8.1.0 и delivery v3. Body v2 и public results v2
 не переименовываются. Manual/mixed/choice требуют согласованного native reader;
 Platform/Gateway проверяются отдельно по exact source/digest, без заявления
 совместимости прежних service releases. Download — необязательный consumer
@@ -45,3 +45,11 @@ Platform/Gateway проверяются отдельно по exact source/diges
 
 Экспортёр 7.1.1 использует Core 7.3.0 и прежний Body v2. Изменён descriptor,
 исполняемые файлы сохранены. Версии Core 7.2.0 / exporter 7.1.0 опубликованы.
+
+## Reference-only единицы и повторные вопросы
+
+Кандидат8.2.0 добавляет публичный контекст исходных optional меню для
+однопозиционных `sec-unit-*` работ и отказывает при различии повторного
+question payload, source mapping, grading/submission или ресурсов.
+Используется прежний public Body/renderer; новых полей схемы и registry нет.
+Тег8.2.0 и course readiness этой веткой не подтверждаются.

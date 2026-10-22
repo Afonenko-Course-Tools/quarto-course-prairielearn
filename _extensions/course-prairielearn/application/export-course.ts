@@ -101,6 +101,25 @@ export async function exportCourse(
     }
     return work;
   });
+  const menuBodies = new Map<string, any>();
+  const unitMenus = new Map<string, any[]>();
+  for (const work of works) {
+    if (!work.id.startsWith("sec-unit-")) continue;
+    const expected = "exr-" + work.id.slice("sec-unit-".length);
+    const slot = work.slots?.[0];
+    if (work.slots?.length !== 1 || slot?.selection !== "fixed" ||
+        slot.id !== expected || slot.candidates?.length !== 1 ||
+        slot.candidates[0] !== expected || slot.assignment?.requirement !== "required") {
+      throw Error("PL reference-only unit не соответствует единственной задаче: " + work.id);
+    }
+    const menus = input.result.model.assessments.filter((menu: any) =>
+      menu.id !== work.id && menu.slots.some((member: any) =>
+        member.assignment.requirement === "optional" && member.candidates.includes(expected)));
+    if (new Set(menus.map((menu: any) => menu.id)).size !== menus.length) {
+      throw Error("PL неоднозначный источник контекста меню: " + work.id);
+    }
+    unitMenus.set(work.id, menus);
+  }
   const active = new Set();
   for (const w of works) {
     if (w.relatedExercise) {
@@ -179,32 +198,49 @@ export async function exportCourse(
       },
     );
     const questions: Record<string, any> = {};
+    const questionSnapshots = new Map<string, string>();
     for (let index = 0; index < works.length; index++) {
       const work = works[index],
         p = await input.body(work.id),
         binding: any = { questions: {} },
         projects: Record<string, string> = {},
         studentArtifacts:Record<string,{files:{name:string;bytes:Uint8Array}[];archive:Uint8Array}>={};
-      const publicWork = p.works?.[0];
-      if (!publicWork || publicWork.key !== input.courseId + "/" + work.id ||
-          publicWork.introduction !== undefined && !Array.isArray(publicWork.introduction)) {
-        throw new Error("PL публичное введение не соответствует выбранной работе: " + work.id);
+      const contexts = [{work, body: p, menu: false}];
+      for (const menu of unitMenus.get(work.id) ?? []) {
+        if (!menuBodies.has(menu.id)) menuBodies.set(menu.id, await input.body(menu.id));
+        contexts.push({work: menu, body: menuBodies.get(menu.id), menu: true});
       }
-      const overview = await renderPublicBody(p, publicWork.introduction ?? [], publicWork.key,
-        {source: publicWork.source, id: work.id, field: "introduction"},
-        "clientFilesCourse", "{{ client_files_course }}");
-      for (const file of overview.files) {
-        const target = join(stage, file.name);
-        await Deno.mkdir(dirname(target), {recursive: true});
-        try {
-          if (await hash(await Deno.readFile(target)) !== await hash(file.data)) {
-            throw new Error("PL конфликт публичного ресурса обзора: " + file.name);
+      const overviewParts: string[] = [];
+      for (const context of contexts) {
+        const publicWork = context.body.works?.[0];
+        if (!publicWork || publicWork.key !== input.courseId + "/" + context.work.id ||
+            context.body.owner !== input.courseId ||
+            context.body.schema !== "course-body-package-v2" ||
+            !Array.isArray(context.body.resources) ||
+            context.menu && (publicWork.source !== context.work.source ||
+              !Array.isArray(publicWork.introduction)) ||
+            publicWork.introduction !== undefined && !Array.isArray(publicWork.introduction)) {
+          throw new Error("PL публичное введение не соответствует работе: " + context.work.id);
+        }
+        // Only the independent public projection; never raw menu.body/full AST.
+        const rendered = await renderPublicBody(context.body, publicWork.introduction ?? [], publicWork.key,
+          {source: publicWork.source, id: context.work.id, field: "introduction"},
+          "clientFilesCourse", "{{ client_files_course }}");
+        overviewParts.push(rendered.html);
+        for (const file of rendered.files) {
+          const target = join(stage, file.name);
+          await Deno.mkdir(dirname(target), {recursive: true});
+          try {
+            if (await hash(await Deno.readFile(target)) !== await hash(file.data)) {
+              throw new Error("PL конфликт публичного ресурса обзора: " + file.name);
+            }
+          } catch (e) {
+            if (!(e instanceof Deno.errors.NotFound)) throw e;
+            await Deno.writeFile(target, file.data);
           }
-        } catch (e) {
-          if (!(e instanceof Deno.errors.NotFound)) throw e;
-          await Deno.writeFile(target, file.data);
         }
       }
+      const overview = {html: overviewParts.join("\n")};
       for (const q of p.questions) {
         const e = input.result.model.exercises.find((e: any) => e.id === q.id);
         if (e?.target !== "prairielearn") {
@@ -332,17 +368,11 @@ export async function exportCourse(
       );
       for (const q of p.questions) {
         const base = "questions/" + q.key;
-        if (!await exists(join(stage, base))) {
-          await Deno.rename(
-            join(partial, base),
-            await parent(join(stage, base)),
-          );
-        }
         const c = input.checks.projects.find((f: any) =>
           f.exerciseId === q.id
         )?.check;
         const info = JSON.parse(
-          await Deno.readTextFile(join(stage, base, "info.json")),
+          await Deno.readTextFile(join(partial, base, "info.json")),
         );
         info.partialCredit = c?c.scoring.mode !== "all-pass":false;
         // Pinned Community validates assessment overrides against this embedded
@@ -354,9 +384,9 @@ export async function exportCourse(
             enum: ["required", "optional"],
           },
         };
-        await write(base + "/info.json", info);
+        await Deno.writeTextFile(join(partial, base, "info.json"), JSON.stringify(info, null, 2) + "\n");
         const f = input.checks.projects.find((f: any) => f.exerciseId === q.id);
-        if(!f?.check)continue;
+        if (f?.check) {
         for (
           const s of await selectedSources(
             resolve(input.projectRoot, f.projectRoot),
@@ -364,10 +394,29 @@ export async function exportCourse(
             input.registry.profiles[f.check.runtime],
           )
         ) {
-          const path = join(stage, base, "serverFilesQuestion/starter", s.name);
+          const path = join(partial, base, "serverFilesQuestion/starter", s.name);
           await Deno.mkdir(dirname(path), { recursive: true });
           await Deno.writeFile(path, s.data);
         }
+        }
+        const nativeFiles = await inventory(join(partial, base));
+        const resourceBindings = [...new Map<string, any>(p.resources
+          .filter((resource: any) => Object.hasOwn(nativeFiles, "clientFilesQuestion/" + resource.target))
+          .map((resource: any) => [resource.target, resource] as [string, any])).values()]
+          .sort((left: any, right: any) => left.target.localeCompare(right.target));
+        const snapshot = canonical({question: q, binding: binding.questions[q.id],
+          grading: questions[q.key], resourceBindings});
+        if (await exists(join(stage, base))) {
+          if (questionSnapshots.get(q.key) !== snapshot ||
+              canonical(await inventory(join(stage, base))) !== canonical(nativeFiles)) {
+            throw Error("PL конфликт повторного вопроса: " + q.key);
+          }
+        } else {
+          questionSnapshots.set(q.key, snapshot);
+          await Deno.rename(join(partial, base), await parent(join(stage, base)));
+        }
+        await write(base + "/info.json", info);
+
       }
       const policy = work.extensions.prairielearn;
       const completion = completionPolicy(input.courseId, work);
