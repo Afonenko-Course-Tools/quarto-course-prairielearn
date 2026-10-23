@@ -41,13 +41,13 @@ jobs:
           repository: Afonenko-Course-Tools/quarto-course
           # Точный локальный Core candidate 8.2.2; тот же commit используется обоими CI jobs.
           # Commit не означает существование release tag.
-          ref: bdf63e40348d7d6f9be5958565260e32c22384ec
+          ref: 7c9388cb4d982caf66657ea8f96c09243d64a147
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "bdf63e40348d7d6f9be5958565260e32c22384ec"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "7c9388cb4d982caf66657ea8f96c09243d64a147"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -105,13 +105,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: bdf63e40348d7d6f9be5958565260e32c22384ec
+          ref: 7c9388cb4d982caf66657ea8f96c09243d64a147
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "bdf63e40348d7d6f9be5958565260e32c22384ec"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "7c9388cb4d982caf66657ea8f96c09243d64a147"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5

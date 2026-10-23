@@ -71,7 +71,7 @@ function M.vet(value, definition, context)
     end
   end)
 end
--- Закрытый enrollment descriptor Core bdf63e40348d7d6f9be5958565260e32c22384ec.
+-- Закрытый enrollment descriptor Core 7c9388cb4d982caf66657ea8f96c09243d64a147.
 -- SHA1 связывает bytes на этой границе; SHA256/identity/currentness проверяет Core.
 local function exact(value, required, optional)
   if type(value)~='table' then return false end

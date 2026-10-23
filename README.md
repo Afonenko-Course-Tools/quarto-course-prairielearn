@@ -278,7 +278,7 @@ registry/image и реальные build/archive/install/course proofs прин�
 отдельно; unit fixture digest не является опубликованным OCI pin. Старые
 Core/Exporter 8.0.0 и immutable assets не меняются.
 
-Точная source dependency Core-кандидата: `bdf63e40348d7d6f9be5958565260e32c22384ec`.
+Точная source dependency Core-кандидата: `7c9388cb4d982caf66657ea8f96c09243d64a147`.
 Оба CI jobs закрепляют этот commit; hosted exact-head CI ещё должен выполниться
 после отдельного разрешённого push. Локальная установка не подтверждает published tag.
 
