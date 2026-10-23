@@ -17,8 +17,8 @@ updated: 2026-10-22
 | --- | --- | --- | --- | --- |
 | [PrairieLearn: действующий контракт](../docs/authoring.md) | specification | course-prairielearn | current | native/CUE binding и selected participant delivery; client/tests/reference |
 | [Диагностика](../docs/diagnostics.md) | reference | course-prairielearn | current | Собственные ID и внешние причины этого адаптера |
-| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/3e552617afad5605c5ee12586b93d60096d5f0ca/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
-| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/3e552617afad5605c5ee12586b93d60096d5f0ca/spec/index.md) | specification/index | course-core | current | Банк, условия, решения и назначения |
+| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/bdf63e40348d7d6f9be5958565260e32c22384ec/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
+| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/bdf63e40348d7d6f9be5958565260e32c22384ec/spec/index.md) | specification/index | course-core | current | Банк, условия, решения и назначения |
 
 Банк и назначения принадлежат текущему Core; этот адаптер проверяет свой вход
 на собственной границе. Неизменяемые выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases).
@@ -64,5 +64,5 @@ witness; SHA256, filesystem identity и currentness проверяет Core до
 поведение сохраняется; публичных author flags и новых delivery schemas нет.
 
 Installed regression закрепляет Core-кандидат 8.2.2
-`3e552617afad5605c5ee12586b93d60096d5f0ca`. Локальные проверки и этот
+`bdf63e40348d7d6f9be5958565260e32c22384ec`. Локальные проверки и этот
 ref не подтверждают публикацию выпуска.

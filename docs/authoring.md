@@ -7,7 +7,7 @@ updated: 2026-10-22
 
 # Спецификация заданий и контрольных работ
 
-Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/3e552617afad5605c5ee12586b93d60096d5f0ca/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
+Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/bdf63e40348d7d6f9be5958565260e32c22384ec/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
@@ -490,6 +490,6 @@ Platform; source candidate не доказывает archive/image/runtime/cours
 сохраняется. Mixed по-прежнему имеет native External и отдельные auto/manual
 компоненты; manual не получает фиктивных tests/runtime.
 
-Core8.1 API, Bodyv2, deliveryv3, public resultsv2 и pin CI Core0a44 сохранены.
+Bodyv2, deliveryv3 и public resultsv2 сохранены. Exact Core-кандидат закреплён в CI.
 Новый whole-course capture/export, доступ Student, Moodle учёт и публикация
 кандидата8.2.1 — отдельные последующие проверки.

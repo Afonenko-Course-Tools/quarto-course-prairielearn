@@ -187,7 +187,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует exporter-кандидат `8.2.1` и Core-кандидат `8.1.0`, Quarto 1.11.5
+Контракт этого ref использует exporter-кандидат `8.2.1` и Core-кандидат `8.2.2`, Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
 `statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
@@ -278,7 +278,7 @@ registry/image и реальные build/archive/install/course proofs прин�
 отдельно; unit fixture digest не является опубликованным OCI pin. Старые
 Core/Exporter 8.0.0 и immutable assets не меняются.
 
-Точная опубликованная source dependency Core: `3e552617afad5605c5ee12586b93d60096d5f0ca`.
+Точная source dependency Core-кандидата: `bdf63e40348d7d6f9be5958565260e32c22384ec`.
 Оба CI jobs закрепляют этот commit; hosted exact-head CI ещё должен выполниться
 после отдельного разрешённого push. Локальная установка не подтверждает published tag.
 

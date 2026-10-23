@@ -4,7 +4,7 @@ const repo=dirname(dirname(fileURLToPath(import.meta.url)));
 const [coreArg,qrcArg,siteArg]=Deno.args;
 if(!coreArg||!qrcArg||!siteArg)throw Error('native-overlay.ts CORE QRC SITE');
 const core=resolve(coreArg),qrc=resolve(qrcArg),site=resolve(siteArg);
-const corePin='3e552617afad5605c5ee12586b93d60096d5f0ca';
+const corePin='bdf63e40348d7d6f9be5958565260e32c22384ec';
 const assert=(v:unknown,m:string)=>{if(!v)throw Error(m)};
 const pin=await new Deno.Command('git',{args:['-C',core,'rev-parse','HEAD'],stdout:'piped'}).output();
 assert(pin.success&&new TextDecoder().decode(pin.stdout).trim()===corePin,'Требуется точный Core candidate');
