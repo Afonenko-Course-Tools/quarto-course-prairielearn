@@ -71,6 +71,69 @@ function M.vet(value, definition, context)
     end
   end)
 end
+-- Закрытый enrollment descriptor Core 7c9388cb4d982caf66657ea8f96c09243d64a147.
+-- SHA1 связывает bytes на этой границе; SHA256/identity/currentness проверяет Core.
+local function exact(value, required, optional)
+  if type(value)~='table' then return false end
+  local allowed={}
+  for _,key in ipairs(required) do allowed[key]=true;if value[key]==nil then return false end end
+  for _,key in ipairs(optional or {}) do allowed[key]=true end
+  for key,_ in pairs(value) do if not allowed[key] then return false end end
+  return true
+end
+local function hex(value,size)
+  return type(value)=='string' and #value==size and value:match('^[0-9a-f]+$')~=nil
+end
+local function hashes(value)
+  return exact(value,{'sha1','sha256'}) and hex(value.sha1,40) and hex(value.sha256,64)
+end
+local function overlay(value)
+  return exact(value,{'kind','sourceContext'}) and value.kind=='owned-config-overlay-v1' and hashes(value.sourceContext)
+end
+local function ref(value,name)
+  return exact(value,{'file','sha1','sha256'}) and value.file==name and hex(value.sha1,40) and hex(value.sha256,64)
+end
+local function strings(value,nonempty)
+  if type(value)~='table' or (nonempty and #value==0) then return false end
+  for key,item in pairs(value) do if type(key)~='number' or key%1~=0 or key<1 or key>#value or type(item)~='string' then return false end end
+  return true
+end
+local function same(a,b)
+  if type(a)~=type(b) then return false end
+  if type(a)~='table' then return a==b end
+  for k,v in pairs(a) do if not same(v,b[k]) then return false end end
+  for k,_ in pairs(b) do if a[k]==nil then return false end end
+  return true
+end
+local function owned_enrollment(run,doc,root,profiles,source)
+  local function check(ok,field)
+    assert(ok,diagnostics.message('PL.NATIVE_INVALID','Неверный active owned overlay',{source=source,field=field}))
+  end
+  check(exact(run,{'schema','directory','projectRoot','profiles','outputDirectory','renderAll','configurationHashes','commonPathBinding','ownedConfigOverlay','overlayState'},{'initialInputFiles'}),'active-native-run')
+  check(run.overlayState=='active' and overlay(run.ownedConfigOverlay),'active-native-run.ownedConfigOverlay')
+  check(type(run.outputDirectory)=='string' and type(run.renderAll)=='boolean' and type(run.configurationHashes)=='table' and (run.initialInputFiles==nil or strings(run.initialInputFiles,false)),'active-native-run')
+  check(strings(run.profiles,true) and #profiles==1 and type(profiles[1])=='string' and profiles[1]:match('^course%-export%-%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$')~=nil,'active-native-run.profiles')
+  check(FORMAT=='json' and doc.meta.course.view and pandoc.utils.stringify(doc.meta.course.view)=='full' and doc.meta['course-export-context']==true and doc.meta['course-current-native-run']==true,'course-current-native-run')
+  local prefix=root..'/_generated/course-spec/native-runs/'
+  check(type(run.directory)=='string' and run.directory:sub(1,#prefix)==prefix and run.directory:sub(#prefix+1):match('^[%w%-]+$')~=nil,'active-native-run.directory')
+  for _,name in ipairs(pandoc.system.list_directory(run.directory)) do
+    check(name~='native-run.json' and name~='owned-export-restored-entry.json','active-native-run.overlayState')
+  end
+  local function bytes(name)
+    local f=io.open(run.directory..'/'..name,'rb');check(f~=nil,name)
+    local result=f:read('*a');f:close();return result
+  end
+  check(ref(run.commonPathBinding,'common-files-path-binding.json'),'active-native-run.commonPathBinding')
+  local raw=bytes('common-files-path-binding.json')
+  check(pandoc.utils.sha1(raw)==run.commonPathBinding.sha1,'commonPathBinding.sha1')
+  local ok,w=pcall(pandoc.json.decode,raw);check(ok and type(w)=='table','commonPathBinding')
+  check(exact(w,{'schema','projectRoot','runDirectory','profiles','outputDirectory','renderAll','quartoVersion','ownerInspectionHash','documentInspectionHashes','configurationInputs','inputFiles','sourceHashes','commonSourceHashes','canonicalOwnerDeclarations','documents','nativeExtensionMetadata','metadataClosure','sourceIdentities','ownedConfigOverlay','sourceInspectionRefs'},{'temporaryExportProfile','forcedWriter'}),'commonPathBinding')
+  check(w.schema=='course-common-files-path-binding-v2' and overlay(w.ownedConfigOverlay) and same(w.ownedConfigOverlay,run.ownedConfigOverlay) and strings(w.sourceInspectionRefs,true),'commonPathBinding.ownedConfigOverlay')
+  check(w.projectRoot==root and w.runDirectory==run.directory and same(w.profiles,run.profiles) and w.outputDirectory==run.outputDirectory and w.renderAll==run.renderAll,'commonPathBinding.runDirectory')
+  local t=w.temporaryExportProfile
+  check(exact(w.forcedWriter,{'kind'}) and w.forcedWriter.kind=='owned-export-json' and exact(t,{'profile','file','sha1','sha256'}) and t.profile==profiles[1] and t.file=='_quarto-'..profiles[1]..'.yml' and hex(t.sha1,40) and hex(t.sha256,64),'commonPathBinding.temporaryExportProfile')
+  check(pandoc.utils.sha1(bytes('owned-export-source-context.json'))==run.ownedConfigOverlay.sourceContext.sha1,'ownedConfigOverlay.sourceContext.sha1')
+end
 function M.write(doc, value)
   local root = assert(quarto.project.directory)
   local profiles = pandoc.List()
@@ -93,7 +156,8 @@ function M.write(doc, value)
   local pointer = io.open(root .. "/_generated/course-spec/active-native-run.json", "r")
   if pointer then
     local run = pandoc.json.decode(pointer:read("*a")); pointer:close()
-    assert(run.schema == "course-native-run-pointer-v2" and run.projectRoot == root, diagnostics.message("PL.NATIVE_INVALID", "Неверный указатель native-сборки", {source = value.source, field = "active-native-run"}))
+    assert((run.schema == "course-native-run-pointer-v2" or run.schema == "course-native-run-pointer-v3") and run.projectRoot == root, diagnostics.message("PL.NATIVE_INVALID", "Неверный указатель native-сборки", {source = value.source, field = "active-native-run"}))
+    if run.schema == "course-native-run-pointer-v3" then owned_enrollment(run,doc,root,profiles,value.source) end
     assert(pandoc.path.directory(run.directory) == root .. "/_generated/course-spec/native-runs", diagnostics.message("PL.NATIVE_INVALID", "Неверный каталог native-сборки", {source = value.source, field = "active-native-run.directory"}))
     assert(pandoc.json.encode(run.profiles) == pandoc.json.encode(profiles), diagnostics.message("PL.NATIVE_INVALID", "Профили адаптера расходятся с native-сборкой", {source = value.source, field = "active-native-run.profiles"}))
     local folder = run.directory .. "/adapters/" .. contract.name

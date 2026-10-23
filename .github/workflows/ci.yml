@@ -39,15 +39,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          # Точный локальный Core candidate 8.1.0; тот же commit используется обоими CI jobs.
+          # Точный локальный Core candidate 8.2.2; тот же commit используется обоими CI jobs.
           # Commit не означает существование release tag.
-          ref: 0a44ba5746b93731ee6fdf6486b923c36e5578f9
+          ref: 7c9388cb4d982caf66657ea8f96c09243d64a147
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "0a44ba5746b93731ee6fdf6486b923c36e5578f9"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "7c9388cb4d982caf66657ea8f96c09243d64a147"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -56,6 +56,22 @@ jobs:
           version: v0.17.1
       - name: Проверка единого словаря контракта
         run: quarto run tools/sync-contract.ts --check
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-reference-catalog
+          ref: 3df2110e9f525f03f3ecb4926b5d55718e955c4c
+          path: .ci-deps/qrc
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-project-publish
+          ref: d03b6054a298310dedc041e852a73a9d4815709d
+          path: .ci-deps/site
+          persist-credentials: false
+      - name: Закрытый writer enrollment
+        run: EXPORTER_EXTENSION="$PWD/_extensions/course-prairielearn" quarto pandoc /dev/null --from markdown --to json --lua-filter tests/native-overlay.lua
+      - name: Installed owned overlay и grading export
+        run: timeout --signal=TERM --kill-after=15s 1200s quarto run tests/native-overlay.ts .ci-deps/core .ci-deps/qrc .ci-deps/site
       - run: quarto run tests/native-model.ts .ci-deps/core
       - run: quarto run tests/native-pointer.ts .ci-deps/core
       - run: quarto run tests/native-manual.ts .ci-deps/core
@@ -89,13 +105,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: 0a44ba5746b93731ee6fdf6486b923c36e5578f9
+          ref: 7c9388cb4d982caf66657ea8f96c09243d64a147
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "0a44ba5746b93731ee6fdf6486b923c36e5578f9"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "7c9388cb4d982caf66657ea8f96c09243d64a147"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5
