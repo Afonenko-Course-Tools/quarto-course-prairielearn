@@ -64,7 +64,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          repository: Afonenko-Course-Tools/quarto-course-site
+          repository: Afonenko-Course-Tools/quarto-project-publish
           ref: d03b6054a298310dedc041e852a73a9d4815709d
           path: .ci-deps/site
           persist-credentials: false
