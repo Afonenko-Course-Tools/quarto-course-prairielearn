@@ -7,11 +7,11 @@ updated: 2026-10-22
 
 # Спецификация заданий и контрольных работ
 
-Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0a44ba5746b93731ee6fdf6486b923c36e5578f9/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
+Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/3e552617afad5605c5ee12586b93d60096d5f0ca/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
-переключения версий схемы. Контракты этого ref: адаптер-кандидат8.2.0 и опубликованный Core8.1.0, delivery v3, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
+переключения версий схемы. Контракты этого ref: адаптер-кандидат8.2.1 и Core-кандидат8.2.2, delivery v3, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
 Канонические `#exr-*` имеют уникальные ID внутри явной области
 `exercise-bank: true`, собственные обязательные `difficulty` и положительное
 целое `time`. Эффективная `statement-visibility` берётся из атрибута задачи либо
@@ -449,7 +449,7 @@ Selected Body v2 передаёт вопросу читаемый `title`, не�
 
 ## Закрытый native Gradle build record
 
-В Core 8.1.0 `java-build` содержит ровно `kind: gradle-jar-v1`, `main-class`
+В Core 8.2.2 `java-build` содержит ровно `kind: gradle-jar-v1`, `main-class`
 и `artifact`. Имя класса соответствует
 `^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$`, имя JAR —
 `^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.jar$` (до105 ASCII bytes).
@@ -464,7 +464,7 @@ selected byte hashes и API/extras boundary сохраняются. Student Grad
 Descriptor остаётся schemaVersion1. Рецепт и реальная сборка принадлежат
 Platform; source candidate не доказывает archive/image/runtime/course readiness.
 
-## Reference-only work и публичный контекст меню (кандидат8.2.0)
+## Reference-only work и публичный контекст меню (кандидат8.2.1)
 
 Обычная работа `sec-unit-<суффикс exr>` содержит ровно один fixed slot с
 `id: exr-<суффикс>`, одним таким же candidate и required local assignment.
@@ -492,4 +492,4 @@ Platform; source candidate не доказывает archive/image/runtime/cours
 
 Core8.1 API, Bodyv2, deliveryv3, public resultsv2 и pin CI Core0a44 сохранены.
 Новый whole-course capture/export, доступ Student, Moodle учёт и публикация
-кандидата8.2.0 — отдельные последующие проверки.
+кандидата8.2.1 — отдельные последующие проверки.

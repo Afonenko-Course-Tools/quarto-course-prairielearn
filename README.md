@@ -17,7 +17,7 @@ updated: 2026-10-22
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Кандидат выпуска этого ref — **8.2.0**, согласованный с Core **8.1.0**.
+Кандидат выпуска этого ref — **8.2.1**, согласованный с Core **8.2.2**.
 Предыдущие Core 7.2.0 и exporter 7.1.0 опубликованы. Core 7.2.0 собирает факты API-предпроверки
 и политики дополнительных Java-исходников, которые переносит этот exporter.
 Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
@@ -33,11 +33,11 @@ quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 Выпущенные версии устанавливайте по неизменяемым тегам после их публикации:
 
 ```sh
-quarto add Afonenko-Course-Tools/quarto-course@v8.1.0 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.1.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v8.2.2 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.2.1 --no-prompt
 ```
 
-Candidate матрица задаёт Core 8.1.0 и exporter-кандидат 8.2.0: delivery v3, Body v2 и public results v2.
+Candidate матрица задаёт Core 8.2.2 и exporter-кандидат 8.2.1: delivery v3, Body v2 и public results v2.
 Platform/Gateway требуют отдельной проверки exact source/digest/interface; прежние
 service releases не объявляются совместимыми. Наличие тегов проверяется у владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
@@ -187,7 +187,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует exporter-кандидат `8.2.0` и опубликованный Core `8.1.0`, Quarto 1.11.5
+Контракт этого ref использует exporter-кандидат `8.2.1` и Core-кандидат `8.1.0`, Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
 `statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
@@ -246,17 +246,17 @@ Counters обходов не являются числом посещённых 
 Core 8.0.0 и exporter 8.0.0 вместе по точным неизменяемым тегам. Стабильные UUID
 сохраняются; delivery v3 требует согласованного reader.
 
-## Подготовка кандидата 8.2.0
+## Подготовка кандидата 8.2.1
 
 Delivery v3 описывает `external`/`manual`/`mixed` и `selection=choice`. Полностью ручная
 задача не получает фиктивную автоматическую оценку; `mixed` сохраняет реальные
 автоматический и преподавательский компоненты. Студенческие ресурсы и текущий закрытый pointer проверяются
-совместимым Core 8.1.0. Закрытые материалы не входят в student ZIP/site.
+совместимым Core 8.2.2. Закрытые материалы не входят в student ZIP/site.
 Body остаётся `course-body-package-v2`, public results projection — v2.
 
 Обе задачи CI закрепляют один полный Core commit, без переопределения repository variable.
 Экспортёр использует готовый Core inventory и не требует Download assembler.
-До отдельной публикации `v8.2.0` это кандидат исходников; готовность курса и native service проверяется отдельно.
+До отдельной публикации `v8.2.1` это кандидат исходников; готовность курса и native service проверяется отдельно.
 
 ## Исторический выпуск совместимости 7.1.1
 
@@ -273,16 +273,16 @@ kind равен `gradle-jar-v1`. Запрещены unknown fields, другой
 готовый JAR и student public tests не входят в native payload. API-precheck и
 optional дополнительные Java sources сохраняют собственные границы.
 
-Это локальный source candidate с Core 8.1.0. Полный Platform candidate, exact
+Это локальный source candidate с Core 8.2.2. Полный Platform candidate, exact
 registry/image и реальные build/archive/install/course proofs принимаются
 отдельно; unit fixture digest не является опубликованным OCI pin. Старые
 Core/Exporter 8.0.0 и immutable assets не меняются.
 
-Точная опубликованная source dependency Core: `0a44ba5746b93731ee6fdf6486b923c36e5578f9`.
+Точная опубликованная source dependency Core: `3e552617afad5605c5ee12586b93d60096d5f0ca`.
 Оба CI jobs закрепляют этот commit; hosted exact-head CI ещё должен выполниться
 после отдельного разрешённого push. Локальная установка не подтверждает published tag.
 
-## Контекст меню и строгая дедупликация в кандидате8.2.0
+## Контекст меню и строгая дедупликация в кандидате8.2.1
 
 Reference-only `sec-unit-*` использует одну исходную задачу и добавляет
 публичное введение исходных optional меню через прежний Body renderer.
