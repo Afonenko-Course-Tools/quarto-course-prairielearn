@@ -39,8 +39,14 @@ if (flags["--candidate-image"]) {
       "--format",
       "{{.Id}}",
     ],
-    env: metrics.childEnv(Deno.env.toObject()),
-    clearEnv: true,
+    ...(() => {
+      const baseEnv = {};
+      const env = metrics.childEnv(baseEnv);
+      return env === baseEnv ? { env } : {
+        env: metrics.childEnv(Deno.env.toObject()),
+        clearEnv: true,
+      };
+    })(),
     stdout: "piped",
     stderr: "piped",
   }).output();
@@ -51,8 +57,14 @@ if (flags["--candidate-image"]) {
 }
 const inspected = await new Deno.Command(Deno.env.get("QUARTO") ?? "quarto", {
   args: ["inspect", resolve(root, book)],
-  env: metrics.childEnv(Deno.env.toObject()),
-  clearEnv: true,
+  ...(() => {
+    const baseEnv = {};
+    const env = metrics.childEnv(baseEnv);
+    return env === baseEnv ? { env } : {
+      env: metrics.childEnv(Deno.env.toObject()),
+      clearEnv: true,
+    };
+  })(),
   stdout: "piped",
   stderr: "piped",
 }).output();
