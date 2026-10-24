@@ -1,3 +1,5 @@
+import { createMetrics } from "../observability/bridge.ts";
+const metrics = createMetrics("course-prairielearn");
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { exportCourse } from "../application/export-course.ts";
@@ -37,6 +39,8 @@ if (flags["--candidate-image"]) {
       "--format",
       "{{.Id}}",
     ],
+    env: metrics.childEnv(Deno.env.toObject()),
+    clearEnv: true,
     stdout: "piped",
     stderr: "piped",
   }).output();
@@ -47,6 +51,8 @@ if (flags["--candidate-image"]) {
 }
 const inspected = await new Deno.Command(Deno.env.get("QUARTO") ?? "quarto", {
   args: ["inspect", resolve(root, book)],
+  env: metrics.childEnv(Deno.env.toObject()),
+  clearEnv: true,
   stdout: "piped",
   stderr: "piped",
 }).output();
