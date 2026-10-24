@@ -63,19 +63,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: 867c198022a587e9e2b5716ad4ca151e6317cae5 # QRC 3.1.1: точный кандидат
+          ref: b20d8934168e808cdb333e58179fbcd25e47bea8 # QRC 3.1.1: точный кандидат
           path: .ci-deps/qrc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-publish
-          ref: 9a23c6ba30f0fda27eee8ae7c39e8ac2796fbdfd # Site 5.1.4: точный кандидат
+          ref: b12a568511fa22cef27bfed1b261566e5d8bc42e # Site 5.1.4: точный кандидат
           path: .ci-deps/site
           persist-credentials: false
       - name: Проверить закреплённые QRC и Site
         run: |
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "867c198022a587e9e2b5716ad4ca151e6317cae5"
-          test "$(git -C .ci-deps/site rev-parse HEAD)" = "9a23c6ba30f0fda27eee8ae7c39e8ac2796fbdfd"
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "b20d8934168e808cdb333e58179fbcd25e47bea8"
+          test "$(git -C .ci-deps/site rev-parse HEAD)" = "b12a568511fa22cef27bfed1b261566e5d8bc42e"
       - name: Закрытый writer enrollment
         run: EXPORTER_EXTENSION="$PWD/_extensions/course-prairielearn" quarto pandoc /dev/null --from markdown --to json --lua-filter tests/native-overlay.lua
       - name: Installed owned overlay и grading export
