@@ -30,6 +30,14 @@ const root = await Deno.realPath(rootArg), book = flags["--book"] ?? "tasks";
 const registryPath = flags["--runtime-registry"] ??
   Deno.env.get("PRAIRIELEARN_RUNTIME_REGISTRY") ??
   join(root, "prairielearn/runtime-profiles.json");
+function childEnvironmentOptions() {
+  const baseEnv = {};
+  const env = metrics.childEnv(baseEnv);
+  return env === baseEnv ? { env } : {
+    env: metrics.childEnv(Deno.env.toObject()),
+    clearEnv: true,
+  };
+}
 if (flags["--candidate-image"]) {
   const found = await new Deno.Command("docker", {
     args: [
@@ -39,14 +47,7 @@ if (flags["--candidate-image"]) {
       "--format",
       "{{.Id}}",
     ],
-    ...(() => {
-      const baseEnv = {};
-      const env = metrics.childEnv(baseEnv);
-      return env === baseEnv ? { env } : {
-        env: metrics.childEnv(Deno.env.toObject()),
-        clearEnv: true,
-      };
-    })(),
+    ...childEnvironmentOptions(),
     stdout: "piped",
     stderr: "piped",
   }).output();
@@ -57,14 +58,7 @@ if (flags["--candidate-image"]) {
 }
 const inspected = await new Deno.Command(Deno.env.get("QUARTO") ?? "quarto", {
   args: ["inspect", resolve(root, book)],
-  ...(() => {
-    const baseEnv = {};
-    const env = metrics.childEnv(baseEnv);
-    return env === baseEnv ? { env } : {
-      env: metrics.childEnv(Deno.env.toObject()),
-      clearEnv: true,
-    };
-  })(),
+  ...childEnvironmentOptions(),
   stdout: "piped",
   stderr: "piped",
 }).output();
