@@ -493,3 +493,36 @@ Platform; source candidate не доказывает archive/image/runtime/cours
 Bodyv2, deliveryv3 и public resultsv2 сохранены. Exact Core-кандидат закреплён в CI.
 Новый whole-course capture/export, доступ Student, Moodle учёт и публикация
 кандидата8.2.1 — отдельные последующие проверки.
+
+## Явные conditions ZIP принятой публикации
+
+Опциональный CLI-параметр `--publication-conditions /absolute/manifest.json`
+подключает целые архивы уже принятой публикации. Это отдельные внешние зависимости,
+не Core student materialization и не содержимое `starter.zip`. Без параметра
+сохраняется прежний экспорт. Core по-прежнему удаляет contextual Download links
+из публичного Body; адаптер добавляет только явно разрешённые conditions archives.
+
+Manifest имеет схему `pl-publication-conditions-v1` и точные поля:
+
+- `courseId` — текущий курс;
+- `source: {repository, commit, book}` — текущий public Git source; в private stage
+  это `publicBase` принятого staging receipt;
+- `publication: {repository, commit, receipt: {path, bytes, sha256}}` — источник
+  исторической публикации и внешнее принятое свидетельство;
+- `archives` — записи `{questionId, source, sourceSha256, file: {path, bytes, sha256}}`.
+  `source` задаёт owner-relative QMD текущего вопроса, `file` — полный исходный ZIP.
+
+Набор записей должен точно совпадать с conditions requests выбранных упражнений
+в исходном native AST, до публичной Core partition. Foreign/duplicate/missing
+IDs, несоответствие source/hash, symlink/hardlink/alias, небезопасный путь,
+collision client target и изменение входов до публикации означают отказ.
+Внешние зависимости читаются на границах операции, не в цикле вопросов.
+Адаптер не создаёт HTML или ZIP и не объявляет исторические архивы новым capture.
+
+Точные bytes копируются в `clientFilesQuestion/<ID>-conditions.zip`; вопрос
+получает ссылку «Скачать условие для локального просмотра» через обычный PL
+client-files URL. Файлы и HTML входят в стандартные inventory/delivery hash.
+Схемы delivery и provenance не меняются: manifest и исходная публикация связаны
+sealed caller inputs, pre/post checks и JSON dependency receipt в CLI stdout,
+сохраняемом внешним исполнителем. Само наличие manifest не доказывает допустимость
+старого Site: публикацию и её ZIP заранее принимает внешний владелец evidence.

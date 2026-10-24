@@ -15,6 +15,7 @@ for (let i = 0; i < options.length; i += 2) {
       "--book",
       "--candidate-image",
       "--staging-receipt",
+      "--publication-conditions",
     ].includes(options[i]) || !options[i + 1] || flags[options[i]]
   ) throw new Error("PL unknown or duplicate CLI option");
   flags[options[i]] = options[i + 1];
@@ -86,8 +87,9 @@ const { buildBodies } = await import(
 const collected = await collectNativeModel(root, { book });
 const checks = await collectProjectChecks(root, { book }, collected);
 let studentArtifact:undefined|((fact:any)=>Promise<{files:{name:string;bytes:Uint8Array}[];archive:Uint8Array}>);
+let receipt:any;
 if(flags['--staging-receipt']){
-  const receipt=JSON.parse(await Deno.readTextFile(flags['--staging-receipt']));
+  receipt=JSON.parse(await Deno.readTextFile(flags['--staging-receipt']));
   let download:string|undefined;
   for(const path of [join(root,book,'_extensions/project-download/domain/zip.ts'),join(root,book,'_extensions/Afonenko-Course-Tools/project-download/domain/zip.ts')]){
     try{if((await Deno.lstat(path)).isFile){download=path;break}}catch(error){if(!(error instanceof Deno.errors.NotFound))throw error}
@@ -95,6 +97,14 @@ if(flags['--staging-receipt']){
   if(!download)throw Error('PL private export требует установленный Download ZIP API');
   const {zip}=await import(pathToFileURL(download).href);
   studentArtifact=async(fact:any)=>{const files=await readMaterializedStudent(root,book,fact.projectRoot,receipt);return {files,archive:zip(files)}};
+}
+let publicationSource:any;
+if(flags['--publication-conditions']){
+  if(receipt)publicationSource=receipt.publicBase;
+  else{
+    const git=async(args:string[])=>{const p=await new Deno.Command('git',{args:['-C',root,...args],stdout:'piped',stderr:'piped'}).output();if(!p.success)throw Error('PL publication source Git authority required');return new TextDecoder().decode(p.stdout).trim()};
+    publicationSource={repository:await git(['remote','get-url','origin']),commit:await git(['rev-parse','HEAD']),book};
+  }
 }
 await exportCourse({
   courseId: collected.courseId,
@@ -107,6 +117,8 @@ await exportCourse({
   output,
   checksOutput: flags["--checks-output"],
   candidateImage: flags["--candidate-image"],
+  publicationConditions: flags["--publication-conditions"],
+  publicationSource,
   studentArtifact,
   body: async (work: string) =>
     (await buildBodies(collected.result, {
