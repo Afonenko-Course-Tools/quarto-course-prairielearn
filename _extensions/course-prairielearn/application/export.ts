@@ -566,7 +566,7 @@ export async function exportPrairieLearn(
       if(!Array.isArray(artifact.files)||!artifact.files.length||!(artifact.archive instanceof Uint8Array)||!artifact.archive.length)questionFail('Пустой комплект Core/Download','studentArtifact');
       for(const file of artifact.files){
         if(!safe(file.name)||!file.name.split('/').includes('.git')&&file.name.split('/').some(part=>['private','reference','solution','solutions','grading-notes','rubric.md','contract.md'].includes(part)))questionFail('Закрытый или небезопасный файл в student artifact','studentArtifact');
-        prepared.push({name:base+'/clientFilesQuestion/starter/'+file.name,data:file.bytes});
+        if(!file.name.split('/').includes('.git'))prepared.push({name:base+'/clientFilesQuestion/starter/'+file.name,data:file.bytes});
       }
       prepared.push({name:base+'/clientFilesQuestion/starter.zip',data:artifact.archive});
     }

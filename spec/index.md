@@ -2,7 +2,7 @@
 type: specification-index
 component: course-prairielearn
 status: current
-version: 8.2.3
+version: 8.2.4
 updated: 2026-10-22
 ---
 
@@ -33,18 +33,18 @@ Pinned official PrairieLearn JSON schemas and bundled offline Ajv validators are
 recorded in `spec/upstream/provenance.json`. The runner descriptor is Platform-owned,
 not a second author configuration or a private GradingJob.
 
-## Текущая совместимость кандидата 8.2.3
+## Текущая совместимость кандидата 8.2.4
 
-Кандидат Exporter 8.2.3 использует опубликованный Core 8.2.4 и delivery v3. Body v2 и public results v2
+Кандидат Exporter 8.2.4 использует опубликованный Core 8.2.4 и delivery v3. Body v2 и public results v2
 не переименовываются. Manual/mixed/choice требуют согласованного native reader;
 Platform/Gateway проверяются отдельно по exact source/digest, без заявления
 совместимости прежних service releases. Download — необязательный consumer
 готового Core inventory, не зависимость этого экспортёра.
 
 Новая линия основана на принятом 8.2.1 и не включает Performance 8.2.2.
-Оба полных hosted CI jobs закрепляют функциональный кандидат Core 8.2.5
-`58fc5c9cb39867f6c612922eec9af09713539ca4`. Его полный CI/review, публикация Core 8.2.5,
-Exporter 8.2.3 и готовность курса ещё не подтверждены. Это pin проверки CI;
+Оба полных hosted CI jobs закрепляют функциональный Core 8.2.5
+`58fc5c9cb39867f6c612922eec9af09713539ca4`. Exporter 8.2.4 ещё не опубликован;
+готовность курса проверяется отдельно. Это pin проверки CI;
 он не меняет уже принятые course/runtime pins Core 8.2.4.
 
 ## Историческая совместимость 7.1.1
