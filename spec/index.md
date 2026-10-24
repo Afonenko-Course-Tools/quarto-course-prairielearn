@@ -17,8 +17,8 @@ updated: 2026-10-24
 | --- | --- | --- | --- | --- |
 | [PrairieLearn: действующий контракт](../docs/authoring.md) | specification | course-prairielearn | current | native/CUE binding и selected participant delivery; client/tests/reference |
 | [Диагностика](../docs/diagnostics.md) | reference | course-prairielearn | current | Собственные ID и внешние причины этого адаптера |
-| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/dc3bd4d7d035359289fc13c44446947830defeb0/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
-| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/dc3bd4d7d035359289fc13c44446947830defeb0/spec/index.md) | specification/index | course-core | current | Банк, условия, решения и назначения |
+| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/9acab6d11afbdcbeefdabb15130068488e2f6dc0/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
+| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/9acab6d11afbdcbeefdabb15130068488e2f6dc0/spec/index.md) | specification/index | course-core | current | Банк, условия, решения и назначения |
 
 Банк и назначения принадлежат текущему Core; этот адаптер проверяет свой вход
 на собственной границе. Неизменяемые выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases).
@@ -67,7 +67,7 @@ witness; SHA256, filesystem identity и currentness проверяет Core до
 поведение сохраняется; публичных author flags и новых delivery schemas нет.
 
 Текущая installed regression закрепляет Core-кандидат 8.2.3
-`dc3bd4d7d035359289fc13c44446947830defeb0`. Локальные проверки и этот
+`9acab6d11afbdcbeefdabb15130068488e2f6dc0`. Локальные проверки и этот
 ref не подтверждают публикацию выпуска.
 
 ## Контекст наблюдения 8.2.2
@@ -77,7 +77,9 @@ ref не подтверждают публикацию выпуска.
 экспорт книги и пакетные команды не выбирают произвольный документ.
 Четыре границы дочерних процессов в export-course, inspect-grading и
 application/export используют полный снимок окружения через `childEnv` и
-`clearEnv: true`. Авторские схемы, Body v2 и delivery v3 сохраняются.
+`clearEnv: true` только при активном контексте агента. Identity/off/недоступный
+режим/отсутствующий агент сохраняют прежние scoped permissions и native
+inheritance без полного чтения env и `clearEnv`. Авторские схемы, Body v2 и delivery v3 сохраняются.
 Общий runtime и полное семантическое покрытие функций не вводятся.
 
 CI проверяет Core 8.2.3 с точным SHA выше, QRC 3.1.1 и Site 5.1.4 по закреплённым

@@ -248,13 +248,17 @@ Counters обходов не являются числом посещённых 
 дополнение не объявляет новое полное покрытие native Lua handlers или всех
 функций адаптера. Новый общий runtime не вводится.
 
-Четыре границы дочерних процессов получают полный снимок окружения через
-`childEnv` и `clearEnv: true`: Docker image inspect и Quarto inspect в
+Только при активном контексте агента четыре границы дочерних процессов получают
+полный снимок окружения через `childEnv` и `clearEnv: true`: Docker image inspect и Quarto inspect в
 `entrypoints/export-course.ts`, Quarto inspect в `entrypoints/inspect-grading.ts`
 и Pandoc в `application/export.ts`. Рабочие переменные сохраняются; удалённый
 устаревший `COURSE_PERF_PARENT_SPAN_ID` не наследуется повторно. Контекст
 родителя берётся из текущего активного span; существующая операция
 `course-prairielearn.application.export.command` сохраняет свою границу.
+При identity-ответе фасада (`off`, отсутствующий агент или недоступное чтение
+режима) сохраняются прежние scoped permissions и native inheritance без полного
+чтения env и `clearEnv`. `quarto run tests/performance-permissions.ts` проверяет
+этот маршрут отдельно от активного агента.
 Самодостаточная проверка `quarto run tests/performance-context.ts` не требует
 установки Performance; агент тестовой fixture не становится runtime зависимостью.
 
@@ -298,7 +302,7 @@ registry/image и реальные build/archive/install/course proofs прин�
 отдельно; unit fixture digest не является опубликованным OCI pin. Старые
 Core/Exporter 8.0.0 и immutable assets не меняются.
 
-Точная source dependency Core-кандидата: `dc3bd4d7d035359289fc13c44446947830defeb0`.
+Точная source dependency Core-кандидата: `9acab6d11afbdcbeefdabb15130068488e2f6dc0`.
 Оба CI jobs закрепляют этот commit; hosted exact-head CI ещё должен выполниться
 после отдельного разрешённого push. Локальная установка не подтверждает published tag.
 Companion-проверки закрепляют QRC 3.1.1 и Site 5.1.4 по точным commits в CI;
