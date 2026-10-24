@@ -104,8 +104,6 @@ export async function exportCourse(
     }
     return work;
   });
-  const selectedIds=new Set(works.flatMap((w:any)=>[...w.slots.flatMap((slot:any)=>slot.candidates),...(w.relatedExercise?[w.relatedExercise]:[])]));
-  const publicationConditions=input.publicationConditions?await loadPublicationConditions(input.publicationConditions,{courseId:input.courseId,projectRoot:input.projectRoot,source:input.publicationSource!,exercises:input.result.model.exercises.filter((e:any)=>selectedIds.has(e.id))}):undefined;
   const menuBodies = new Map<string, any>();
   const unitMenus = new Map<string, any[]>();
   for (const work of works) {
@@ -137,6 +135,8 @@ export async function exportCourse(
   const methods:Record<string,'external'|'manual'|'mixed'>={};
   for(const exercise of input.result.model.exercises)methods[exercise.id]=gradingMethod(exercise.extensions?.prairielearn?.grading??input.config['question-defaults'].grading).method;
   for (const work of works) validateGradingComponents(work,methods);
+  const selectedIds=input.publicationConditions?new Set(works.flatMap((w:any)=>[...(w.slots??[]).flatMap((slot:any)=>slot.candidates),...(w.relatedExercise?[w.relatedExercise]:[])])):undefined;
+  const publicationConditions=input.publicationConditions?await loadPublicationConditions(input.publicationConditions,{courseId:input.courseId,projectRoot:input.projectRoot,source:input.publicationSource!,exercises:input.result.model.exercises.filter((e:any)=>selectedIds!.has(e.id))}):undefined;
   const stage = await Deno.makeTempDir({
       dir: dirname(out),
       prefix: ".pl-course-",
