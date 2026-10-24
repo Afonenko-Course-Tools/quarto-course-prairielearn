@@ -1,3 +1,5 @@
+import { createMetrics } from "../observability/bridge.ts";
+const metrics = createMetrics("course-prairielearn");
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { declarations } from "../application/declarations.ts";
@@ -19,6 +21,14 @@ if (!rootArg || !flags["--instance"]) {
 const root = await Deno.realPath(rootArg), book = flags["--book"] ?? "tasks";
 const inspected = await new Deno.Command(Deno.env.get("QUARTO") ?? "quarto", {
   args: ["inspect", resolve(root, book)],
+  ...(() => {
+    const baseEnv = {};
+    const env = metrics.childEnv(baseEnv);
+    return env === baseEnv ? { env } : {
+      env: metrics.childEnv(Deno.env.toObject()),
+      clearEnv: true,
+    };
+  })(),
   stdout: "piped",
   stderr: "piped",
 }).output();

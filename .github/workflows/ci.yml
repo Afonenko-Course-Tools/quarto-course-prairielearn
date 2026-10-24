@@ -39,15 +39,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          # Точный локальный Core candidate 8.2.2; тот же commit используется обоими CI jobs.
+          # Точный Core-кандидат 8.2.3; тот же commit используется обеими задачами CI.
           # Commit не означает существование release tag.
-          ref: 7c9388cb4d982caf66657ea8f96c09243d64a147
+          ref: 9acab6d11afbdcbeefdabb15130068488e2f6dc0
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "7c9388cb4d982caf66657ea8f96c09243d64a147"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "9acab6d11afbdcbeefdabb15130068488e2f6dc0"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -56,18 +56,26 @@ jobs:
           version: v0.17.1
       - name: Проверка единого словаря контракта
         run: quarto run tools/sync-contract.ts --check
+      - name: Самодостаточная проверка контекста ABI 1
+        run: quarto run tests/performance-context.ts
+      - name: Прежние разрешения окружения без активного агента
+        run: quarto run tests/performance-permissions.ts
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: 3df2110e9f525f03f3ecb4926b5d55718e955c4c
+          ref: b20d8934168e808cdb333e58179fbcd25e47bea8 # QRC 3.1.1: точный кандидат
           path: .ci-deps/qrc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-publish
-          ref: d03b6054a298310dedc041e852a73a9d4815709d
+          ref: b12a568511fa22cef27bfed1b261566e5d8bc42e # Site 5.1.4: точный кандидат
           path: .ci-deps/site
           persist-credentials: false
+      - name: Проверить закреплённые QRC и Site
+        run: |
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "b20d8934168e808cdb333e58179fbcd25e47bea8"
+          test "$(git -C .ci-deps/site rev-parse HEAD)" = "b12a568511fa22cef27bfed1b261566e5d8bc42e"
       - name: Закрытый writer enrollment
         run: EXPORTER_EXTENSION="$PWD/_extensions/course-prairielearn" quarto pandoc /dev/null --from markdown --to json --lua-filter tests/native-overlay.lua
       - name: Installed owned overlay и grading export
@@ -105,13 +113,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: 7c9388cb4d982caf66657ea8f96c09243d64a147
+          ref: 9acab6d11afbdcbeefdabb15130068488e2f6dc0
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "7c9388cb4d982caf66657ea8f96c09243d64a147"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "9acab6d11afbdcbeefdabb15130068488e2f6dc0"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5

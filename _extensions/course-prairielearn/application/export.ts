@@ -60,7 +60,14 @@ async function command(
   try {
     child = new Deno.Command(tool, {
       args,
-      env: __metrics.childEnv({}),
+      ...(() => {
+        const baseEnv = {};
+        const env = __metrics.childEnv(baseEnv);
+        return env === baseEnv ? { env } : {
+          env: __metrics.childEnv(Deno.env.toObject()),
+          clearEnv: true,
+        };
+      })(),
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",
