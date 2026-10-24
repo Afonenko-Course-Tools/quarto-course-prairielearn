@@ -502,6 +502,17 @@ Bodyv2, deliveryv3 и public resultsv2 сохранены. Exact Core-канди
 сохраняется прежний экспорт. Core по-прежнему удаляет contextual Download links
 из публичного Body; адаптер добавляет только явно разрешённые conditions archives.
 
+Неизменённый host builder Platform 2.3.0 передаёт окружение настоящему
+установленному entrypoint. Для этого маршрута вместо CLI используется один
+явный `PRAIRIELEARN_PUBLICATION_CONDITIONS=/absolute/manifest.json`.
+CLI и ENV одновременно запрещены, даже с одинаковым значением; пустой или
+относительный путь отвергается. Если оба отсутствуют, прежний экспорт сохраняется.
+Один эффективный путь определяет ту же source authority (`stagingReceipt.publicBase`
+в private stage), проверки и JSON dependency receipt в stdout. Исполнитель должен
+закрепить exact ENV, manifest, публикационный receipt и whole ZIP в собственных
+sealed inputs; неявное ambient значение не является разрешением. Другая версия
+builder/runtime assembly или новые образы для этого transport не требуются.
+
 Manifest имеет схему `pl-publication-conditions-v1` и точные поля:
 
 - `courseId` — текущий курс;

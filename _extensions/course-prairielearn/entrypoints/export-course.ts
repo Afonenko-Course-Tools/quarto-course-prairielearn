@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { exportCourse } from "../application/export-course.ts";
 import { declarations } from "../application/declarations.ts";
@@ -20,6 +20,10 @@ for (let i = 0; i < options.length; i += 2) {
   ) throw new Error("PL unknown or duplicate CLI option");
   flags[options[i]] = options[i + 1];
 }
+const publicationEnvironment=Deno.env.get("PRAIRIELEARN_PUBLICATION_CONDITIONS");
+if(flags["--publication-conditions"]!==undefined&&publicationEnvironment!==undefined)throw Error("PL ambiguous publication conditions input: CLI and ENV");
+const publicationConditions=flags["--publication-conditions"]??publicationEnvironment;
+if(publicationConditions!==undefined&&!isAbsolute(publicationConditions))throw Error("PL publication conditions absolute path required");
 if (!rootArg || !output || !flags["--instance"] || !flags["--checks-output"]) {
   throw new Error(
     "Usage: export-course.ts COURSE_ROOT NATIVE --instance KEY --checks-output PATH [--runtime-registry PATH] [--book tasks]",
@@ -99,7 +103,7 @@ if(flags['--staging-receipt']){
   studentArtifact=async(fact:any)=>{const files=await readMaterializedStudent(root,book,fact.projectRoot,receipt);return {files,archive:zip(files)}};
 }
 let publicationSource:any;
-if(flags['--publication-conditions']){
+if(publicationConditions){
   if(receipt)publicationSource=receipt.publicBase;
   else{
     const git=async(args:string[])=>{const p=await new Deno.Command('git',{args:['-C',root,...args],stdout:'piped',stderr:'piped'}).output();if(!p.success)throw Error('PL publication source Git authority required');return new TextDecoder().decode(p.stdout).trim()};
@@ -117,7 +121,7 @@ await exportCourse({
   output,
   checksOutput: flags["--checks-output"],
   candidateImage: flags["--candidate-image"],
-  publicationConditions: flags["--publication-conditions"],
+  publicationConditions: publicationConditions,
   publicationSource,
   studentArtifact,
   body: async (work: string) =>
