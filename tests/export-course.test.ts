@@ -1005,3 +1005,29 @@ Deno.test("additional Java policy rejects present null/false and closed-field de
   assert(denied,"invalid present Java policy silently disabled: "+JSON.stringify(value));
  }
 });
+
+Deno.test("Дублированная защита отвергается раньше переданной неверной публикационной зависимости", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const config = {
+      delivery: {
+        book: "tasks",
+        course: { name: "JAVA", title: "Java", timezone: "Europe/Minsk", topics: [{ name: "Java", color: "blue2", description: "Java" }] },
+        instances: { pilot: { title: "Pilot", "self-enrollment": false, publishing: { "start-date": "1970-01-01T00:00:00Z", "end-date": "9999-12-31T00:00:00Z" }, works: ["sec-one", "sec-two"] } },
+      },
+      "question-defaults": { topic: "Java", submission: { mode: "editor" } },
+    };
+    const works = ["sec-one", "sec-two"].map((id) => ({ id, relatedExercise: "exr-essay", extensions: { prairielearn: {} } }));
+    let called = false, message = "";
+    try {
+      await exportCourse({
+        courseId: "demo", projectRoot: root, result: { model: { assessments: works } },
+        checks: {}, config, registry: {}, instance: "pilot", output: root + "/native", checksOutput: root + "/checks.json",
+        publicationConditions: root + "/nonexistent-conditions.json",
+        publicationSource: { repository: "invalid", commit: "invalid", book: "tasks" },
+        body: async () => { called = true; throw new Error("unexpected body"); },
+      });
+    } catch (e) { message = String(e); }
+    assert(message === "Error: PL duplicate active defense" && !called, "Опциональная зависимость скрыла duplicate defense до body");
+  } finally { await Deno.remove(root, { recursive: true }); }
+});
