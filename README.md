@@ -38,7 +38,7 @@ quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.2.2 --no-prompt
 ```
 
 Матрица кандидата задаёт Core 8.2.3 и экспортёр 8.2.2: API Core 8.1,
-delivery v3, Body v2 и public results v2. Сохранённое `core-version: 8.2.2`
+delivery v3, Body v2 и public results v2. Информационное `core-version: 8.2.3`
 в metadata descriptor не является выполняемой проверкой точного bundle или
 минимальной версии. [Граница API и проверяемого Core](docs/authoring.md#версия-api-и-проверяемый-core)
 разделяет эти сведения и точный companion CI.

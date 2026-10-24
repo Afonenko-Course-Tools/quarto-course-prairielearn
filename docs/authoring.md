@@ -23,7 +23,7 @@ updated: 2026-10-24
 ## Версия API и проверяемый Core
 
 Контракт API Core 8.1, Body v2 и delivery v3 сохраняется. Metadata descriptor
-адаптера по-прежнему содержит `core-version: 8.2.2`, а словарный `contract.json`
+адаптера указывает companion bundle `core-version: 8.2.3`, а словарный `contract.json`
 сохраняет API-декларацию `core_version: "8.1.0"`. Текущие native consumers
 не используют эти поля для проверки равенства bundle или минимальной версии:
 entrypoints загружают установленные публичные модули Core, а транспорт адаптера

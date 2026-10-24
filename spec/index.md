@@ -36,7 +36,7 @@ not a second author configuration or a private GradingJob.
 ## Текущая совместимость кандидата 8.2.2
 
 Кандидат Exporter 8.2.2 использует проверяемый Core-кандидат 8.2.3 с API Core 8.1
-и delivery v3. Сохранённое `core-version: 8.2.2` в metadata descriptor не
+и delivery v3. Информационное `core-version: 8.2.3` в metadata descriptor не
 используется как проверка равенства bundle или нижней границы версии; оно
 не заменяет точный companion SHA. Body v2 и public results v2
 не переименовываются. Manual/mixed/choice требуют согласованного native reader;

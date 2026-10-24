@@ -12,5 +12,5 @@ contributes:
       grading-inspection-entrypoint: entrypoints/inspect-grading.ts
       native-entrypoint: entrypoints/export-course.ts
       native-contract: course-native-delivery-v3
-      core-version: 8.2.2
+      core-version: 8.2.3
       activation: explicit-script-only
