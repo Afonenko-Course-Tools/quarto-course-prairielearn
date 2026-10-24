@@ -1,13 +1,15 @@
 // File/AST/producer unit fixtures; не NativeRun и не native qualification.
 import {join} from 'node:path';
 import {hash} from '../_extensions/course-prairielearn/application/source-selection.ts';
-const assert=(v:unknown,m='Проверка не выполнена')=>{if(!v)throw Error(m)};
+function assert(v:unknown,m='Проверка не выполнена'):asserts v {if(!v)throw Error(m)}
 const rejects=async(f:()=>Promise<unknown>)=>{let rejected=false;try{await f()}catch{rejected=true}assert(rejected,'Небезопасный вход принят')};
 const zip=Uint8Array.from(atob('UEsDBBQAAAAAACRtWF2/c6wWXgAAAF4AAAAKAAAAaW5kZXguaHRtbDwhZG9jdHlwZSBodG1sPjx0aXRsZT7Qo9GB0LvQvtCy0LjQtTwvdGl0bGU+PHA+0KHQuNC90YLQtdGC0LjRh9C10YHQutC40Lkg0LrQvtC80L/Qu9C10LrRgjwvcD5QSwECFAMUAAAAAAAkbVhdv3OsFl4AAABeAAAACgAAAAAAAAAAAAAAgAEAAAAAaW5kZXguaHRtbFBLBQYAAAAAAQABADgAAACGAAAAAAA='),c=>c.charCodeAt(0));
 const link=(id:string,kind='conditions')=>({t:'Link',c:[['',['project-download'],[['download','']]],[],['_downloads/'+id+'-'+kind+'.zip','']]});
+type FixtureExercise={id:string;source:string;body:{blocks:{t:string;c:ReturnType<typeof link>[]}[]}};
 async function fixture(){
  const root=await Deno.makeTempDir(),projectRoot=join(root,'tasks');await Deno.mkdir(join(projectRoot,'labs'),{recursive:true});
- const source={repository:'https://example.invalid/course.git',commit:'a'.repeat(40),book:'tasks'},exercises=[],archives=[];
+ const source={repository:'https://example.invalid/course.git',commit:'a'.repeat(40),book:'tasks'},archives=[];
+ const exercises:FixtureExercise[]=[];
  const proof=join(root,'accepted-publication.json');await Deno.writeTextFile(proof,'{"fixture":"accepted historical publication"}');
  const typed=async(path:string)=>{const bytes=await Deno.readFile(path);return {path,bytes:bytes.length,sha256:await hash(bytes)}};
  for(let n=0;n<7;n++){
@@ -23,7 +25,7 @@ async function fixture(){
 }
 Deno.test('семь whole ZIP и normal client links; без зависимости presentation отсутствует',async()=>{
  const f=await fixture();try{const deps=await f.load();const {publicationConditionFile}=await import('../_extensions/course-prairielearn/application/publication-conditions.ts');assert(deps.artifacts.size===7);
-  for(const e of f.exercises){const value=publicationConditionFile(e.id,deps.artifacts.get(e.id));assert(value.file.name===e.id+'-conditions.zip');assert(await hash(value.file.data)===await hash(zip));assert(value.html.includes('{{options.client_files_question_url}}/'+e.id+'-conditions.zip')&&value.html.includes('Скачать условие для локального просмотра'));assert(!value.html.includes(f.root));assert(publicationConditionFile(e.id,undefined)===undefined);}
+  for(const e of f.exercises){const value=publicationConditionFile(e.id,deps.artifacts.get(e.id));assert(value!==undefined);assert(value.file.name===e.id+'-conditions.zip');assert(await hash(value.file.data)===await hash(zip));assert(value.html.includes('{{options.client_files_question_url}}/'+e.id+'-conditions.zip')&&value.html.includes('Скачать условие для локального просмотра'));assert(!value.html.includes(f.root));assert(publicationConditionFile(e.id,undefined)===undefined);}
   assert(deps.provenance.manifestSha256===await hash(await Deno.readFile(f.path)));assert(!JSON.stringify(deps.provenance).includes(f.root));await deps.check();
  }finally{await Deno.remove(f.root,{recursive:true})}
 });
