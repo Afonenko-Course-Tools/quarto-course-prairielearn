@@ -2,16 +2,16 @@
 type: specification
 component: course-prairielearn
 status: current
-updated: 2026-10-22
+updated: 2026-10-24
 ---
 
 # Спецификация заданий и контрольных работ
 
-Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/7c9388cb4d982caf66657ea8f96c09243d64a147/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
+Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/dc3bd4d7d035359289fc13c44446947830defeb0/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
-переключения версий схемы. Контракты этого ref: адаптер-кандидат8.2.1 и Core-кандидат8.2.2, delivery v3, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
+переключения версий схемы. Контракты этого ref: адаптер-кандидат 8.2.2 и Core-кандидат 8.2.3, delivery v3, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
 Канонические `#exr-*` имеют уникальные ID внутри явной области
 `exercise-bank: true`, собственные обязательные `difficulty` и положительное
 целое `time`. Эффективная `statement-visibility` берётся из атрибута задачи либо
@@ -19,6 +19,21 @@ updated: 2026-10-22
 `course-role` необязателен. Native упражнения вне банка сохраняют обычные правила Quarto.
 `course.id` задаётся в корне курса и передаётся в контекст полного экспорта.
 Обычная нативная разметка не требует экспортных метаданных.
+
+## Версия API и проверяемый Core
+
+Контракт API Core 8.1, Body v2 и delivery v3 сохраняется. Metadata descriptor
+адаптера по-прежнему содержит `core-version: 8.2.2`, а словарный `contract.json`
+сохраняет API-декларацию `core_version: "8.1.0"`. Текущие native consumers
+не используют эти поля для проверки равенства bundle или минимальной версии:
+entrypoints загружают установленные публичные модули Core, а транспорт адаптера
+передаёт `name`, `rules` и `directory`. Из этих полей нельзя вывести проверенный
+диапазон поддерживаемых bundle.
+
+Для этого кандидата CI отдельно закрепляет Core 8.2.3:
+`dc3bd4d7d035359289fc13c44446947830defeb0`. Это проверяемый companion, а не
+автоматическое повышение API или объявление опубликованной совместимости.
+Нативная интеграция и поставка Java требуют собственных итоговых результатов.
 
 ## Область ответственности
 
@@ -449,7 +464,7 @@ Selected Body v2 передаёт вопросу читаемый `title`, не�
 
 ## Закрытый native Gradle build record
 
-В Core 8.2.2 `java-build` содержит ровно `kind: gradle-jar-v1`, `main-class`
+В Core 8.2.3 `java-build` содержит ровно `kind: gradle-jar-v1`, `main-class`
 и `artifact`. Имя класса соответствует
 `^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$`, имя JAR —
 `^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.jar$` (до105 ASCII bytes).
@@ -464,7 +479,7 @@ selected byte hashes и API/extras boundary сохраняются. Student Grad
 Descriptor остаётся schemaVersion1. Рецепт и реальная сборка принадлежат
 Platform; source candidate не доказывает archive/image/runtime/course readiness.
 
-## Reference-only work и публичный контекст меню (кандидат8.2.1)
+## Reference-only work и публичный контекст меню из 8.2.1
 
 Обычная работа `sec-unit-<суффикс exr>` содержит ровно один fixed slot с
 `id: exr-<суффикс>`, одним таким же candidate и required local assignment.
@@ -491,5 +506,31 @@ Platform; source candidate не доказывает archive/image/runtime/cours
 компоненты; manual не получает фиктивных tests/runtime.
 
 Bodyv2, deliveryv3 и public resultsv2 сохранены. Exact Core-кандидат закреплён в CI.
-Новый whole-course capture/export, доступ Student, Moodle учёт и публикация
-кандидата8.2.1 — отдельные последующие проверки.
+Возможность появилась в кандидате 8.2.1 и сохраняется в 8.2.2. Новый полный
+захват/экспорт курса, доступ Student, учёт Moodle и публикация текущего
+кандидата — отдельные последующие проверки.
+
+## Контекст наблюдения и окружение процессов (8.2.2)
+
+Фасад ABI 1 передаёт `attributes.extension_id: "course-prairielearn"` и сохраняет
+явный необязательный `document_id`. Контекст документа не выводится из имени
+операции или книги. Экспорт книги и пакетные команды сохраняют общий контекст
+без выбора одного произвольного документа. Это дополнение не вводит новый
+общий runtime и не заявляет полного семантического покрытия адаптера.
+
+Полный снимок окружения проходит через `childEnv`, затем `Deno.Command`
+использует `clearEnv: true` на четырёх границах: Docker image inspect и Quarto
+inspect в `entrypoints/export-course.ts`, Quarto inspect в
+`entrypoints/inspect-grading.ts`, Pandoc в `application/export.ts`. Рабочие
+переменные сохраняются, удалённый устаревший `COURSE_PERF_PARENT_SPAN_ID`
+не восстанавливается повторным наследованием Deno. Контекст родителя берётся
+из текущего активного span; без такого контекста новая связь не придумывается.
+Существующая command-операция публичного Body renderer сохраняется.
+В режиме `off` фасад возвращает исходные функции, Promise и окружение.
+
+Самодостаточная проверка `tests/performance-context.ts` использует локальную
+тестовую fixture и реальные дочерние процессы, без зависимости от Performance.
+Она не подтверждает полную native/Java интеграцию или опубликованный runtime.
+Матрица Exporter 8.2.2 / Core 8.2.3 с companion QRC 3.1.1 / Site 5.1.4 требует
+собственных проверок точных refs, установленного состава и итогового CI.
+Body v2, delivery v3 и public results v2 сохраняются; новых авторских полей нет.

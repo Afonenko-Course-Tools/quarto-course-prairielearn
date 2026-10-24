@@ -2,7 +2,7 @@
 type: documentation
 component: course-prairielearn
 status: current
-updated: 2026-10-22
+updated: 2026-10-24
 ---
 
 # Задания курса в PrairieLearn
@@ -17,7 +17,7 @@ updated: 2026-10-22
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Кандидат выпуска этого ref — **8.2.1**, согласованный с Core **8.2.2**.
+Кандидат выпуска этого ref — **8.2.2**, согласованный с Core **8.2.3**.
 Предыдущие Core 7.2.0 и exporter 7.1.0 опубликованы. Core 7.2.0 собирает факты API-предпроверки
 и политики дополнительных Java-исходников, которые переносит этот exporter.
 Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
@@ -33,11 +33,15 @@ quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 Выпущенные версии устанавливайте по неизменяемым тегам после их публикации:
 
 ```sh
-quarto add Afonenko-Course-Tools/quarto-course@v8.2.2 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.2.1 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v8.2.3 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.2.2 --no-prompt
 ```
 
-Candidate матрица задаёт Core 8.2.2 и exporter-кандидат 8.2.1: delivery v3, Body v2 и public results v2.
+Матрица кандидата задаёт Core 8.2.3 и экспортёр 8.2.2: API Core 8.1,
+delivery v3, Body v2 и public results v2. Сохранённое `core-version: 8.2.2`
+в metadata descriptor не является выполняемой проверкой точного bundle или
+минимальной версии. [Граница API и проверяемого Core](docs/authoring.md#версия-api-и-проверяемый-core)
+разделяет эти сведения и точный companion CI.
 Platform/Gateway требуют отдельной проверки exact source/digest/interface; прежние
 service releases не объявляются совместимыми. Наличие тегов проверяется у владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
@@ -187,7 +191,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует exporter-кандидат `8.2.1` и Core-кандидат `8.2.2`, Quarto 1.11.5
+Контракт этого ref использует экспортёр-кандидат `8.2.2` и Core-кандидат `8.2.3`, Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
 `statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
@@ -237,6 +241,22 @@ Counters обходов не являются числом посещённых 
 
 Прежний `COURSE_BUILD_TRACE` удалён; для новых измерений используются фасады ABI 1.
 Копии `observability/bridge.ts` и `bridge.lua` синхронизируются из проекта Performance.
+Фасад сохраняет ABI 1 и добавляет
+`attributes.extension_id: "course-prairielearn"`. Явный необязательный
+`document_id` сохраняется только при подтверждённом контексте одного документа.
+Экспорт книги и пакетные команды не выбирают произвольный документ; это
+дополнение не объявляет новое полное покрытие native Lua handlers или всех
+функций адаптера. Новый общий runtime не вводится.
+
+Четыре границы дочерних процессов получают полный снимок окружения через
+`childEnv` и `clearEnv: true`: Docker image inspect и Quarto inspect в
+`entrypoints/export-course.ts`, Quarto inspect в `entrypoints/inspect-grading.ts`
+и Pandoc в `application/export.ts`. Рабочие переменные сохраняются; удалённый
+устаревший `COURSE_PERF_PARENT_SPAN_ID` не наследуется повторно. Контекст
+родителя берётся из текущего активного span; существующая операция
+`course-prairielearn.application.export.command` сохраняет свою границу.
+Самодостаточная проверка `quarto run tests/performance-context.ts` не требует
+установки Performance; агент тестовой fixture не становится runtime зависимостью.
 
 ## Совместимое обновление producer и consumer
 
@@ -246,17 +266,17 @@ Counters обходов не являются числом посещённых 
 Core 8.0.0 и exporter 8.0.0 вместе по точным неизменяемым тегам. Стабильные UUID
 сохраняются; delivery v3 требует согласованного reader.
 
-## Подготовка кандидата 8.2.1
+## Подготовка кандидата 8.2.2
 
 Delivery v3 описывает `external`/`manual`/`mixed` и `selection=choice`. Полностью ручная
 задача не получает фиктивную автоматическую оценку; `mixed` сохраняет реальные
 автоматический и преподавательский компоненты. Студенческие ресурсы и текущий закрытый pointer проверяются
-совместимым Core 8.2.2. Закрытые материалы не входят в student ZIP/site.
+совместимым Core 8.2.3. Закрытые материалы не входят в student ZIP/site.
 Body остаётся `course-body-package-v2`, public results projection — v2.
 
 Обе задачи CI закрепляют один полный Core commit, без переопределения repository variable.
 Экспортёр использует готовый Core inventory и не требует Download assembler.
-До отдельной публикации `v8.2.1` это кандидат исходников; готовность курса и native service проверяется отдельно.
+До отдельной публикации `v8.2.2` это кандидат исходников; готовность курса и native service проверяется отдельно.
 
 ## Исторический выпуск совместимости 7.1.1
 
@@ -273,16 +293,20 @@ kind равен `gradle-jar-v1`. Запрещены unknown fields, другой
 готовый JAR и student public tests не входят в native payload. API-precheck и
 optional дополнительные Java sources сохраняют собственные границы.
 
-Это локальный source candidate с Core 8.2.2. Полный Platform candidate, exact
+Текущий кандидат исходников согласован с Core 8.2.3. Полный Platform candidate, exact
 registry/image и реальные build/archive/install/course proofs принимаются
 отдельно; unit fixture digest не является опубликованным OCI pin. Старые
 Core/Exporter 8.0.0 и immutable assets не меняются.
 
-Точная source dependency Core-кандидата: `7c9388cb4d982caf66657ea8f96c09243d64a147`.
+Точная source dependency Core-кандидата: `dc3bd4d7d035359289fc13c44446947830defeb0`.
 Оба CI jobs закрепляют этот commit; hosted exact-head CI ещё должен выполниться
 после отдельного разрешённого push. Локальная установка не подтверждает published tag.
+Companion-проверки закрепляют QRC 3.1.1 и Site 5.1.4 по точным commits в CI;
+они не вводят зависимость от Performance или Download. Полные native/Java suite
+и hosted CI итогового HEAD требуют отдельных результатов, прежняя матрица
+не подтверждает их прохождение.
 
-## Контекст меню и строгая дедупликация в кандидате8.2.1
+## Контекст меню и строгая дедупликация из кандидата 8.2.1
 
 Reference-only `sec-unit-*` использует одну исходную задачу и добавляет
 публичное введение исходных optional меню через прежний Body renderer.
@@ -292,6 +316,7 @@ source mapping, grading/submission, ресурсов, starter и всего nati
 конфликт вызывает атомарный отказ. Ручная часть mixed и manual сохраняется.
 Новых schema/registry/flags или канонических условий нет.
 
-Это исходники нового кандидата от immutable Exporter8.1 commit0d5e20e6.
-Существующий опубликованный8.1 и открытый PR22 не меняются. Тег8.2, hostedCI,
-полный экспорт курсов, серверная поставка и Student proof здесь не заявлены.
+Эта возможность появилась при подготовке 8.2.1 от неизменяемого Exporter 8.1
+commit `0d5e20e6` и сохраняется в 8.2.2. Исторические выпуск 8.1 и PR22
+сохраняют своё происхождение. Новый тег, hosted CI, полный экспорт курсов,
+серверная поставка и Student proof требуют собственных проверок.
