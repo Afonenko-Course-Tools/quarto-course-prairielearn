@@ -2,7 +2,7 @@
 type: specification-index
 component: course-prairielearn
 status: current
-version: 8.2.1
+version: 8.2.3
 updated: 2026-10-22
 ---
 
@@ -17,8 +17,8 @@ updated: 2026-10-22
 | --- | --- | --- | --- | --- |
 | [PrairieLearn: действующий контракт](../docs/authoring.md) | specification | course-prairielearn | current | native/CUE binding и selected participant delivery; client/tests/reference |
 | [Диагностика](../docs/diagnostics.md) | reference | course-prairielearn | current | Собственные ID и внешние причины этого адаптера |
-| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/7c9388cb4d982caf66657ea8f96c09243d64a147/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
-| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/7c9388cb4d982caf66657ea8f96c09243d64a147/spec/index.md) | specification/index | course-core | current | Банк, условия, решения и назначения |
+| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/7d8a472a0fe4f05b5543fb856336a6d15278ef3a/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
+| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/7d8a472a0fe4f05b5543fb856336a6d15278ef3a/spec/index.md) | specification/index | course-core | current | Банк, условия, решения и назначения |
 
 Банк и назначения принадлежат текущему Core; этот адаптер проверяет свой вход
 на собственной границе. Неизменяемые выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases).
@@ -33,13 +33,19 @@ Pinned official PrairieLearn JSON schemas and bundled offline Ajv validators are
 recorded in `spec/upstream/provenance.json`. The runner descriptor is Platform-owned,
 not a second author configuration or a private GradingJob.
 
-## Текущая совместимость кандидата 8.2.1
+## Текущая совместимость кандидата 8.2.3
 
-Кандидат Exporter 8.2.1 использует Core-кандидат 8.2.2 и delivery v3. Body v2 и public results v2
+Кандидат Exporter 8.2.3 использует опубликованный Core 8.2.4 и delivery v3. Body v2 и public results v2
 не переименовываются. Manual/mixed/choice требуют согласованного native reader;
 Platform/Gateway проверяются отдельно по exact source/digest, без заявления
 совместимости прежних service releases. Download — необязательный consumer
 готового Core inventory, не зависимость этого экспортёра.
+
+Новая линия основана на принятом 8.2.1 и не включает Performance 8.2.2.
+Оба полных hosted CI jobs закрепляют функциональный кандидат Core 8.2.5
+`58fc5c9cb39867f6c612922eec9af09713539ca4`. Его полный CI/review, публикация Core 8.2.5,
+Exporter 8.2.3 и готовность курса ещё не подтверждены. Это pin проверки CI;
+он не меняет уже принятые course/runtime pins Core 8.2.4.
 
 ## Историческая совместимость 7.1.1
 

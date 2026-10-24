@@ -1,3 +1,4 @@
+import {publicationConditionFile,type PublicationCondition} from './publication-conditions.ts';
 import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
 import { validateAdditionalJavaSources } from "./runtime-descriptor.ts";
@@ -24,6 +25,7 @@ const fields = (v: any, required: string[], optional: string[] = []) =>
 export interface ProjectContext {
   projectRoot: string;
   projects: Record<string, string>;
+  publicationConditions?:Record<string,PublicationCondition>;
   studentArtifacts?:Record<string,{files:{name:string;bytes:Uint8Array}[];archive:Uint8Array}>;
 }
 export async function publicProjectFiles(root:string){
@@ -635,6 +637,8 @@ export async function exportPrairieLearn(
     if(artifact){
       controls='<p><a href="{{options.client_files_question_url}}/starter.zip">Скачать заготовку</a>'+(artifact.files.some(f=>f.name==='README.md')?' · <a href="{{options.client_files_question_url}}/starter/README.md">README</a>':'')+'</p>\n'+controls;
     }
+    const presented=publicationConditionFile(q.id,context.publicationConditions?.[q.id]);
+    if(presented){prepared.push({name:base+'/clientFilesQuestion/'+presented.file.name,data:presented.file.data});controls=presented.html+'\n'+controls;}
     text(
       base + "/question.html",
       "<pl-question-panel>\n" + metadata(q) + html + "\n" + controls +

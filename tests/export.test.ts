@@ -1089,3 +1089,22 @@ Deno.test('PL real Pandoc Table semantic attrs namespace all targets across ques
   assert(rejected,'duplicate semantic Table/Cell target accepted');
  }finally{await Deno.remove(root,{recursive:true})}
 });
+
+// Выполняется обычной hosted suite с настоящим Pandoc; source-unit195 его не запускает.
+Deno.test('publication conditions проходят normal prepared files и collision guard без изменения student/tests',async()=>{
+ const archive=Uint8Array.from(atob('UEsDBBQAAAAAACRtWF2/c6wWXgAAAF4AAAAKAAAAaW5kZXguaHRtbDwhZG9jdHlwZSBodG1sPjx0aXRsZT7Qo9GB0LvQvtCy0LjQtTwvdGl0bGU+PHA+0KHQuNC90YLQtdGC0LjRh9C10YHQutC40Lkg0LrQvtC80L/Qu9C10LrRgjwvcD5QSwECFAMUAAAAAAAkbVhdv3OsFl4AAABeAAAACgAAAAAAAAAAAAAAgAEAAAAAaW5kZXguaHRtbFBLBQYAAAAAAQABADgAAACGAAAAAAA='),c=>c.charCodeAt(0));
+ for(const collision of [false,true]){
+  const root=await Deno.makeTempDir();try{
+   for(const name of ['student','tests'])await Deno.mkdir(root+'/projects/clamp/'+name,{recursive:true});
+   await Deno.writeTextFile(root+'/projects/clamp/student/Clamp.java','PUBLIC_STARTER');await Deno.writeTextFile(root+'/projects/clamp/tests/grade.sh','PRIVATE_TESTS');
+   if(collision)await Deno.writeFile(root+'/projects/clamp/student/exr-clamp-conditions.zip',archive);
+   const output=root+'/out';let error:unknown;
+   try{await exportPrairieLearn(p(),{projectRoot:root,projects:{'exr-clamp':'/projects/clamp'},publicationConditions:{'exr-clamp':{target:'exr-clamp-conditions.zip',data:archive}}},binding,output)}catch(cause){error=cause}
+   if(collision){assert(String(error).includes('совпадающие пути'),'normal collision guard пропустил archive target');continue}
+   if(error)throw error;
+   const base=output+'/questions/demo/exr-clamp';assert(JSON.stringify([...await Deno.readFile(base+'/clientFilesQuestion/exr-clamp-conditions.zip')])===JSON.stringify([...archive]),'whole ZIP bytes изменились');
+   const html=await Deno.readTextFile(base+'/question.html');assert(html.includes('{{options.client_files_question_url}}/exr-clamp-conditions.zip')&&html.includes('Скачать условие для локального просмотра'),'normal question не содержит ссылку');
+   assert((await Deno.readTextFile(base+'/clientFilesQuestion/Clamp.java'))==='PUBLIC_STARTER','student payload изменён');assert((await Deno.readTextFile(base+'/tests/grade.sh'))==='PRIVATE_TESTS','tests payload изменён');
+  }finally{await Deno.remove(root,{recursive:true})}
+ }
+});

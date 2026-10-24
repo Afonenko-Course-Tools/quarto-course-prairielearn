@@ -17,7 +17,9 @@ updated: 2026-10-22
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Кандидат выпуска этого ref — **8.2.1**, согласованный с Core **8.2.2**.
+Кандидат выпуска этого ref — **8.2.3**, согласованный с Core **8.2.4**.
+Он продолжает принятую линию 8.2.1 и добавляет опциональные внешние архивы условий;
+изменения Performance 8.2.2 в эту линию не включены. Тег 8.2.3 ещё не опубликован.
 Предыдущие Core 7.2.0 и exporter 7.1.0 опубликованы. Core 7.2.0 собирает факты API-предпроверки
 и политики дополнительных Java-исходников, которые переносит этот exporter.
 Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
@@ -33,11 +35,11 @@ quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 Выпущенные версии устанавливайте по неизменяемым тегам после их публикации:
 
 ```sh
-quarto add Afonenko-Course-Tools/quarto-course@v8.2.2 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.2.1 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v8.2.4 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.2.3 --no-prompt
 ```
 
-Candidate матрица задаёт Core 8.2.2 и exporter-кандидат 8.2.1: delivery v3, Body v2 и public results v2.
+Матрица кандидата задаёт Core 8.2.4 и exporter-кандидат 8.2.3: delivery v3, Body v2 и public results v2.
 Platform/Gateway требуют отдельной проверки exact source/digest/interface; прежние
 service releases не объявляются совместимыми. Наличие тегов проверяется у владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
@@ -187,7 +189,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует exporter-кандидат `8.2.1` и Core-кандидат `8.2.2`, Quarto 1.11.5
+Контракт этого ref использует exporter-кандидат `8.2.3` и Core `8.2.4`, Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
 `statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant

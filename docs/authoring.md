@@ -7,11 +7,11 @@ updated: 2026-10-22
 
 # Спецификация заданий и контрольных работ
 
-Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/7c9388cb4d982caf66657ea8f96c09243d64a147/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
+Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/7d8a472a0fe4f05b5543fb856336a6d15278ef3a/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
-переключения версий схемы. Контракты этого ref: адаптер-кандидат8.2.1 и Core-кандидат8.2.2, delivery v3, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
+переключения версий схемы. Контракты этого ref: адаптер-кандидат8.2.3 и Core8.2.4, delivery v3, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
 Канонические `#exr-*` имеют уникальные ID внутри явной области
 `exercise-bank: true`, собственные обязательные `difficulty` и положительное
 целое `time`. Эффективная `statement-visibility` берётся из атрибута задачи либо
@@ -493,3 +493,47 @@ Platform; source candidate не доказывает archive/image/runtime/cours
 Bodyv2, deliveryv3 и public resultsv2 сохранены. Exact Core-кандидат закреплён в CI.
 Новый whole-course capture/export, доступ Student, Moodle учёт и публикация
 кандидата8.2.1 — отдельные последующие проверки.
+
+## Явные conditions ZIP принятой публикации
+
+Опциональный CLI-параметр `--publication-conditions /absolute/manifest.json`
+подключает целые архивы уже принятой публикации. Это отдельные внешние зависимости,
+не Core student materialization и не содержимое `starter.zip`. Без параметра
+сохраняется прежний экспорт. Core по-прежнему удаляет contextual Download links
+из публичного Body; адаптер добавляет только явно разрешённые conditions archives.
+
+Неизменённый host builder Platform 2.3.0 передаёт окружение настоящему
+установленному entrypoint. Для этого маршрута вместо CLI используется один
+явный `PRAIRIELEARN_PUBLICATION_CONDITIONS=/absolute/manifest.json`.
+CLI и ENV одновременно запрещены, даже с одинаковым значением; пустой или
+относительный путь отвергается. Если оба отсутствуют, прежний экспорт сохраняется.
+Один эффективный путь определяет ту же source authority (`stagingReceipt.publicBase`
+в private stage), проверки и JSON dependency receipt в stdout. Исполнитель должен
+закрепить exact ENV, manifest, публикационный receipt и whole ZIP в собственных
+sealed inputs; неявное ambient значение не является разрешением. Другая версия
+builder/runtime assembly или новые образы для этого transport не требуются.
+
+Manifest имеет схему `pl-publication-conditions-v1` и точные поля:
+
+- `courseId` — текущий курс;
+- `source: {repository, commit, book}` — текущий public Git source; в private stage
+  это `publicBase` принятого staging receipt;
+- `publication: {repository, commit, receipt: {path, bytes, sha256}}` — источник
+  исторической публикации и внешнее принятое свидетельство;
+- `archives` — записи `{questionId, source, sourceSha256, file: {path, bytes, sha256}}`.
+  `source` задаёт owner-relative QMD текущего вопроса, `file` — полный исходный ZIP.
+
+Набор записей должен точно совпадать с conditions requests выбранных упражнений
+в исходном native AST, до публичной Core partition. Foreign/duplicate/missing
+IDs, несоответствие source/hash, symlink/hardlink/alias, небезопасный путь,
+collision client target и изменение входов до публикации означают отказ.
+Внешние зависимости читаются на границах операции, не в цикле вопросов.
+Адаптер не создаёт HTML или ZIP и не объявляет исторические архивы новым capture.
+
+Точные bytes копируются в `clientFilesQuestion/<ID>-conditions.zip`; вопрос
+получает ссылку «Скачать условие для локального просмотра» через обычный PL
+client-files URL. Файлы и HTML входят в стандартные inventory/delivery hash.
+Схемы delivery и provenance не меняются: manifest и исходная публикация связаны
+sealed caller inputs, pre/post checks и JSON dependency receipt в CLI stdout,
+сохраняемом внешним исполнителем. Само наличие manifest не доказывает допустимость
+старого Site: публикацию и её ZIP заранее принимает внешний владелец evidence.

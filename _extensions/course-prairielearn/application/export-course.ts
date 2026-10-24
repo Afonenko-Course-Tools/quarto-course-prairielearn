@@ -1,3 +1,4 @@
+import {loadPublicationConditions} from './publication-conditions.ts';
 import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
 import { qualifiedSlots, nativeSlotZones } from "./slots.ts";
@@ -82,6 +83,8 @@ export async function exportCourse(
     checksOutput: string;
     body: (work: string) => Promise<any>;
     candidateImage?: string;
+    publicationConditions?: string;
+    publicationSource?: {repository:string;commit:string;book:string};
     studentArtifact?:(fact:any)=>Promise<{files:{name:string;bytes:Uint8Array}[];archive:Uint8Array}>;
   },
 ) {
@@ -132,6 +135,8 @@ export async function exportCourse(
   const methods:Record<string,'external'|'manual'|'mixed'>={};
   for(const exercise of input.result.model.exercises)methods[exercise.id]=gradingMethod(exercise.extensions?.prairielearn?.grading??input.config['question-defaults'].grading).method;
   for (const work of works) validateGradingComponents(work,methods);
+  const selectedIds=input.publicationConditions?new Set(works.flatMap((w:any)=>[...(w.slots??[]).flatMap((slot:any)=>slot.candidates),...(w.relatedExercise?[w.relatedExercise]:[])])):undefined;
+  const publicationConditions=input.publicationConditions?await loadPublicationConditions(input.publicationConditions,{courseId:input.courseId,projectRoot:input.projectRoot,source:input.publicationSource!,exercises:input.result.model.exercises.filter((e:any)=>selectedIds!.has(e.id))}):undefined;
   const stage = await Deno.makeTempDir({
       dir: dirname(out),
       prefix: ".pl-course-",
@@ -366,7 +371,7 @@ export async function exportCourse(
       const partial = join(scratch, "work-" + index);
       await exportPrairieLearn(
         p,
-        { projectRoot: scratch, projects,studentArtifacts },
+        { projectRoot: scratch, projects,studentArtifacts,publicationConditions:publicationConditions?Object.fromEntries(publicationConditions.artifacts):undefined },
         binding,
         partial,
       );
@@ -468,6 +473,7 @@ export async function exportCourse(
         },
       );
     }
+    if(publicationConditions)await publicationConditions.check();
     const files = await inventory(stage);
     const delivery: any = {
       schemaVersion: 3,
@@ -503,6 +509,7 @@ export async function exportCourse(
       ...(input.candidateImage ? { candidate: true } : {}),
     };
     delivery.deliveryHash = await hash(canonical(delivery));
+    if(publicationConditions)console.log('PL publication conditions dependency '+JSON.stringify(publicationConditions.provenance));
     await write("delivery.json", delivery);
     await Deno.mkdir(dirname(privateOut), { recursive: true });
     const privateStage = await Deno.makeTempFile({
@@ -516,7 +523,8 @@ export async function exportCourse(
       );
       await Deno.rename(privateStage, privateOut);
       try {
-        await Deno.rename(stage, out);
+        if(publicationConditions)await publicationConditions.check();
+      await Deno.rename(stage, out);
       } catch (e) {
         await Deno.remove(privateOut);
         throw e;

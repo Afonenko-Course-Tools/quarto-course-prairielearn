@@ -39,15 +39,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          # Точный локальный Core candidate 8.2.2; тот же commit используется обоими CI jobs.
-          # Commit не означает существование release tag.
-          ref: 7c9388cb4d982caf66657ea8f96c09243d64a147
+          # Функциональный кандидат Core 8.2.5; тот же exact commit в обоих CI jobs.
+          # Полный CI/review и публикация кандидата ещё не подтверждены.
+          ref: 58fc5c9cb39867f6c612922eec9af09713539ca4
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "7c9388cb4d982caf66657ea8f96c09243d64a147"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "58fc5c9cb39867f6c612922eec9af09713539ca4"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -105,13 +105,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: 7c9388cb4d982caf66657ea8f96c09243d64a147
+          ref: 58fc5c9cb39867f6c612922eec9af09713539ca4
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "7c9388cb4d982caf66657ea8f96c09243d64a147"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "58fc5c9cb39867f6c612922eec9af09713539ca4"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5
@@ -128,7 +128,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
         with:
           gradle-version: '9.1.0'
-      - run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts tests/manual-mixed.test.ts tests/materialized-student.test.ts tests/public-cases.test.ts tests/body-projection.test.ts tests/java-build.test.ts tests/whole-bank.test.ts
+      - run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts tests/manual-mixed.test.ts tests/materialized-student.test.ts tests/publication-conditions.test.ts tests/publication-conditions-entry.test.ts tests/public-cases.test.ts tests/body-projection.test.ts tests/java-build.test.ts tests/whole-bank.test.ts
       - name: Атомарный экспорт между файловыми системами
         run: PL_EXDEV_TEST_DIR=/dev/shm deno test --no-config -A --filter "across output filesystems" tests/export-course.test.ts
       - run: CORE="$PWD/.ci-deps/core" bash tools/check-java.sh
