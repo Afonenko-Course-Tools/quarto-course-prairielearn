@@ -4,7 +4,7 @@ const repo=dirname(dirname(fileURLToPath(import.meta.url)));
 const [coreArg,qrcArg,siteArg]=Deno.args;
 if(!coreArg||!qrcArg||!siteArg)throw Error('native-overlay.ts CORE QRC SITE');
 const core=resolve(coreArg),qrc=resolve(qrcArg),site=resolve(siteArg);
-const corePin='58fc5c9cb39867f6c612922eec9af09713539ca4';
+const corePin='069251845a1803f1993ff2b09b30a2e0e275b04a';
 const assert=(v:unknown,m:string)=>{if(!v)throw Error(m)};
 const pin=await new Deno.Command('git',{args:['-C',core,'rev-parse','HEAD'],stdout:'piped'}).output();
 assert(pin.success&&new TextDecoder().decode(pin.stdout).trim()===corePin,'Требуется точный Core candidate');
@@ -39,6 +39,8 @@ assert(run.adapters.length===1&&run.adapters[0].fragments.length===2&&run.docume
 for(const row of run.adapters[0].fragments)assert(row.adapter==='prairielearn'&&row.document.format==='json'&&JSON.stringify(row.document.profiles)===JSON.stringify(pointer.profiles),'Неверный actual document context');
 const witness=JSON.parse(await Deno.readTextFile(join(pointer.directory,'common-files-path-binding.json')));
 assert(witness.schema==='course-common-files-path-binding-v2','Нет genuine witness-v2');
+assert(Array.isArray(pointer.commonPathDocuments)&&pointer.commonPathDocuments.length===2,'Нет actual selected refs Core827 обоих документов');
+assert(pointer.commonPathDocuments.every((r:any,i:number)=>r.source===witness.documents[i].source&&r.format===witness.documents[i].format),'Selected refs расходятся с порядком genuine witness');
 const source=JSON.parse(await Deno.readTextFile(join(pointer.directory,'owned-export-source-context.json')));
 await Deno.writeTextFile(join(root,'overlay-observation.json'),JSON.stringify({pointer,run,witness,source},null,2));
 assert((await Promise.all(sourceNames.map(name=>Deno.readTextFile(join(book,name))))).every((v,i)=>v===before[i]),'Source bytes не восстановлены');

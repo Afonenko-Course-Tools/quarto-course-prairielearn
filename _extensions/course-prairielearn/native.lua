@@ -109,7 +109,7 @@ local function owned_enrollment(run,doc,root,profiles,source)
   local function check(ok,field)
     assert(ok,diagnostics.message('PL.NATIVE_INVALID','Неверный active owned overlay',{source=source,field=field}))
   end
-  check(exact(run,{'schema','directory','projectRoot','profiles','outputDirectory','renderAll','configurationHashes','commonPathBinding','ownedConfigOverlay','overlayState'},{'initialInputFiles'}),'active-native-run')
+  check(exact(run,{'schema','directory','projectRoot','profiles','outputDirectory','renderAll','configurationHashes','commonPathBinding','ownedConfigOverlay','overlayState'},{'initialInputFiles','commonPathDocuments'}),'active-native-run')
   check(run.overlayState=='active' and overlay(run.ownedConfigOverlay),'active-native-run.ownedConfigOverlay')
   check(type(run.outputDirectory)=='string' and type(run.renderAll)=='boolean' and type(run.configurationHashes)=='table' and (run.initialInputFiles==nil or strings(run.initialInputFiles,false)),'active-native-run')
   check(strings(run.profiles,true) and #profiles==1 and type(profiles[1])=='string' and profiles[1]:match('^course%-export%-%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$')~=nil,'active-native-run.profiles')
@@ -130,6 +130,30 @@ local function owned_enrollment(run,doc,root,profiles,source)
   check(exact(w,{'schema','projectRoot','runDirectory','profiles','outputDirectory','renderAll','quartoVersion','ownerInspectionHash','documentInspectionHashes','configurationInputs','inputFiles','sourceHashes','commonSourceHashes','canonicalOwnerDeclarations','documents','nativeExtensionMetadata','metadataClosure','sourceIdentities','ownedConfigOverlay','sourceInspectionRefs'},{'temporaryExportProfile','forcedWriter'}),'commonPathBinding')
   check(w.schema=='course-common-files-path-binding-v2' and overlay(w.ownedConfigOverlay) and same(w.ownedConfigOverlay,run.ownedConfigOverlay) and strings(w.sourceInspectionRefs,true),'commonPathBinding.ownedConfigOverlay')
   check(w.projectRoot==root and w.runDirectory==run.directory and same(w.profiles,run.profiles) and w.outputDirectory==run.outputDirectory and w.renderAll==run.renderAll,'commonPathBinding.runDirectory')
+  if run.commonPathDocuments~=nil then
+    local function dense(value)
+      if type(value)~='table' then return false end
+      local count=0
+      for key,_ in pairs(value) do
+        if type(key)~='number' or key%1~=0 or key<1 or key>#value then return false end
+        count=count+1
+      end
+      return count==#value
+    end
+    local refs=run.commonPathDocuments
+    check(dense(refs) and dense(w.documents) and #refs==#w.documents,'active-native-run.commonPathDocuments')
+    local sources,files={},{}
+    for i,r in ipairs(refs) do
+      local field='active-native-run.commonPathDocuments'
+      check(exact(r,{'source','format','file','sha1','sha256'}),field)
+      check(type(r.source)=='string' and r.source~='' and type(r.format)=='string' and r.format~='' and hex(r.sha1,40) and hex(r.sha256,64),field)
+      check(type(r.file)=='string' and hex(r.file:match('^selected%-common%-paths/([0-9a-f]+)%.json$'),64),field)
+      sources[r.source]=sources[r.source] or {}
+      check(not sources[r.source][r.format] and not files[r.file],field)
+      sources[r.source][r.format]=true;files[r.file]=true
+      check(type(w.documents[i])=='table' and r.source==w.documents[i].source and r.format==w.documents[i].format,field)
+    end
+  end
   local t=w.temporaryExportProfile
   check(exact(w.forcedWriter,{'kind'}) and w.forcedWriter.kind=='owned-export-json' and exact(t,{'profile','file','sha1','sha256'}) and t.profile==profiles[1] and t.file=='_quarto-'..profiles[1]..'.yml' and hex(t.sha1,40) and hex(t.sha256,64),'commonPathBinding.temporaryExportProfile')
   check(pandoc.utils.sha1(bytes('owned-export-source-context.json'))==run.ownedConfigOverlay.sourceContext.sha1,'ownedConfigOverlay.sourceContext.sha1')

@@ -2,7 +2,7 @@
 type: specification-index
 component: course-prairielearn
 status: current
-version: 8.2.4
+version: 8.2.5
 updated: 2026-10-22
 ---
 
@@ -33,19 +33,27 @@ Pinned official PrairieLearn JSON schemas and bundled offline Ajv validators are
 recorded in `spec/upstream/provenance.json`. The runner descriptor is Platform-owned,
 not a second author configuration or a private GradingJob.
 
-## Текущая совместимость кандидата 8.2.4
+## Текущая совместимость кандидата 8.2.5
 
-Кандидат Exporter 8.2.4 использует опубликованный Core 8.2.4 и delivery v3. Body v2 и public results v2
+Кандидат Exporter 8.2.5 проверяется с опубликованным Core 8.2.7 и delivery v3. Body v2 и public results v2
 не переименовываются. Manual/mixed/choice требуют согласованного native reader;
 Platform/Gateway проверяются отдельно по exact source/digest, без заявления
 совместимости прежних service releases. Download — необязательный consumer
 готового Core inventory, не зависимость этого экспортёра.
 
 Новая линия основана на принятом 8.2.1 и не включает Performance 8.2.2.
-Оба полных hosted CI jobs закрепляют функциональный Core 8.2.5
-`58fc5c9cb39867f6c612922eec9af09713539ca4`. Exporter 8.2.4 ещё не опубликован;
-готовность курса проверяется отдельно. Это pin проверки CI;
-он не меняет уже принятые course/runtime pins Core 8.2.4.
+Оба полных hosted CI jobs закрепляют опубликованный Core 8.2.7
+`069251845a1803f1993ff2b09b30a2e0e275b04a`. Exporter 8.2.5 ещё не опубликован;
+полный CI, installed integration и готовность курса проверяются отдельно.
+
+Active pointer-v3 может содержать необязательный `commonPathDocuments`:
+плотный список закрытых refs `source/format/file/sha1/sha256` с уникальными
+source+format и file, ограниченным путём `selected-common-paths/<64hex>.json`.
+Число и порядок refs совпадают с уже SHA1-связанными `witness.documents`.
+Адаптер не читает selected records повторно: их bytes/SHA256/closure/currentness
+и полный END остаются обязанностью Core. Прежние проверки active/current,
+owned profile, source-context, forced writer и отказ restored/completed сохранены.
+Отсутствие поля сохраняет прежнее поведение; публичные schemas не меняются.
 
 ## Историческая совместимость 7.1.1
 

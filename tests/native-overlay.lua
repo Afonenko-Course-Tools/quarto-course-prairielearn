@@ -30,6 +30,39 @@ return {{Pandoc=function(doc)
       print((expected and 'PASS ' or 'REFUSED ')..label)
     end
     attempt(nil,true,'active-v3 до позднего course-core-processed')
+    -- Реальный writer должен принять новый необязательный Core refset;
+    -- selected bytes/currentness остаются обязанностью Core bridge и END.
+    local function selected(r,w)
+      w.documents={{source='index.qmd',format='json'},{source='lab.qmd',format='json'}}
+      r.commonPathDocuments={
+        {source='index.qmd',format='json',file='selected-common-paths/'..string.rep('a',64)..'.json',sha1=string.rep('a',40),sha256=string.rep('b',64)},
+        {source='lab.qmd',format='json',file='selected-common-paths/'..string.rep('b',64)..'.json',sha1=string.rep('b',40),sha256=string.rep('c',64)},
+      }
+    end
+    attempt(selected,true,'active-v3 с selected refs Core827')
+    local selectedCases={
+      {'selected не список',function(r) r.commonPathDocuments='invalid' end},
+      {'selected неизвестный ключ списка',function(r) r.commonPathDocuments={extra=true} end},
+      {'selected неизвестный ключ ref',function(r) r.commonPathDocuments[1].extra=true end},
+      {'selected нет sha256',function(r) r.commonPathDocuments[1].sha256=nil end},
+      {'selected ref не объект',function(r) r.commonPathDocuments[1]='invalid' end},
+      {'selected пустой source',function(r) r.commonPathDocuments[1].source='' end},
+      {'selected пустой format',function(r) r.commonPathDocuments[1].format='' end},
+      {'selected неверный format',function(r) r.commonPathDocuments[1].format=1 end},
+      {'selected неверный sha1',function(r) r.commonPathDocuments[1].sha1=string.rep('A',40) end},
+      {'selected неверный sha256',function(r) r.commonPathDocuments[1].sha256=string.rep('a',63) end},
+      {'selected traversal',function(r) r.commonPathDocuments[1].file='selected-common-paths/../escape.json' end},
+      {'selected foreign directory',function(r) r.commonPathDocuments[1].file='other/'..string.rep('a',64)..'.json' end},
+      {'selected повтор source format',function(r) r.commonPathDocuments[2].source='index.qmd' end},
+      {'selected повтор file',function(r) r.commonPathDocuments[2].file=r.commonPathDocuments[1].file end},
+      {'selected неверный размер',function(r) table.remove(r.commonPathDocuments) end},
+      {'selected неверный порядок',function(r) r.commonPathDocuments[1],r.commonPathDocuments[2]=r.commonPathDocuments[2],r.commonPathDocuments[1] end},
+      {'selected чужой source',function(r) r.commonPathDocuments[1].source='other.qmd' end},
+      {'selected чужой format',function(r) r.commonPathDocuments[1].format='html' end},
+    }
+    for _,case in ipairs(selectedCases) do
+      attempt(function(r,w) selected(r,w);case[2](r,w) end,false,case[1])
+    end
     local cases={
       {'schema',function(r) r.schema='course-native-run-pointer-v4' end},
       {'owner',function(r) r.projectRoot=root..'/other' end},

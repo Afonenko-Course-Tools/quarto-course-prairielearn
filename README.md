@@ -17,11 +17,13 @@ updated: 2026-10-22
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Кандидат выпуска этого ref — **8.2.4**, согласованный с Core **8.2.4**.
-Он продолжает принятую линию 8.2.1 и добавляет опциональные внешние архивы условий;
-изменения Performance 8.2.2 в эту линию не включены. Кандидат 8.2.4 исключает
-прямые `.git` файлы из `starter/`, сохраняя исходный ZIP с историей.
-Тег 8.2.4 ещё не опубликован.
+Кандидат выпуска этого ref — **8.2.5**, проверяемый с опубликованным Core **8.2.7**.
+Он продолжает принятую линию 8.2.4 без Performance 8.2.2 и допускает
+необязательные selected refs в active owned overlay. Адаптер проверяет закрытую
+структуру refs и их порядок относительно связанного witness; selected bytes,
+SHA256, identity и currentness по-прежнему проверяет Core. Отсутствие нового поля
+сохраняет прежний путь. Тег 8.2.5 ещё не опубликован; полный CI и genuine
+installed integration этого кандидата пока не подтверждены.
 Предыдущие Core 7.2.0 и exporter 7.1.0 опубликованы. Core 7.2.0 собирает факты API-предпроверки
 и политики дополнительных Java-исходников, которые переносит этот exporter.
 Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
@@ -37,11 +39,11 @@ quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 Выпущенные версии устанавливайте по неизменяемым тегам после их публикации:
 
 ```sh
-quarto add Afonenko-Course-Tools/quarto-course@v8.2.4 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.2.4 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v8.2.7 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.2.5 --no-prompt
 ```
 
-Матрица кандидата задаёт Core 8.2.4 и exporter-кандидат 8.2.4: delivery v3, Body v2 и public results v2.
+Матрица кандидата задаёт Core 8.2.7 и exporter-кандидат 8.2.5: delivery v3, Body v2 и public results v2.
 Platform/Gateway требуют отдельной проверки exact source/digest/interface; прежние
 service releases не объявляются совместимыми. Наличие тегов проверяется у владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
@@ -191,7 +193,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует exporter-кандидат `8.2.4` и Core `8.2.4`, Quarto 1.11.5
+Контракт этого ref использует exporter-кандидат `8.2.5` и Core `8.2.7`, Quarto 1.11.5
 и CUE 0.17.1. Body использует отдельную
 `statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
