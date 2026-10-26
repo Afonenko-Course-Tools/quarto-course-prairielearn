@@ -3,10 +3,10 @@ const __metrics=__createMetrics("course-prairielearn");
 import { normalizeDiscovery } from './grading-descriptor.ts';
 import { javaBuild } from './java-build.ts';
 import { safePath } from './source-selection.ts';
-export interface AdditionalJavaSources {archive:string;maxFiles:number;maxFileBytes:number;maxTotalBytes:number;maxArchiveBytes:number}
+export interface AdditionalJavaSources {primaryRequired?:boolean;archive:string;maxFiles:number;maxFileBytes:number;maxTotalBytes:number;maxArchiveBytes:number}
 export function validateAdditionalJavaSources(value:any,sources:string[],tests:string[]):AdditionalJavaSources {
   const caps={maxFiles:128,maxFileBytes:1048576,maxTotalBytes:4194304,maxArchiveBytes:2097152};
-  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==5||Object.keys(value).some(k=>!['archive',...Object.keys(caps)].includes(k))||typeof value.archive!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.zip$/.test(value.archive)||Object.entries(caps).some(([key,cap])=>!Number.isInteger(value[key])||value[key]<1||value[key]>cap))throw new Error('PL invalid additional Java sources policy');
+  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['archive','primaryRequired',...Object.keys(caps)].includes(k))||('primaryRequired' in value&&typeof value.primaryRequired!=='boolean')||typeof value.archive!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.zip$/.test(value.archive)||Object.entries(caps).some(([key,cap])=>!Number.isInteger(value[key])||value[key]<1||value[key]>cap))throw new Error('PL invalid additional Java sources policy');
   if([...sources,...tests,'grading-job.json','tests/grading-job.json'].some(name=>name===value.archive||name.startsWith(value.archive+'/')||value.archive.startsWith(name+'/')))throw new Error('PL additional Java archive conflicts with primary/trusted path');
   return {...value};
 }
@@ -29,8 +29,8 @@ export function runtimeDescriptor(c: any, profile: any, sources: string[], tests
   const extra=c['additional-java-sources'];
   let additionalJavaSources:AdditionalJavaSources|undefined;
   if(extra!==undefined){
-    if(!extra||typeof extra!=='object'||Array.isArray(extra)||!['java25-junit-v1','java25-gradle-junit-v1'].includes(c.runtime)||c.sourceProfile.mode!=='implementation'||Object.keys(extra).some(k=>!['archive','max-files','max-file-bytes','max-total-bytes','max-archive-bytes'].includes(k)))throw new Error('PL additional Java sources require closed Java implementation policy');
-    additionalJavaSources=validateAdditionalJavaSources({archive:extra.archive,maxFiles:extra['max-files'],maxFileBytes:extra['max-file-bytes'],maxTotalBytes:extra['max-total-bytes'],maxArchiveBytes:extra['max-archive-bytes']},sources,tests);
+    if(!extra||typeof extra!=='object'||Array.isArray(extra)||!['java25-junit-v1','java25-gradle-junit-v1'].includes(c.runtime)||c.sourceProfile.mode!=='implementation'||Object.keys(extra).some(k=>!['archive','max-files','max-file-bytes','max-total-bytes','max-archive-bytes','primary-required'].includes(k)))throw new Error('PL additional Java sources require closed Java implementation policy');
+    additionalJavaSources=validateAdditionalJavaSources({...('primary-required' in extra?{primaryRequired:extra['primary-required']}:{}),archive:extra.archive,maxFiles:extra['max-files'],maxFileBytes:extra['max-file-bytes'],maxTotalBytes:extra['max-total-bytes'],maxArchiveBytes:extra['max-archive-bytes']},sources,tests);
   }
   return {
     schemaVersion:1, sourceFiles:sources, testFiles:tests,

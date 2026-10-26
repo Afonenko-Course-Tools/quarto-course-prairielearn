@@ -413,6 +413,20 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       assert(!html.includes("PRIVATE_REFERENCE")&&!html.includes(apiText),"private sources leaked into UI");
       assert(delivery.files["questions/demo/exr-a/question.html"]===await hash(html),"optional controls absent from delivery hash");
     }
+    const optionalFact={...extrasFact,check:{...extrasFact.check,"additional-java-sources":{...extrasPolicy,"primary-required":false}}};
+    const optionalConfig:any=structuredClone(config);optionalConfig["question-defaults"].submission={mode:"upload"};
+    const optionalOut=root+"/optional-primary";
+    const optionalDelivery=await exportCourse({...apiInput,config:optionalConfig,checks:{...input.checks,projects:[optionalFact]},output:optionalOut,checksOutput:optionalOut+"-checks.json"});
+    const optionalDescriptor=JSON.parse(await Deno.readTextFile(optionalOut+"/questions/demo/exr-a/tests/grading-job.json"));
+    const optionalHtml=await Deno.readTextFile(optionalOut+"/questions/demo/exr-a/question.html");
+    assert(optionalDescriptor.additionalJavaSources.primaryRequired===false,"optional primary missing from descriptor");
+    assert(optionalHtml.includes('optional-file-names="'+[...optionalDescriptor.sourceFiles.filter((name:string)=>!name.includes('/')),extrasPolicy.archive].join(',')+'"')&&!optionalHtml.includes(' file-names="')&&!optionalHtml.includes('<pl-file-editor '),"optional upload still requires primary");
+    assert(canonical(optionalDescriptor.sourceFiles)===canonical(apiDescriptor.sourceFiles)&&optionalDescriptor.sourceFiles.includes("pkg/A.java"),"nested primary inventory was flattened or dropped");
+    assert(optionalHtml.includes("исходники с пакетами и остальные .java поместите в ZIP"),"nested ZIP transport guidance absent");
+    assert(optionalDelivery.files["questions/demo/exr-a/question.html"]===await hash(optionalHtml),"optional UI hash missing");
+    optionalConfig["question-defaults"].submission={mode:"editor"};
+    let optionalDenied=false;try{await exportCourse({...apiInput,config:optionalConfig,checks:{...input.checks,projects:[optionalFact]},output:root+"/optional-editor-denied",checksOutput:root+"/optional-editor-denied.json"});}catch{optionalDenied=true;}
+    assert(optionalDenied,"optional primary accepted placeholder editor");
     const nativeFact={...extrasFact,check:{...extrasFact.check,runtime:"java25-gradle-junit-v1","java-build":{kind:"gradle-jar-v1","main-class":"grade.Main",artifact:"gradeapp.jar"}}};
     const nativeInput={...apiInput,checks:{...input.checks,projects:[nativeFact]},registry:{schemaVersion:1,profiles:{"java25-gradle-junit-v1":{mode:"implementation",javaRelease:25,image:"registry/native-java@sha256:"+"e".repeat(64)}}},output:root+"/native-gradle",checksOutput:root+"/native-gradle-checks.json"};
     await exportCourse(nativeInput);

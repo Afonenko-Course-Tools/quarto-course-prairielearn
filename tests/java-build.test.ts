@@ -41,3 +41,14 @@ Deno.test('Java API capability accepts only the two explicit implementation runt
  const plain=runtimeDescriptor({...c,runtime:'java25-junit-v1'},profile,['Main.java'],['Api.java','Checks.java'],api);
  assert(plain.apiPrecheck?.entry==='Api','plain Java API capability lost');
 });
+
+Deno.test('optional-primary policy preserves absent bytes and validates both typed values',()=>{
+ const extra={archive:'extra.zip','max-files':128,'max-file-bytes':1048576,'max-total-bytes':4194304,'max-archive-bytes':2097152};
+ const plain:any=runtimeDescriptor({...check,'additional-java-sources':extra},profile,['Main.java'],['Checks.java']);
+ assert(!('primaryRequired' in plain.additionalJavaSources),'legacy descriptor acquired field');
+ for(const value of [false,true]){
+  const descriptor:any=runtimeDescriptor({...check,'additional-java-sources':{...extra,'primary-required':value}},profile,['Main.java'],['Checks.java']);
+  assert(descriptor.additionalJavaSources.primaryRequired===value,'primaryRequired translation lost');
+ }
+ for(const value of [0,1,'false',null,undefined,[]])rejected(()=>runtimeDescriptor({...check,'additional-java-sources':{...extra,'primary-required':value}},profile,['Main.java'],['Checks.java']));
+});

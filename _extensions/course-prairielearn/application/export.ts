@@ -592,6 +592,7 @@ export async function exportPrairieLearn(
         "&#125;&#125;",
       );
     const extras=b.additionalJavaSources===undefined?undefined:validateAdditionalJavaSources(b.additionalJavaSources,b.files,tests.map(f=>f.name));
+    if(extras?.primaryRequired===false&&submission.mode!=='upload')questionFail('Необязательные primary Java sources требуют submission.mode: upload','submission');
     let controls: string;
     if (submission.mode === "editor") {
       controls = b.files.map((name: string) => {
@@ -628,12 +629,13 @@ export async function exportPrairieLearn(
         '<pl-file-download file-name="' + escape(f.name) +
         '"></pl-file-download>'
       ).join("\n");
-      controls = downloads + (manual?'\n<pl-file-upload file-patterns="*" optional-file-patterns="*"></pl-file-upload>':'\n<pl-file-upload file-names="' +
+      controls = downloads + (extras?.primaryRequired===false?'\n<pl-file-upload optional-file-names="'+escape([...b.files.filter((name:string)=>!name.includes('/')),extras.archive].join(','))+'"></pl-file-upload>':manual?'\n<pl-file-upload file-patterns="*" optional-file-patterns="*"></pl-file-upload>':'\n<pl-file-upload file-names="' +
         escape(b.files.join(",")) + '"' + (extras?' optional-file-names="'+escape(extras.archive)+'"':'') + '></pl-file-upload>');
     }
     if(extras){
       if(submission.mode==='editor')controls+='\n<pl-file-upload optional-file-names="'+escape(extras.archive)+'"></pl-file-upload>';
     }
+    if(extras?.primaryRequired===false)controls='<p>Перечисленные в поле загрузки файлы можно отправить отдельно; исходники с пакетами и остальные .java поместите в ZIP, сохранив относительные пути.</p>\n'+controls;
     if(artifact){
       controls='<p><a href="{{options.client_files_question_url}}/starter.zip">Скачать заготовку</a>'+(artifact.files.some(f=>f.name==='README.md')?' · <a href="{{options.client_files_question_url}}/starter/README.md">README</a>':'')+'</p>\n'+controls;
     }

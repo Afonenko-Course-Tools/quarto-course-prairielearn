@@ -546,3 +546,20 @@ Git-историю. При прямом копировании в `clientFilesQu
 Остальные raw файлы, README и ссылки сохраняются. Это позволяет перенести
 весь native курс обычным Git clone без вложенных gitlinks; историю учащийся
 получает после распаковки неизменённого ZIP.
+
+### Загрузка без обязательного starter primary
+
+`additional-java-sources.primary-required: false` переносится в runtime descriptor
+как `additionalJavaSources.primaryRequired: false`. Это opt-in только для Java
+implementation с полной bounded ZIP policy. Используйте `submission.mode: upload`:
+в единственном `pl-file-upload` все известные основные имена и архив перечислены
+в `optional-file-names`; editor явно отклоняется. Runtime проверяет непустую union
+реально загруженных Java sources и сохраняет API/tests/scoring. Подстановка
+starter/reference и автоматическое переключение в ручную проверку не выполняются.
+Отсутствие поля сохраняет прежний descriptor и UI; `true` сохраняет обязательные
+основные файлы. Starter inventory остаётся непустым.
+
+В opt-in upload отдельно перечисляются только primary без каталогов и архив.
+Nested primary передаются внутри ZIP с исходными относительными путями; полный
+`sourceFiles` и canonical binding сохраняются. Flattening, кодирование имён и
+wildcard загрузка не применяются.
