@@ -2,10 +2,14 @@
 type: specification
 component: course-prairielearn
 status: current
-updated: 2026-10-22
+updated: 2026-10-26
 ---
 
 # Спецификация заданий и контрольных работ
+
+Кандидат Exporter 8.3.0 продолжает принятую линию 8.2.5. Optional-primary
+требует Core 8.3.0 и нового отдельно проверенного Platform 2.4.0 image.
+Теги и OCI digests не подтверждаются version metadata; Body v2/native v3 сохранены.
 
 Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/7d8a472a0fe4f05b5543fb856336a6d15278ef3a/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
 
