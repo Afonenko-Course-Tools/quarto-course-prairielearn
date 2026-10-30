@@ -1,0 +1,47 @@
+{
+  "schema": "pl-trusted-git-helper-v1",
+  "repository": "https://github.com/BSU-RFCT-Afonenko-Courses/System-Practice",
+  "commit": "8c8622d7be5043f32a611717064bc642a346f1e0",
+  "functions": {
+    "git_env": {
+      "path": "tools/build_git_materials.py",
+      "sourceSha256": "11583511de304a10805e0cda1ed66cd5097e930e9878eb36cc81b144a14daeeb",
+      "functionSha256": "21bdd20d399d3f55e1f5d01ef03f5c4800a2f5a8e8d994ff564366149cc40f73"
+    },
+    "git": {
+      "path": "tools/build_git_materials.py",
+      "sourceSha256": "11583511de304a10805e0cda1ed66cd5097e930e9878eb36cc81b144a14daeeb",
+      "functionSha256": "ee767c76d434d8e3ce09ce2499dbe0420836a29e01587246f89c0ac6e0f3dc3d"
+    },
+    "put": {
+      "path": "tools/build_git_materials.py",
+      "sourceSha256": "11583511de304a10805e0cda1ed66cd5097e930e9878eb36cc81b144a14daeeb",
+      "functionSha256": "81a7c32bbe7a2ec2de17519199e20fe048f454d2d67bcd29b233f87d1a8e5741"
+    },
+    "commit": {
+      "path": "tools/build_git_materials.py",
+      "sourceSha256": "11583511de304a10805e0cda1ed66cd5097e930e9878eb36cc81b144a14daeeb",
+      "functionSha256": "7a2fa71cc8855869200232e57567dc6d81e9516d1a8ceccd21c43a12e5ec3618"
+    },
+    "initialize": {
+      "path": "tools/build_git_materials.py",
+      "sourceSha256": "11583511de304a10805e0cda1ed66cd5097e930e9878eb36cc81b144a14daeeb",
+      "functionSha256": "a27d66ce2d4f3e13d7a8453b4cad7a660670c712bfd9af7982784e8364950ab7"
+    },
+    "normalize": {
+      "path": "tools/build_git_materials.py",
+      "sourceSha256": "11583511de304a10805e0cda1ed66cd5097e930e9878eb36cc81b144a14daeeb",
+      "functionSha256": "a867c03c184a1b71a9c11fedc0f367f08d496433c145e1b490501e8170ebd0f3"
+    },
+    "target": {
+      "path": "tools/build_materials.py",
+      "sourceSha256": "0b2c209c0f37a719aa18b3c641ed1eabd580ac580042d3995d60a5dd5759bf04",
+      "functionSha256": "726041ce646aa99a842c8f910c206dbed23900bbd3e267e29e9b76bc48c144fd"
+    },
+    "safe_archive_name": {
+      "path": "tools/system_support.py",
+      "sourceSha256": "66d9a4259d7549b2b56a2113021bc33014ee0126e3e8384688c66c7f1f936b89",
+      "functionSha256": "ef0eb1013fd36490336c24c713e5674ea039e45bca6b24642be3f9fa0c77cd05"
+    }
+  }
+}
