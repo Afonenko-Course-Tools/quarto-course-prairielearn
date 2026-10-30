@@ -11,8 +11,8 @@ const gitStateFiles = [
   "work/**",
   "work/.git/**",
   "work/.*",
-  "explanation.md",
-  ".pl-seed/identity.json",
+  "explanation.m[d]",
+  ".pl-seed/identity.jso[n]",
 ];
 const workspaceOptions = z.strictObject({
   image: z.string().min(1).max(512).regex(

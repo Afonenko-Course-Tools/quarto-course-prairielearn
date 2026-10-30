@@ -51,8 +51,8 @@ Deno.test("Workspace summary описывает native сдачу без вым�
         "work/**",
         "work/.git/**",
         "work/.*",
-        "explanation.md",
-        ".pl-seed/identity.json",
+        "explanation.m[d]",
+        ".pl-seed/identity.jso[n]",
       ],
     },
   }, []);

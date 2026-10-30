@@ -574,7 +574,7 @@ wildcard загрузка не применяются.
 `application/submission.ts`; публичный вход — `_extensions/course-prairielearn/public.ts`.
 Он декодирует прежние editor/upload и новый Manual Git Workspace. Workspace
 требует `singleVariant: true`, точный image digest, home/port и явный возврат
-`work/**`, `work/.git/**`, `work/.*`, `explanation.md`, `.pl-seed/identity.json`.
+`work/**`, `work/.git/**`, `work/.*`, `explanation.m[d]`, `.pl-seed/identity.jso[n]`.
 Один wildcard не устанавливает перенос скрытой `.git`. В этой ранней партии
 проверены плоский учебный worktree, скрытый untracked файл, обычные Git objects,
 refs, HEAD и index; произвольная вложенная структура дополнительных скрытых
@@ -607,3 +607,9 @@ HEAD/index/worktree не изменяются. Существующая рабо
 остаются отдельными открытыми проверками. Старый CUE не расширяется вторым
 постоянным описанием Workspace. Наличие local info.json не означает готовность
 курса или возможность публикации на портале.
+
+Для `explanation.md` и `.pl-seed/identity.json` используются точные bracket
+patterns `explanation.m[d]` и `.pl-seed/identity.jso[n]`. Они выбирают те же
+реальные имена, но native question-variant не превращает их в обязательные
+поля самостоятельной локальной загрузки. Локальная сдача архива разрешена
+без запуска Workspace; её полнота по условию остаётся предметом Manual.
