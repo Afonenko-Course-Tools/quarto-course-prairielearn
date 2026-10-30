@@ -567,3 +567,43 @@ starter/reference и автоматическое переключение в р
 Nested primary передаются внутри ZIP с исходными относительными путями; полный
 `sourceFiles` и canonical binding сохраняются. Flattening, кодирование имён и
 wildcard загрузка не применяются.
+
+## Ранний Git Workspace: локальный кандидат
+
+Единственный runtime-канон изменённого submission-контракта находится в
+`application/submission.ts`; публичный вход — `_extensions/course-prairielearn/public.ts`.
+Он декодирует прежние editor/upload и новый Manual Git Workspace. Workspace
+требует `singleVariant: true`, точный image digest, home/port и явный возврат
+`work/**`, `work/.git/**`, `work/.*`, `explanation.md`, `.pl-seed/identity.json`.
+Один wildcard не устанавливает перенос скрытой `.git`. В этой ранней партии
+проверены плоский учебный worktree, скрытый untracked файл, обычные Git objects,
+refs, HEAD и index; произвольная вложенная структура дополнительных скрытых
+каталогов этим набором шаблонов ещё не квалифицирована.
+
+`exportPrairieLearn` принимает полный student artifact от Core/Download,
+сохраняет его ZIP без изменения в `workspace/.pl-seed/starter.zip` и связывает
+manifest с SHA-256 архива и каждым member исходного inventory. При отсутствии
+Git seed либо неполном договоре возврата публикация отвергается. Служебные
+байты `.pl-seed` принадлежат транспорту. Студент не создаёт ZIP в Workspace.
+Native вопрос содержит `pl-workspace`, `pl-file-preview` и необязательную
+загрузку для полноценного локального пути. Автоматический grader не добавляется.
+
+Назначенный image `sp-git-workspace` проверяет seed до первого использования,
+создаёт только исходный A/main и записывает identity. При restart существующие
+HEAD/index/worktree не изменяются. Существующая работа без identity, пропавшая
+работа с identity или изменённый seed дают явный отказ без автоматического сброса.
+Ручной разбор различает конечные свойства и свидетельства двух restore.
+
+`describeSubmission(contract, files)` возвращает нейтральный фрагмент README:
+`{files:[{name,starterPath?}],instructions}`. `name` — логическое имя сдачи,
+`starterPath` — отдельный проверенный путь в starter; basename не выводится.
+Для Workspace `files: []`: фиктивное имя загрузки не создаётся. Core владеет
+общей схемой этого фрагмента и README writer; mode/options остаются у PL.
+
+Это ограниченная локальная партия. Native schema закреплена provenance commit
+`92584fe426ececb84bc2d09de9975c7056c0c5f6`. Полный перенос прежнего CUE/Lua reader
+на TS, подключение actual Core inventory/summary в установленной композиции,
+новый опубликованный image digest и квалификация действующего Workspace host
+остаются отдельными открытыми проверками. Старый CUE не расширяется вторым
+постоянным описанием Workspace. Наличие local info.json не означает готовность
+курса или возможность публикации на портале.

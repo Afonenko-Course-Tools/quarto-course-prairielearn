@@ -1,3 +1,4 @@
+import { submission as parseSubmission } from "./submission.ts";
 import { createMetrics as __createMetrics } from "../observability/bridge.ts";
 const __metrics = __createMetrics("course-prairielearn");
 export const object = (v: any) =>
@@ -26,13 +27,15 @@ export function question(v: any) {
   if (typeof v.topic !== "string" || !v.topic.trim()) {
     throw new Error("PL topic required");
   }
-  closed(v.submission, ["mode"], ["ace-mode"]);
+  const submission = parseSubmission(v.submission, true);
   if (
-    !["editor", "upload"].includes(v.submission.mode) ||
-    v.submission["ace-mode"] !== undefined &&
-      (v.submission.mode !== "editor" ||
-        !/^ace\/mode\/[a-z][a-z0-9_]*$/.test(v.submission["ace-mode"]))
-  ) throw new Error("PL submission invalid");
+    submission.mode === "workspace" &&
+    (v.grading?.method !== "manual" || v["single-variant"] === false)
+  ) {
+    throw Error(
+      "PL.WORKSPACE_INVALID: Workspace требует Manual и single-variant: true",
+    );
+  }
   return {
     topic: v.topic,
     ...(v.grading !== undefined && v.grading !== "external"
@@ -41,12 +44,8 @@ export function question(v: any) {
     ...(Object.hasOwn(v, "single-variant")
       ? { singleVariant: v["single-variant"] }
       : {}),
-    submission: {
-      mode: v.submission.mode,
-      ...(v.submission["ace-mode"]
-        ? { aceMode: v.submission["ace-mode"] }
-        : {}),
-    },
+    ...(submission.mode === "workspace" ? { singleVariant: true } : {}),
+    submission,
   };
 }
 export function gradingMethod(

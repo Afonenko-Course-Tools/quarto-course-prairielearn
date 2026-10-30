@@ -1,3 +1,5 @@
+import { workspaceSeed } from "./workspace-seed.ts";
+import { submission as parseSubmission } from "./submission.ts";
 import {
   type PublicationCondition,
   publicationConditionFile,
@@ -631,27 +633,29 @@ export async function exportPrairieLearn(
         "binding.questions." + q.id,
       );
     }
-    const submission = b.submission ?? { mode: "upload" };
+    let submission!: ReturnType<typeof parseSubmission>;
+    try {
+      submission = parseSubmission(b.submission ?? { mode: "upload" });
+    } catch (cause) {
+      questionFail("Неверный договор submission", "submission", cause);
+    }
+    const workspace = submission.mode === "workspace"
+      ? submission.workspaceOptions
+      : undefined;
     if (
       manual &&
-      (submission.mode !== "upload" || b.additionalJavaSources !== undefined)
+      (submission.mode === "editor" || b.additionalJavaSources !== undefined ||
+        b.externalGradingOptions !== undefined)
     ) {
       questionFail(
-        "Manual требует штатную загрузку файлов без автоматического runtime",
+        "Manual требует upload или Workspace без автоматического runtime",
         "submission",
       );
     }
-    if (
-      !fields(submission, ["mode"], ["aceMode"]) ||
-      !["upload", "editor"].includes(submission.mode) ||
-      submission.aceMode !== undefined &&
-        (submission.mode !== "editor" ||
-          typeof submission.aceMode !== "string" ||
-          !/^ace\/mode\/[a-z][a-z0-9_]*$/.test(submission.aceMode))
-    ) {
+    if (workspace && (!manual || b.singleVariant === false)) {
       questionFail(
-        "Неверный режим submission: upload либо editor с необязательным aceMode",
-        "binding.questions." + q.id + ".submission",
+        "Workspace требует Manual и singleVariant: true",
+        "submission",
       );
     }
     const grading = b.externalGradingOptions;
@@ -767,6 +771,24 @@ export async function exportPrairieLearn(
         data: artifact.archive,
       });
     }
+    if (submission.mode === "workspace") {
+      let seed;
+      try {
+        seed = await workspaceSeed(artifact);
+      } catch (cause) {
+        questionFail(
+          "Неполный seed либо договор возврата Workspace",
+          "studentArtifact",
+          cause,
+        );
+      }
+      for (const file of seed!) {
+        prepared.push({
+          name: base + "/workspace/" + file.name,
+          data: file.data,
+        });
+      }
+    }
     for (const f of submission.mode === "editor" ? [] : student) {
       prepared.push({
         name: base + "/clientFilesQuestion/" + f.name,
@@ -808,7 +830,10 @@ export async function exportPrairieLearn(
       );
     }
     let controls: string;
-    if (submission.mode === "editor") {
+    if (workspace) {
+      controls =
+        '<pl-workspace></pl-workspace>\n<p>При работе в собственной ОС загрузите архив решения.</p>\n<pl-file-upload optional-file-patterns="*.zip,*.tar.gz"></pl-file-upload>';
+    } else if (submission.mode === "editor") {
       controls = b.files.map((name: string) => {
         const starter = student.find((file) => file.name === name);
         if (!starter || starter.data.length > 1024 * 1024) {
@@ -890,7 +915,9 @@ export async function exportPrairieLearn(
     text(
       base + "/question.html",
       "<pl-question-panel>\n" + metadata(q) + html + "\n" + controls +
-        "\n</pl-question-panel>\n" + (manual
+        "\n</pl-question-panel>\n" + (workspace
+          ? "<pl-submission-panel><pl-file-preview></pl-file-preview></pl-submission-panel>\n"
+          : manual
           ? ""
           : "<pl-submission-panel><pl-external-grader-results></pl-external-grader-results></pl-submission-panel>\n"),
     );
@@ -905,6 +932,9 @@ export async function exportPrairieLearn(
           gradingMethod: manual ? "Manual" : "External",
           ...(b.singleVariant !== undefined
             ? { singleVariant: b.singleVariant }
+            : {}),
+          ...(workspace
+            ? { singleVariant: true, workspaceOptions: workspace }
             : {}),
           showCorrectAnswer: false,
           partialCredit: false,
