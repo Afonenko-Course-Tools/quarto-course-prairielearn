@@ -1,6 +1,7 @@
 // @deno-types="../vendor/zod/v4/index.d.ts"
 import { z } from "../vendor/zod/v4/index.js";
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { nativeWorkspaceArtifact } from "./native-workspace.ts";
 import { decodeNativeCheck } from "./native-checks.ts";
 import {
@@ -190,6 +191,18 @@ export function createNativeAdapter(
             original.attributes[key] !== value
           ) throw Error("PL.CAPTURE_CHANGED: authored adapter attribute");
         }
+      }
+      if (!Object.hasOwn(input, "configuration")) {
+        throw Error("PL.CAPTURE_CHANGED: missing authored configuration");
+      }
+      // Оба значения проходят один PL decoder; generated JSON не является authority.
+      const captured = validateNativeRaw(raw.business).config;
+      const authoritative = validateNativeRaw({
+        ...raw.business,
+        config: input.configuration,
+      }).config;
+      if (!isDeepStrictEqual(captured, authoritative)) {
+        throw Error("PL.CAPTURE_CHANGED: authored configuration");
       }
       const business = decodeNativeBusiness(raw.business, input);
       const sources: { path: string; kind: "directory" | "file" }[] = [];

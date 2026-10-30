@@ -3,6 +3,8 @@ import { fileURLToPath, pathToFileURL as toFileUrl } from "node:url";
 
 // Запуск: quarto run tests/native-adapter-integration.ts <immutable Core snapshot>.
 const snapshot = Deno.args[0];
+const metadata = Deno.args.includes("--metadata");
+const profiles = metadata ? ["qualified"] : [];
 if (!snapshot) throw Error("Требуется точный Core snapshot");
 const corePath = join(snapshot, "_extensions/course-core");
 const Core = await import(toFileUrl(join(corePath, "public.ts")).href);
@@ -61,7 +63,9 @@ await put(
 import * as PL from ${
     JSON.stringify(toFileUrl(join(plPath, "public.ts")).href)
   };
-await PL.prepareNativeAdapter(Core,{root:Deno.cwd(),profiles:[],format:'html',projection:'student',outputDirectory:Deno.cwd()+'/_site'});`,
+await PL.prepareNativeAdapter(Core,{root:Deno.cwd(),profiles:${
+    JSON.stringify(profiles)
+  },format:'html',projection:'student',outputDirectory:Deno.cwd()+'/_site'});`,
 );
 await put(
   "_quarto.yml",
@@ -99,7 +103,13 @@ filters:
 );
 async function render() {
   const r = await new Deno.Command("quarto", {
-    args: ["render", "index.qmd", "--to", "html"],
+    args: [
+      "render",
+      "index.qmd",
+      "--to",
+      "html",
+      ...(metadata ? ["--profile", "qualified"] : []),
+    ],
     cwd: root,
     env: { QUARTO_RUN_NO_NETWORK: "true", DENO_NO_PACKAGE_JSON: "1" },
     stdout: "piped",
@@ -112,11 +122,45 @@ async function render() {
 }
 const expectation = {
   root,
-  profiles: [],
+  profiles,
   format: "html",
   projection: "student",
   outputDirectory: root + "/_site",
 };
+if (metadata) {
+  const config = await Deno.readTextFile(join(root, "_quarto.yml"));
+  await put(
+    "_quarto.yml",
+    config.replace(
+      /prairielearn:\n  question-defaults:[\s\S]*?(?=filters:)/,
+      "metadata-files: [settings.yml]\n",
+    ),
+  );
+  await put(
+    "settings.yml",
+    `prairielearn: &policy
+  question-defaults:
+    topic: Metadata
+    grading: {method: manual}
+    submission: {mode: upload}
+foreign-policy-copy: *policy
+`,
+  );
+  await put(
+    "_metadata.yml",
+    `prairielearn:
+  question-defaults:
+    single-variant: true
+`,
+  );
+  await put(
+    "_quarto-qualified.yml",
+    `prairielearn:
+  question-defaults:
+    topic: Profile
+`,
+  );
+}
 await render();
 const base = join(root, "_generated/course-spec/prairielearn-native");
 async function rawPath() {
@@ -156,9 +200,14 @@ await Core.withCurrentNativeOperation(expectation, async (op: any) => {
     await Deno.remove(other, { recursive: true });
   }
   const adapter = PL.createNativeAdapter({ root, core: Core });
-  const proof = await op.validateRelease({ expectedSources: ["index.qmd"] }, [
-    adapter,
-  ]);
+  let authenticated: any;
+  const proof = await op.validateRelease({ expectedSources: ["index.qmd"] }, [{
+    name: "prairielearn",
+    validate(input: unknown) {
+      authenticated = structuredClone(input);
+      return adapter.validate(input);
+    },
+  }]);
   check(
     "actual-public-executable-validator",
     proof.validatedAdapters.includes("prairielearn"),
@@ -174,6 +223,85 @@ await Core.withCurrentNativeOperation(expectation, async (op: any) => {
     adapter.business("index.qmd").questions["exr-open"].grading.method ===
       "manual",
   );
+  if (metadata) {
+    const question = adapter.business("index.qmd").questions["exr-open"];
+    check(
+      "actual-native-metadata-files-alias-directory-profile",
+      question.topic === "Profile" && question.singleVariant === true &&
+        question.submission.mode === "upload",
+    );
+  }
+  const missing = structuredClone(authenticated);
+  delete missing.configuration;
+  await refuse(
+    "missing-authentic-configuration-refused",
+    () => PL.createNativeAdapter({ root, core: Core }).validate(missing),
+    "PL.CAPTURE_CHANGED",
+  );
+  // Валидная схема и current identity не дают generated sidecar менять authored policy.
+  const changed = JSON.parse(first);
+  changed.business.config["question-defaults"].submission = {
+    mode: "editor",
+    "ace-mode": "ace/mode/text",
+  };
+  await Deno.writeTextFile(firstPath, JSON.stringify(changed));
+  try {
+    await refuse(
+      "valid-current-capture-cannot-replace-authored-submission",
+      () =>
+        op.validateRelease({ expectedSources: ["index.qmd"] }, [
+          PL.createNativeAdapter({ root, core: Core }),
+        ]),
+      "PL.CAPTURE_CHANGED",
+    );
+  } finally {
+    await Deno.writeTextFile(firstPath, first);
+  }
+  for (
+    const [name, mutate] of [
+      ["missing-raw-config", (raw: any) => {
+        delete raw.business.config;
+      }],
+      ["changed-assessment-defaults", (raw: any) => {
+        raw.business.config["assessment-defaults"] = { attempts: "2" };
+      }],
+    ] as const
+  ) {
+    const changed = JSON.parse(first);
+    mutate(changed);
+    await Deno.writeTextFile(firstPath, JSON.stringify(changed));
+    try {
+      await refuse(
+        name,
+        () =>
+          op.validateRelease({ expectedSources: ["index.qmd"] }, [
+            PL.createNativeAdapter({ root, core: Core }),
+          ]),
+        "PL.CAPTURE_CHANGED",
+      );
+    } finally {
+      await Deno.writeTextFile(firstPath, first);
+    }
+  }
+  const reordered = JSON.parse(first);
+  const defaults = reordered.business.config["question-defaults"];
+  reordered.business.config["question-defaults"] = Object.fromEntries(
+    Object.entries(defaults).reverse(),
+  );
+  await Deno.writeTextFile(firstPath, JSON.stringify(reordered));
+  try {
+    const reorderedAdapter = PL.createNativeAdapter({ root, core: Core });
+    await op.validateRelease({ expectedSources: ["index.qmd"] }, [
+      reorderedAdapter,
+    ]);
+    check(
+      "equivalent-native-map-order-preserved",
+      reorderedAdapter.business("index.qmd").questions["exr-open"].submission
+        .mode === "upload",
+    );
+  } finally {
+    await Deno.writeTextFile(firstPath, first);
+  }
   await refuse(
     "missing-real-adapter",
     () => op.validateRelease({ expectedSources: ["index.qmd"] }),

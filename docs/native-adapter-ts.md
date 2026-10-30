@@ -37,6 +37,25 @@ Frozen Core payload не получает новый `deno.lock` при запу
 Это данные владельца, а не новое полномочие на чтение файлов или release proof.
 Неверный raw capture не заменяется default/fallback.
 
+В ограниченном исправлении I1 callback требует подлинный
+`NativeAdapterValidationInput.configuration` из native preprojection AST Core.
+Сохранённый `raw.business.config` и это значение проходят один
+`validateNativeRaw`; сравнение полученных namespace не зависит от порядка
+ключей. Missing configuration и валидная по схеме подмена, включая
+`question-defaults` и `assessment-defaults`, получают `PL.CAPTURE_CHANGED`
+до выдачи business и release proof. Наследование metadata-files, YAML aliases,
+каталожного `_metadata.yml` и активного профиля по-прежнему выполняет Quarto.
+
+Для этого checkpoint использована неизменяемая **не прошедшая рецензию**
+зависимость Core `4b47708c951188fdf76b01f2311120514f9bebc9`. Совместимость
+со старым callback без configuration не заявляется. Это закрывает только
+плоскость `meta.prairielearn`: `assessment.prairielearn`, `project-checks` и
+`project-materialization` остаются отдельными исходными metadata namespace.
+Имеющиеся `input.assessment` и атрибуты `project`/`project-check` удостоверяют
+общий состав и имена, но не все байты этих policy. Полная I1 acceptance
+требует их авторитетного native транспорта и независимой проверки пары
+Core producer → C consumer; текущая проверка схемы sidecar её не заменяет.
+
 ## Compiler inputs и корневая миграция
 
 `selectNativeCompilerInputs` — чистый consumer действительных A1 student/full
