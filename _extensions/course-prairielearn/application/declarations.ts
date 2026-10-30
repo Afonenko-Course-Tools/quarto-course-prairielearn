@@ -1,5 +1,5 @@
-import {createMetrics as __createMetrics} from "../observability/bridge.ts";
-const __metrics=__createMetrics("course-prairielearn");
+import { createMetrics as __createMetrics } from "../observability/bridge.ts";
+const __metrics = __createMetrics("course-prairielearn");
 export const object = (v: any) =>
   v !== null && typeof v === "object" && !Array.isArray(v);
 export function closed(v: any, required: string[], optional: string[] = []) {
@@ -18,7 +18,7 @@ export function closed(v: any, required: string[], optional: string[] = []) {
   }
 }
 export function question(v: any) {
-  closed(v, ["topic", "submission"], ["single-variant","grading"]);
+  closed(v, ["topic", "submission"], ["single-variant", "grading"]);
   if (
     Object.hasOwn(v, "single-variant") &&
     typeof v["single-variant"] !== "boolean"
@@ -35,7 +35,9 @@ export function question(v: any) {
   ) throw new Error("PL submission invalid");
   return {
     topic: v.topic,
-    ...(v.grading!==undefined&&v.grading!=='external'?{grading:gradingMethod(v.grading)}:{}),
+    ...(v.grading !== undefined && v.grading !== "external"
+      ? { grading: gradingMethod(v.grading) }
+      : {}),
     ...(Object.hasOwn(v, "single-variant")
       ? { singleVariant: v["single-variant"] }
       : {}),
@@ -47,11 +49,19 @@ export function question(v: any) {
     },
   };
 }
-export function gradingMethod(value:any):{method:'external'|'manual'|'mixed'}{
-  if(value===undefined||value==='external')return {method:'external'};
-  closed(value,['method']);
-  if(!['manual','mixed'].includes(value.method))throw Error('PL.GRADING_INVALID: grading.method должен быть manual или mixed');
-  return {method:value.method};
+export function gradingMethod(
+  value: any,
+): { method: "external" | "manual" | "mixed" } {
+  if (value === undefined || value === "external") {
+    return { method: "external" };
+  }
+  closed(value, ["method"]);
+  if (!["manual", "mixed"].includes(value.method)) {
+    throw Error(
+      "PL.GRADING_INVALID: grading.method должен быть manual или mixed",
+    );
+  }
+  return { method: value.method };
 }
 export function declarations(raw: any, key: string) {
   closed(raw, ["delivery", "question-defaults"], ["assessment-defaults"]);
@@ -125,8 +135,17 @@ export function declarations(raw: any, key: string) {
 }
 
 // @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-closed=__metrics.wrapSync({id:"course-prairielearn.application.declarations.closed",kind:"phase"},closed);
+closed = __metrics.wrapSync({
+  id: "course-prairielearn.application.declarations.closed",
+  kind: "phase",
+}, closed);
 // @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-question=__metrics.wrapSync({id:"course-prairielearn.application.declarations.question",kind:"phase"},question);
+question = __metrics.wrapSync({
+  id: "course-prairielearn.application.declarations.question",
+  kind: "phase",
+}, question);
 // @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-declarations=__metrics.wrapSync({id:"course-prairielearn.application.declarations.declarations",kind:"phase"},declarations);
+declarations = __metrics.wrapSync({
+  id: "course-prairielearn.application.declarations.declarations",
+  kind: "phase",
+}, declarations);
