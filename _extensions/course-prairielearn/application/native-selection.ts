@@ -107,14 +107,25 @@ export async function selectNativeCompilerInputs(options: {
       typeof e !== "string" || !/^\.[a-z][a-z0-9]*$/.test(e)
     )
   ) throw Error("PL.SELECTION_INVALID: runtime extensions");
-  for (const source of sources) {
+  function validateSources(files: typeof sources) {
     if (
-      !extensions.some((e: string) => source.name.endsWith(e)) ||
-      source.bytes.length > 1048576
-    ) throw Error("PL.SELECTION_INVALID: non-source student target");
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(source.bytes);
-    if (text.includes("\0")) throw Error("PL.SELECTION_INVALID: NUL source");
+      !files.length || files.length > 128 ||
+      files.reduce((n, f) => n + f.bytes.length, 0) > 4194304
+    ) {
+      throw Error("PL.SELECTION_INVALID: source count/total bytes");
+    }
+    for (const source of files) {
+      if (
+        !extensions.some((e: string) => source.name.endsWith(e)) ||
+        source.bytes.length > 1048576
+      ) throw Error("PL.SELECTION_INVALID: non-source student target");
+      const text = new TextDecoder("utf-8", { fatal: true }).decode(
+        source.bytes,
+      );
+      if (text.includes("\0")) throw Error("PL.SELECTION_INVALID: NUL source");
+    }
   }
+  validateSources(sources);
   function trustedRole(f: File) {
     return f.reason.startsWith("testset:")
       ? fullPlan.testsets.includes(f.reason.slice(8))
@@ -177,11 +188,8 @@ export async function selectNativeCompilerInputs(options: {
     const files = await Promise.all(
       records.map((f) => file(f, under(f.target, ref.root)!)),
     );
-    if (files.some((f) => !sources.some((s) => s.name === f.name))) {
-      throw Error(
-        "PL.SELECTION_INVALID: reference mapping differs from primary",
-      );
-    }
+    // Вспомогательные классы эталона принадлежат той же проверенной A1 solution group.
+    validateSources(files);
     references.push({ name: ref.name, files });
   }
   const descriptor = runtimeDescriptor(

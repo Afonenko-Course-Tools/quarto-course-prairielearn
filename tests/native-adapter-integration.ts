@@ -32,7 +32,7 @@ async function refuse(name: string, callback: () => unknown, expected: string) {
   }
   check(
     name + (!error.includes(expected) ? ": " + error : ""),
-    error.includes(expected),
+    Boolean(error) && error.includes(expected),
   );
 }
 await put(
@@ -65,7 +65,7 @@ import * as PL from ${
   };
 await PL.prepareNativeAdapter(Core,{root:Deno.cwd(),profiles:${
     JSON.stringify(profiles)
-  },format:'html',projection:'student',outputDirectory:Deno.cwd()+'/_site'});`,
+  },projection:'student',outputDirectory:Deno.cwd()+'/_site'});`,
 );
 await put(
   "_quarto.yml",
@@ -123,7 +123,6 @@ async function render() {
 const expectation = {
   root,
   profiles,
-  format: "html",
   projection: "student",
   outputDirectory: root + "/_site",
 };
@@ -203,6 +202,7 @@ await Core.withCurrentNativeOperation(expectation, async (op: any) => {
   let authenticated: any;
   const proof = await op.validateRelease({ expectedSources: ["index.qmd"] }, [{
     name: "prairielearn",
+    nativeMetadataReadSet: adapter.nativeMetadataReadSet,
     validate(input: unknown) {
       authenticated = structuredClone(input);
       return adapter.validate(input);
@@ -231,12 +231,66 @@ await Core.withCurrentNativeOperation(expectation, async (op: any) => {
         question.submission.mode === "upload",
     );
   }
+  for (
+    const [plane, mutation] of [
+      [
+        "config",
+        (raw: any) => raw.business.config["question-defaults"].topic = "Forged",
+      ],
+      [
+        "assessment",
+        (raw: any) =>
+          raw.business.assessment = { attempts: 2, pass: { "at-least": 1 } },
+      ],
+      [
+        "projectChecks",
+        (raw: any) =>
+          raw.business.projectChecks = { "source-profiles": {}, profiles: {} },
+      ],
+      ["materialization", (raw: any) =>
+        raw.business.materialization = {
+          projects: { "exr-open": { "include-git": true, "common-files": [] } },
+        }],
+    ] as const
+  ) {
+    const changed = JSON.parse(first);
+    mutation(changed);
+    await Deno.writeTextFile(firstPath, JSON.stringify(changed));
+    try {
+      await refuse(
+        "authentic-" + plane + "-tamper-refused",
+        () =>
+          op.validateRelease({ expectedSources: ["index.qmd"] }, [
+            PL.createNativeAdapter({ root, core: Core }),
+          ]),
+        "PL.CAPTURE_CHANGED",
+      );
+    } finally {
+      await Deno.writeTextFile(firstPath, first);
+    }
+  }
+  for (
+    const readSet of [[], ["configuration"], [
+      "configuration",
+      "assessment",
+      "projectChecks",
+      "projectChecks",
+    ]]
+  ) {
+    const incomplete = structuredClone(authenticated);
+    incomplete.nativeMetadata.readSet = readSet;
+    await refuse(
+      "incomplete-readset-refused",
+      () => adapter.validate(incomplete),
+      "",
+    );
+  }
   const missing = structuredClone(authenticated);
-  delete missing.configuration;
+  delete missing.nativeMetadata;
   await refuse(
-    "missing-authentic-configuration-refused",
+    "missing-authentic-envelope-refused",
     () => PL.createNativeAdapter({ root, core: Core }).validate(missing),
-    "PL.CAPTURE_CHANGED",
+    "nativeMetadata",
   );
   // Валидная схема и current identity не дают generated sidecar менять authored policy.
   const changed = JSON.parse(first);

@@ -26,10 +26,14 @@ return {{Pandoc=function(doc)
    declarations:insert(declaration)
   end
  end})
- local value={config=plain(doc.meta.prairielearn or {}),declarations=declarations}
+ local value={declarations=declarations}
+ if doc.meta.prairielearn~=nil then value.config=plain(doc.meta.prairielearn)end
+ local native=quarto.format.format_identifier()
+ local format=native['target-format']
+ assert((format=='html' or format=='revealjs') and native['base-format']==format,'PL.CAPTURE_FORMAT: требуется exact html/revealjs')
  if doc.meta.assessment and doc.meta.assessment.prairielearn~=nil then value.assessment=plain(doc.meta.assessment.prairielearn)end
  if doc.meta['project-checks']~=nil then value.projectChecks=plain(doc.meta['project-checks'])end
  if doc.meta['project-materialization']~=nil then value.materialization=plain(doc.meta['project-materialization'])end
- pandoc.pipe(os.getenv('QUARTO') or 'quarto',{'run',directory..'/capture.ts',root,source},pandoc.json.encode(value))
+ pandoc.pipe(os.getenv('QUARTO') or 'quarto',{'run',directory..'/capture.ts',root,source,format},pandoc.json.encode(value))
  return doc
 end}}

@@ -108,7 +108,7 @@ const fields = {
     kind: z.literal("gradle-jar-v1"),
     "main-class": text.regex(
       /^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/,
-    ),
+    ).optional(),
     artifact: text.regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.jar$/),
   }).optional(),
   "additional-java-sources": z.strictObject({

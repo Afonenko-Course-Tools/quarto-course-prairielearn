@@ -3,10 +3,15 @@ import { z } from "../vendor/zod/v4/index.js";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { nativeWorkspaceArtifact } from "./native-workspace.ts";
-import { decodeNativeCheck } from "./native-checks.ts";
+import {
+  decodeNativeCheck,
+  nativeCheckScalars,
+  NativeProjectChecksSchema,
+} from "./native-checks.ts";
 import {
   decodeNativeBusiness,
   NativeBusinessSchema,
+  nativePolicy,
   validateNativeRaw,
 } from "./native-business.ts";
 import { hash, safePath } from "./source-selection.ts";
@@ -15,7 +20,7 @@ const originSchema = z.strictObject({
   operation: z.uuid(),
   captureWitness: z.uuid(),
   source: z.string().refine(safePath),
-  format: z.literal("html"),
+  format: z.enum(["html", "revealjs"]),
   projection: z.enum(["student", "author"]),
   profiles: z.array(z.string()).max(16),
 });
@@ -67,8 +72,10 @@ async function ownFile(root: string, path: string) {
 }
 export async function prepareNativeAdapter(core: PublicCore, expectation: any) {
   const root = await Deno.realPath(expectation.root);
-  await core.withPendingNativeOperation(
-    { ...expectation, root },
+  const profiles = expectation.profiles ??
+    (Deno.env.get("QUARTO_PROFILE") || "").split(",").filter(Boolean);
+  return await core.withPendingNativeOperation(
+    { ...expectation, root, profiles },
     async (pending) => {
       const identity = structuredClone(pending.identity),
         inputs = structuredClone(pending.inputs);
@@ -86,6 +93,23 @@ export async function prepareNativeAdapter(core: PublicCore, expectation: any) {
         identity,
         inputs: requests,
       };
+      try {
+        const previous = JSON.parse(
+          await Deno.readTextFile(
+            await ownFile(root, ownBase + "/" + id + "/request.json"),
+          ),
+        );
+        if (!isDeepStrictEqual(previous, request)) {
+          throw Error("PL.CAPTURE_CHANGED: preparation");
+        }
+        const current = await requestFor(root);
+        if (current.id !== id) {
+          throw Error("PL.CAPTURE_CHANGED: active preparation");
+        }
+        return;
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) throw error;
+      }
       await Deno.writeTextFile(
         join(folder, "request.json"),
         JSON.stringify(request),
@@ -119,6 +143,7 @@ export async function captureNativeBusiness(
   root: string,
   source: string,
   business: unknown,
+  format: "html" | "revealjs",
 ) {
   root = await Deno.realPath(root);
   const { id, request } = await requestFor(root);
@@ -132,7 +157,7 @@ export async function captureNativeBusiness(
       operation: id,
       captureWitness: input.captureWitness,
       source,
-      format: request.identity.format,
+      format,
       projection: request.identity.projection,
       profiles: request.identity.profiles,
     },
@@ -152,6 +177,14 @@ export function createNativeAdapter(
   const effectiveInputs = new Map<string, any>();
   const adapter = {
     name: "prairielearn",
+    nativeMetadataReadSet: Object.freeze(
+      [
+        "configuration",
+        "assessment",
+        "projectChecks",
+        "projectMaterialization",
+      ] as const,
+    ),
     async validate(value: unknown) {
       const input = options.core.NativeAdapterValidationInputSchema.parse(
         value,
@@ -192,19 +225,55 @@ export function createNativeAdapter(
           ) throw Error("PL.CAPTURE_CHANGED: authored adapter attribute");
         }
       }
-      if (!Object.hasOwn(input, "configuration")) {
-        throw Error("PL.CAPTURE_CHANGED: missing authored configuration");
+      const slots = adapter.nativeMetadataReadSet;
+      const envelope = input.nativeMetadata;
+      if (
+        !envelope || !Array.isArray(envelope.readSet) ||
+        envelope.readSet.length !== slots.length ||
+        slots.some((slot) => !envelope.readSet.includes(slot)) ||
+        !envelope.values ||
+        Object.keys(envelope.values).some((key) => !slots.includes(key as any))
+      ) {
+        throw Error("PL.CAPTURE_CHANGED: missing or incomplete nativeMetadata");
       }
-      // Оба значения проходят один PL decoder; generated JSON не является authority.
-      const captured = validateNativeRaw(raw.business).config;
-      const authoritative = validateNativeRaw({
-        ...raw.business,
-        config: input.configuration,
-      }).config;
-      if (!isDeepStrictEqual(captured, authoritative)) {
-        throw Error("PL.CAPTURE_CHANGED: authored configuration");
+      const mapping = {
+        configuration: "config",
+        assessment: "assessment",
+        projectChecks: "projectChecks",
+        projectMaterialization: "materialization",
+      } as const;
+      const authoritativeRaw: any = { declarations: raw.business.declarations };
+      for (const slot of slots) {
+        if (Object.hasOwn(envelope.values, slot)) {
+          authoritativeRaw[mapping[slot]] = envelope.values[slot];
+        }
       }
-      const business = decodeNativeBusiness(raw.business, input);
+      // Обе стороны проходят тот же прежний PL canon. Отсутствие slot сохраняет отдельный смысл.
+      const planes = (value: unknown) => {
+        const checked = validateNativeRaw(value), r = checked.raw;
+        return {
+          ...(Object.hasOwn(r, "config")
+            ? { configuration: checked.config }
+            : {}),
+          ...(Object.hasOwn(r, "assessment")
+            ? { assessment: nativePolicy(r.assessment) }
+            : {}),
+          ...(Object.hasOwn(r, "projectChecks")
+            ? {
+              projectChecks: NativeProjectChecksSchema.parse(
+                nativeCheckScalars(r.projectChecks),
+              ),
+            }
+            : {}),
+          ...(Object.hasOwn(r, "materialization")
+            ? { projectMaterialization: r.materialization }
+            : {}),
+        };
+      };
+      if (!isDeepStrictEqual(planes(raw.business), planes(authoritativeRaw))) {
+        throw Error("PL.CAPTURE_CHANGED: authored native metadata");
+      }
+      const business = decodeNativeBusiness(authoritativeRaw, input);
       const sources: { path: string; kind: "directory" | "file" }[] = [];
       for (const declaration of input.declarations) {
         const path = declaration.attributes.project?.replace(/^\//, "");
@@ -222,7 +291,7 @@ export function createNativeAdapter(
           throw Error("PL.PROJECT_CHECK_INVALID: требуется project-check");
         }
         if (settings.grading.method !== "manual") {
-          decodeNativeCheck(raw.business.projectChecks, check);
+          decodeNativeCheck(authoritativeRaw.projectChecks, check);
         }
         sources.push({ path, kind: "directory" });
       }

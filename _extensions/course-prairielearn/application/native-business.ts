@@ -42,7 +42,7 @@ export const AssessmentDefaultsSchema = ScoringPolicySchema.extend({
   assignment: AssignmentPolicySchema.optional(),
 });
 export const NativeBusinessSchema = z.strictObject({
-  config: z.record(z.string(), z.unknown()).default({}),
+  config: z.record(z.string(), z.unknown()).optional(),
   assessment: z.unknown().optional(),
   projectChecks: z.unknown().optional(),
   materialization: z.unknown().optional(),
@@ -108,7 +108,7 @@ function mergePolicy(base: any, local: any): any {
 /** Полный raw канон проверяется до Core audience projection. */
 export function validateNativeRaw(value: unknown) {
   const raw = NativeBusinessSchema.parse(structuredClone(value)),
-    config = raw.config as any;
+    config = (raw.config ?? {}) as any;
   // Pandoc представляет numeric metadata scalar как Inlines; нормализация принадлежит PL.
   const port = config["question-defaults"]?.submission?.workspaceOptions?.port;
   if (typeof port === "string" && /^\d+$/.test(port)) {
