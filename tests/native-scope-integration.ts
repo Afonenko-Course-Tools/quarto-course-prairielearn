@@ -1,3 +1,4 @@
+import { readNativeAdapterExpectation } from "../_extensions/course-prairielearn/application/native-adapter.ts";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 const corePath = join(Deno.args[0], "_extensions/course-core"),
@@ -89,6 +90,11 @@ await Core.withNativeCaptureScope(
     }
   },
 );
+const candidate = await readNativeAdapterExpectation(Core, root);
+if (
+  candidate.identity.profiles.join(",") !== "student" ||
+  candidate.expectation.outputDirectory !== root + "/_site"
+) throw Error("CLI candidate lost actual pending identity");
 await Core.withCurrentNativeOperation({
   root,
   profiles: ["student"],
@@ -99,7 +105,11 @@ await Core.withCurrentNativeOperation({
     format: "revealjs",
   }],
 }, async (op: any) => {
-  const adapter = PL.createNativeAdapter({ root, core: Core });
+  const adapter = PL.createNativeAdapter({
+    root,
+    core: Core,
+    preparedIdentity: candidate.identity,
+  });
   const proof = await op.validateRelease({
     expectedSources: ["index.qmd", "slides.qmd"],
   }, [adapter]);
@@ -148,6 +158,40 @@ await Core.withCurrentNativeOperation({
       throw Error("added absent plane accepted: " + plane + error);
     }
     checks.push("added absent " + plane + " refused");
+  }
+  const requestPath = join(base, active.operation, "request.json"),
+    originalRequest = await Deno.readTextFile(requestPath);
+  for (
+    const [label, change] of [
+      ["profiles", (r: any) => r.identity.profiles = ["foreign"]],
+      ["output", (r: any) => r.outputDirectory = root + "/_foreign"],
+      ["owner", (r: any) => r.owner = root + "/foreign"],
+      ["missing-output", (r: any) => delete r.outputDirectory],
+    ] as const
+  ) {
+    const r = JSON.parse(originalRequest);
+    change(r);
+    await Deno.writeTextFile(requestPath, JSON.stringify(r));
+    let error = "";
+    try {
+      const bad = await readNativeAdapterExpectation(Core, root);
+      await Core.withCurrentNativeOperation(
+        bad.expectation,
+        async (current: any) => {
+          await PL.createNativeAdapter({
+            root,
+            core: Core,
+            preparedIdentity: bad.identity,
+          }).validateCourse(current, { expectedSources: bad.expectedSources });
+        },
+      );
+    } catch (e) {
+      error = String(e);
+    } finally {
+      await Deno.writeTextFile(requestPath, originalRequest);
+    }
+    if (!error) throw Error("CLI candidate forgery accepted " + label);
+    checks.push("CLI " + label + " candidate refused");
   }
   console.log(JSON.stringify({ root, checks, metrics: op.metrics }, null, 2));
 });

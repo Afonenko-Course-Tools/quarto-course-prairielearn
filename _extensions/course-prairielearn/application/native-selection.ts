@@ -8,6 +8,7 @@ type File = {
   bytes: Uint8Array;
   sha256: string;
   reason: string;
+  size: number;
 };
 type CoreBoundary = {
   ArtifactInventorySchema: { parse: (value: unknown) => any };
@@ -38,7 +39,10 @@ export async function selectNativeCompilerInputs(options: {
     studentPlan.input !== fullPlan.input
   ) throw Error("PL.SELECTION_INVALID: inventories/plan identity mismatch");
   const file = async (value: File, name: string) => {
-    if (!safePath(name) || await hash(value.bytes) !== value.sha256) {
+    if (
+      !safePath(name) || value.size !== value.bytes.length ||
+      await hash(value.bytes) !== value.sha256
+    ) {
       throw Error("PL.SELECTION_CHANGED: inventory bytes");
     }
     const bytes = new Uint8Array(value.bytes);
@@ -103,6 +107,8 @@ export async function selectNativeCompilerInputs(options: {
   const extensions = options.runtimeProfile?.sourceExtensions ?? [".java"];
   if (
     !Array.isArray(extensions) || !extensions.length ||
+    options.runtimeProfile?.javaRelease !== undefined &&
+      extensions.some((e: string) => e !== ".java") ||
     extensions.some((e: any) =>
       typeof e !== "string" || !/^\.[a-z][a-z0-9]*$/.test(e)
     )

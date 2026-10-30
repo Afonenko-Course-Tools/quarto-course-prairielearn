@@ -88,6 +88,9 @@ export async function exportCourse(
     checksOutput: string;
     body: (work: string) => Promise<any>;
     candidateImage?: string;
+    deferPublish?: boolean;
+    nativeInputs?: Record<string, any>;
+    nativeAnswers?: Record<string, any>;
     publicationConditions?: string;
     publicationSource?: { repository: string; commit: string; book: string };
     studentArtifact?: (
@@ -351,6 +354,15 @@ export async function exportCourse(
             : {}),
         });
         const method = gradingMethod(settings.grading).method;
+        if (input.nativeAnswers?.[q.id]) {
+          binding.questions[q.id] = { ...settings, files: [] };
+          questions[input.courseId + "/" + q.id] = {
+            uuid: await uuid(input.courseId + "/" + q.id),
+            grading: { method },
+            answerType: input.nativeAnswers[q.id].type,
+          };
+          continue;
+        }
         if (input.studentArtifact) {
           const fact = input.result.model.projects?.find((f: any) =>
             f.exerciseId === q.id && f.bankMember
@@ -414,7 +426,13 @@ export async function exportCourse(
           }
         }
         const profile = input.registry.profiles?.[fact.check.runtime];
-        const sources = await selectedSources(root, fact, profile);
+        const nativeSelection = input.nativeInputs?.[q.id];
+        const sources = nativeSelection
+          ? nativeSelection.sources.map((s: any) => ({
+            name: s.name,
+            data: s.bytes,
+          }))
+          : await selectedSources(root, fact, profile);
         if (
           input.registry.schemaVersion !== 1 || !profile ||
           profile.mode !== fact.check.sourceProfile.mode
@@ -440,17 +458,30 @@ export async function exportCourse(
           });
           await Deno.writeFile(join(project, "student", s.name), s.data);
         }
-        if (!fact.trustedTests.length) {
+        if (
+          !(nativeSelection
+            ? nativeSelection.tests.length
+            : fact.trustedTests.length)
+        ) {
           throw new Error("PL trusted tests missing");
         }
         const testNames = new Set();
-        for (const test of fact.trustedTests) {
+        for (
+          const test of nativeSelection
+            ? nativeSelection.tests.map((t: any) => ({
+              submissionRelativePath: t.name,
+              bytes: t.bytes,
+            }))
+            : fact.trustedTests
+        ) {
           if (
             testNames.has(test.submissionRelativePath) ||
             test.submissionRelativePath === "grading-job.json"
           ) throw new Error("PL duplicate or reserved trusted test path");
           testNames.add(test.submissionRelativePath);
-          const bytes = await readSelected(root, test);
+          const bytes = nativeSelection
+            ? test.bytes
+            : await readSelected(root, test);
           await Deno.mkdir(
             dirname(join(project, "tests", test.submissionRelativePath)),
             { recursive: true },
@@ -461,10 +492,10 @@ export async function exportCourse(
           );
         }
         const c = fact.check;
-        const descriptor = runtimeDescriptor(
+        const descriptor = nativeSelection?.descriptor ?? runtimeDescriptor(
           c,
           profile,
-          sources.map((s) => s.name),
+          sources.map((s: any) => s.name),
           fact.trustedTests.map((t: any) => t.submissionRelativePath),
           fact.apiPrecheck,
         );
@@ -474,7 +505,7 @@ export async function exportCourse(
         );
         binding.questions[q.id] = {
           ...settings,
-          files: sources.map((s) => s.name),
+          files: sources.map((s: any) => s.name),
           ...(descriptor.additionalJavaSources
             ? { additionalJavaSources: descriptor.additionalJavaSources }
             : {}),
@@ -502,6 +533,7 @@ export async function exportCourse(
           projectRoot: scratch,
           projects,
           studentArtifacts,
+          nativeAnswers: input.nativeAnswers,
           publicationConditions: publicationConditions
             ? Object.fromEntries(publicationConditions.artifacts)
             : undefined,
@@ -516,7 +548,11 @@ export async function exportCourse(
         const info = JSON.parse(
           await Deno.readTextFile(join(partial, base, "info.json")),
         );
-        info.partialCredit = c ? c.scoring.mode !== "all-pass" : false;
+        info.partialCredit = input.nativeAnswers?.[q.id]
+          ? input.nativeAnswers[q.id].type !== "manual"
+          : c
+          ? c.scoring.mode !== "all-pass"
+          : false;
         // Pinned Community validates assessment overrides against this embedded
         // question schema. A sidecar preferences.schema.json is not loaded.
         info.preferences = {
@@ -533,11 +569,16 @@ export async function exportCourse(
         const f = input.checks.projects.find((f: any) => f.exerciseId === q.id);
         if (f?.check) {
           for (
-            const s of await selectedSources(
-              resolve(input.projectRoot, f.projectRoot),
-              f,
-              input.registry.profiles[f.check.runtime],
-            )
+            const s of input.nativeInputs?.[q.id]
+              ? input.nativeInputs[q.id].sources.map((s: any) => ({
+                name: s.name,
+                data: s.bytes,
+              }))
+              : await selectedSources(
+                resolve(input.projectRoot, f.projectRoot),
+                f,
+                input.registry.profiles[f.check.runtime],
+              )
           ) {
             const path = join(
               partial,
@@ -646,7 +687,8 @@ export async function exportCourse(
         input.checks,
         input.projectRoot,
         Object.keys(questions).filter((key) =>
-          questions[key].grading?.method !== "manual"
+          questions[key].grading?.method !== "manual" &&
+          !input.nativeAnswers?.[key.slice(input.courseId.length + 1)]
         ),
       ),
       questions: Object.keys(questions).sort(),
@@ -684,29 +726,52 @@ export async function exportCourse(
       dir: dirname(privateOut),
       prefix: ".pl-checks-",
     });
-    try {
-      await Deno.writeTextFile(
-        privateStage,
-        JSON.stringify(input.checks, null, 2) + "\n",
-      );
-      await Deno.rename(privateStage, privateOut);
+    await Deno.writeTextFile(
+      privateStage,
+      JSON.stringify(input.checks, null, 2) + "\n",
+    );
+    let state = "prepared";
+    const discard = async () => {
+      if (state !== "prepared") return;
+      state = "discarded";
+      for (const path of [stage, privateStage]) {
+        try {
+          await Deno.remove(path, { recursive: true });
+        } catch (error) {
+          if (!(error instanceof Deno.errors.NotFound)) throw error;
+        }
+      }
+    };
+    const publish = async () => {
+      if (state !== "prepared") {
+        throw Error("PL export preparation already consumed");
+      }
       try {
+        await absent(out);
+        await absent(privateOut);
         if (publicationConditions) await publicationConditions.check();
-        await Deno.rename(stage, out);
-      } catch (e) {
-        await Deno.remove(privateOut);
-        throw e;
+        await Deno.rename(privateStage, privateOut);
+        try {
+          await Deno.rename(stage, out);
+        } catch (error) {
+          await Deno.remove(privateOut);
+          throw error;
+        }
+        state = "published";
+        return delivery;
+      } catch (error) {
+        await discard();
+        throw error;
       }
-    } finally {
-      try {
-        await Deno.remove(privateStage);
-      } catch (e) {
-        if (!(e instanceof Deno.errors.NotFound)) throw e;
-      }
-    }
-    return delivery;
+    };
+    if (input.deferPublish) return { delivery, publish, discard };
+    return await publish();
   } catch (e) {
-    await Deno.remove(stage, { recursive: true });
+    try {
+      await Deno.remove(stage, { recursive: true });
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) throw error;
+    }
     throw e;
   } finally {
     await Deno.remove(scratch, { recursive: true });

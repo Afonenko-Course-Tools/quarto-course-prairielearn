@@ -1,3 +1,4 @@
+import { readNativeAdapterExpectation } from "../_extensions/course-prairielearn/application/native-adapter.ts";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL as toFileUrl } from "node:url";
 
@@ -171,6 +172,7 @@ async function rawPath() {
   return join(folder, request.inputs[0].file);
 }
 const firstPath = await rawPath(), first = await Deno.readTextFile(firstPath);
+const firstCandidate = await readNativeAdapterExpectation(Core, root);
 await Core.withCurrentNativeOperation(expectation, async (op: any) => {
   const other = await Deno.makeTempDir({ prefix: "pl-foreign-owner-" });
   try {
@@ -389,6 +391,16 @@ await Core.withCurrentNativeOperation(expectation, async (op: any) => {
     "PL.CAPTURE_CHANGED",
   );
   await Deno.writeTextFile(secondPath, second);
+  await refuse(
+    "equal-bytes-stale-preparation-candidate-refused",
+    () =>
+      PL.createNativeAdapter({
+        root,
+        core: Core,
+        preparedIdentity: firstCandidate.identity,
+      }).validateCourse(op, { expectedSources: ["index.qmd"] }),
+    "PL.CAPTURE_CHANGED",
+  );
   await op.validateRelease({ expectedSources: ["index.qmd"] }, [
     PL.createNativeAdapter({ root, core: Core }),
   ]);

@@ -355,11 +355,18 @@ Deno.test("full native export is deterministic, closed and atomic across output 
     const mixedAssessment=JSON.parse(await Deno.readTextFile(root+'/mixed/courseInstances/pilot/assessments/sec-lab/infoAssessment.json'));
     const mixedInfo=JSON.parse(await Deno.readTextFile(root+'/mixed/questions/demo/exr-a/info.json'));
     assert(mixedInfo.gradingMethod==='External'&&mixedInfo.externalGradingOptions&&mixedAssessment.zones[0].questions[0].autoPoints===1&&mixedAssessment.zones[0].questions[0].manualPoints===2,'Mixed lost actual External runtime or explicit teacher component');
-    const a = await exportCourse({
+    const prepared = await exportCourse({
       ...input,
       output: root + "/one",
       checksOutput: root + "/checks1.json",
+      deferPublish: true,
     });
+    assert(
+      !await Deno.stat(root + "/one").then(() => true, () => false) &&
+        !await Deno.stat(root + "/checks1.json").then(() => true, () => false),
+      "course/private checks published before outer final fence",
+    );
+    const a = await prepared.publish();
     assert(a.schemaVersion===3&&a.gradingPayloads['demo/exr-a'].grading?.method==='external'&&a.gradingPayloads['demo/exr-a'].submission?.mode==='editor','Delivery v3 requires explicit normalized grading/submission bindings');
     const b = await exportCourse({
       ...input,
@@ -430,6 +437,63 @@ Deno.test("full native export is deterministic, closed and atomic across output 
     const nativeFact={...extrasFact,check:{...extrasFact.check,runtime:"java25-gradle-junit-v1","java-build":{kind:"gradle-jar-v1","main-class":"grade.Main",artifact:"gradeapp.jar"}}};
     const nativeInput={...apiInput,checks:{...input.checks,projects:[nativeFact]},registry:{schemaVersion:1,profiles:{"java25-gradle-junit-v1":{mode:"implementation",javaRelease:25,image:"registry/native-java@sha256:"+"e".repeat(64)}}},output:root+"/native-gradle",checksOutput:root+"/native-gradle-checks.json"};
     await exportCourse(nativeInput);
+    const canonicalFact = {
+      ...nativeFact,
+      check: {
+        ...nativeFact.check,
+        sourceProfile: {
+          ...nativeFact.check.sourceProfile,
+          root: "src/main/java",
+        },
+      },
+      trustedTests: [],
+    };
+    const nativeSelected = {
+      sources: [{
+        name: "pkg/A.java",
+        bytes: new TextEncoder().encode(source),
+        sha256: await hash(source),
+      }],
+      tests: [{
+        name: "ATest.java",
+        bytes: new TextEncoder().encode("class ATest {}"),
+      }, {
+        name: "ApiContract.java",
+        bytes: new TextEncoder().encode(apiText),
+      }],
+      descriptor: runtimeDescriptor(
+        canonicalFact.check,
+        nativeInput.registry.profiles["java25-gradle-junit-v1"],
+        ["pkg/A.java"],
+        ["ATest.java", "ApiContract.java"],
+        { files: ["ApiContract.java"], entry: "ApiContract" },
+      ),
+    };
+    await exportCourse({
+      ...nativeInput,
+      checks: { ...input.checks, projects: [canonicalFact] },
+      nativeInputs: { "exr-a": nativeSelected },
+      output: root + "/canonical-targets",
+      checksOutput: root + "/canonical-targets-checks.json",
+    });
+    assert(
+      await Deno.readTextFile(
+        root +
+          "/canonical-targets/questions/demo/exr-a/serverFilesQuestion/starter/pkg/A.java",
+      ) === source,
+      "actual A1 target bytes lost to old student partition selector",
+    );
+    assert(
+      canonical(
+        JSON.parse(
+          await Deno.readTextFile(
+            root +
+              "/canonical-targets/questions/demo/exr-a/tests/grading-job.json",
+          ),
+        ),
+      ) === canonical(nativeSelected.descriptor),
+      "native compiler descriptor changed at exporter connection",
+    );
     const nativeDescriptor=JSON.parse(await Deno.readTextFile(root+"/native-gradle/questions/demo/exr-a/tests/grading-job.json"));
     assert(canonical(nativeDescriptor.javaBuild)===canonical({kind:"gradle-jar-v1",mainClass:"grade.Main",artifact:"gradeapp.jar"}),"native full export dropped javaBuild");
     assert(nativeDescriptor.runtime==='java25-gradle-junit-v1'&&canonical(nativeDescriptor.sourceFiles)===canonical(apiDescriptor.sourceFiles)&&canonical(nativeDescriptor.apiPrecheck)===canonical(apiDescriptor.apiPrecheck),"native export changed selected source/API boundary");

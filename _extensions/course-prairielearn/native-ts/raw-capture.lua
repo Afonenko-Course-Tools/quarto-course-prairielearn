@@ -22,7 +22,7 @@ return {{Pandoc=function(doc)
    local attributes={};for key,value in pairs(div.attributes)do attributes[key]=value end
    local declaration={id=div.identifier,attributes=attributes}
    if div.attributes.answer or div.attributes['answer-spec'] or div.attributes.correct then declaration.answer=true end
-   div:walk({CodeBlock=function(block)if block.classes:includes('answer-spec')then declaration.answer=true end end})
+   div:walk({CodeBlock=function(block)if block.classes:includes('answer-spec')then declaration.answer=true end end,Div=function(block)if block.classes:includes('answer')then declaration.answer=true end end})
    declarations:insert(declaration)
   end
  end})

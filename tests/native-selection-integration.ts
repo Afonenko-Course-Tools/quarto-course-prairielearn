@@ -103,6 +103,7 @@ if (
 for (
   const [name, mutate] of [
     ["foreign-role", (o: any) => o.full.files[4].reason = "starter"],
+    ["dishonest-size", (o: any) => o.full.files[4].size = 0],
     ["changed-bytes", (o: any) => o.full.files[4].bytes[0] = 0],
     ["non-source-helper", (o: any) => {
       o.full.files[4].target = "author/alternate/src/main/java/evil.txt";
@@ -131,7 +132,7 @@ console.log(
   JSON.stringify(
     {
       referenceHelpers: selected.references[0].files.map((x: any) => x.name),
-      controls: 4,
+      controls: 5,
       descriptor: selected.descriptor,
     },
     null,

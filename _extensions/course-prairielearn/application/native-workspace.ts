@@ -1,3 +1,4 @@
+import { NativeMaterializationSchema } from "./native-materialization.ts";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { hash, safePath } from "./source-selection.ts";
@@ -46,22 +47,39 @@ export async function nativeWorkspaceArtifact(options: {
   if (settings.mode !== "workspace") {
     throw Error("PL.WORKSPACE_SEED: Workspace submission required");
   }
-  const materialization = options.materialization as any;
+  let materialization: any;
+  try {
+    materialization = NativeMaterializationSchema.parse(
+      options.materialization,
+    );
+  } catch (error) {
+    throw Error("PL.WORKSPACE_SEED: invalid materialization", { cause: error });
+  }
   if (
     materialization?.projects?.[options.exerciseId]?.["include-git"] !== true
   ) throw Error("PL.WORKSPACE_SEED: explicit include-git required");
   const declaration = materialization.projects[options.exerciseId];
-  if (
-    Object.keys(declaration).some((k) =>
-      !["include-git", "common-files"].includes(k)
-    ) || !Array.isArray(declaration["common-files"]) ||
-    declaration["common-files"].length
-  ) {
-    throw Error(
-      "PL.WORKSPACE_SEED: common-files require an explicit native binding",
-    );
-  }
   const root = await Deno.realPath(options.root);
+  await options.assertCurrent();
+  const commonTargets = new Set<string>();
+  for (const common of declaration["common-files"]) {
+    if (common.audience !== "student") continue;
+    const target = common.target.slice("student/".length);
+    if (commonTargets.has(target) || target.startsWith(".pl-seed/")) {
+      throw Error("PL.WORKSPACE_SEED: common target collision");
+    }
+    commonTargets.add(target);
+    const source = await Deno.readFile(await ownerFile(root, common.source));
+    const selected = options.files.filter((file) => file.name === target);
+    if (
+      selected.length !== 1 ||
+      await hash(source) !== await hash(selected[0].bytes)
+    ) {
+      throw Error(
+        "PL.WORKSPACE_SEED: common file lacks exact native inventory binding",
+      );
+    }
+  }
   const recipe = await ownerFile(root, options.project + "/seed_recipe.py");
   const helperBytes = await Deno.readFile(trustedModule);
   if (await hash(helperBytes) !== trustedModuleHash) {

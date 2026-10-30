@@ -1,3 +1,4 @@
+import { decodeNativeMaterialization } from "./native-materialization.ts";
 // @deno-types="../vendor/zod/v4/index.d.ts"
 import { z } from "../vendor/zod/v4/index.js";
 import { createHash } from "node:crypto";
@@ -106,7 +107,10 @@ function mergePolicy(base: any, local: any): any {
   return out;
 }
 /** Полный raw канон проверяется до Core audience projection. */
-export function validateNativeRaw(value: unknown) {
+export function validateNativeRaw(
+  value: unknown,
+  context: { source?: string } = {},
+) {
   const raw = NativeBusinessSchema.parse(structuredClone(value)),
     config = (raw.config ?? {}) as any;
   // Pandoc представляет numeric metadata scalar как Inlines; нормализация принадлежит PL.
@@ -160,7 +164,7 @@ export function validateNativeRaw(value: unknown) {
         }
       }
     }
-    if (declaration.answer !== undefined) {
+    if (declaration.answer !== undefined && declaration.answer !== true) {
       throw Error(
         "PL.ANSWER_UNQUALIFIED: raw answer требует отдельного проверенного транспорта",
       );
@@ -169,11 +173,20 @@ export function validateNativeRaw(value: unknown) {
   if (raw.projectChecks !== undefined) {
     NativeProjectChecksSchema.parse(nativeCheckScalars(raw.projectChecks));
   }
-  return { raw, config, defaults };
+  const materialization = raw.materialization === undefined
+    ? undefined
+    : decodeNativeMaterialization(raw.materialization, context.source);
+  return { raw, config, defaults, materialization };
 }
 /** Чистая PL business validation: не создаёт Core capability/release proof. */
-export function decodeNativeBusiness(value: unknown, input: any) {
-  const { raw, config, defaults } = validateNativeRaw(value);
+export function decodeNativeBusiness(
+  value: unknown,
+  input: any,
+  options: { deferComposition?: boolean } = {},
+) {
+  const { raw, config, defaults, materialization } = validateNativeRaw(value, {
+    source: input.origin?.source,
+  });
   const questions: Record<
     string,
     ReturnType<typeof question> & {
@@ -183,6 +196,10 @@ export function decodeNativeBusiness(value: unknown, input: any) {
   for (const declaration of input.declarations) {
     if (!raw.declarations.some((d) => d.id === declaration.id)) {
       throw Error("PL.CAPTURE_CHANGED: декларация отсутствует в raw каноне");
+    }
+    const original = raw.declarations.find((d) => d.id === declaration.id)!;
+    if (Boolean(original.answer) !== Boolean(declaration.answer)) {
+      throw Error("PL.ANSWER_UNQUALIFIED: raw/native answer mismatch");
     }
     const attrs = declaration.attributes, base = config["question-defaults"];
     if (!base) {
@@ -257,12 +274,12 @@ export function decodeNativeBusiness(value: unknown, input: any) {
         s.candidates.every((id: string) => methods[id] !== undefined)
       )
     ) validateGradingComponents(work, methods);
-    else {
+    else if (!options.deferComposition) {
       gradingPolicy(work);
       throw Error(
         "PL.ASSESSMENT_UNQUALIFIED: требуется полная cross-document grading composition",
       );
     }
   }
-  return { questions, assessment, raw };
+  return { questions, assessment, raw, materialization };
 }

@@ -1,3 +1,4 @@
+import { renderNativeAnswer } from "./native-answer.ts";
 import { workspaceSeed } from "./workspace-seed.ts";
 import { submission as parseSubmission } from "./submission.ts";
 import {
@@ -28,6 +29,7 @@ const fields = (v: any, required: string[], optional: string[] = []) =>
   record(v) && required.every((k) => Object.hasOwn(v, k)) &&
   Object.keys(v).every((k) => [...required, ...optional].includes(k));
 export interface ProjectContext {
+  nativeAnswers?: Record<string, any>;
   projectRoot: string;
   projects: Record<string, string>;
   publicationConditions?: Record<string, PublicationCondition>;
@@ -332,8 +334,11 @@ export async function renderPublicBody(
       )
     ) questionFail("Закрытая отметка в публичном условии", "condition");
     if (node.t === "Image" || node.t === "Link") {
-      const href = node.c[2][0],
-        resource = declaredResources.get(href);
+      const href = node.c[2][0];
+      const split = href.search(/[?#]/),
+        path = split < 0 ? href : href.slice(0, split),
+        suffix = split < 0 ? "" : href.slice(split);
+      const resource = declaredResources.get(path);
       if (node.t === "Link" && href.startsWith("#")) {
         let target: string;
         try {
@@ -355,7 +360,8 @@ export async function renderPublicBody(
         node.c[2][0] = "#" + actual;
       } else if (resource) {
         if (
-          !safe(resource.target) || resource.owner !== p.owner ||
+          !safe(resource.target) || /[?#]/.test(resource.target) ||
+          resource.owner !== p.owner ||
           resource.visibility !== "public" ||
           typeof resource.data !== "string"
         ) {
@@ -365,7 +371,7 @@ export async function renderPublicBody(
           );
         }
         resources.set(resource.target, resource);
-        node.c[2][0] = resourceMarker + "/" + resource.target;
+        node.c[2][0] = resourceMarker + "/" + resource.target + suffix;
       } else if (!(node.t === "Link" && /^https?:\/\//.test(href))) {
         questionFail(
           "Ресурс условия отсутствует в публичной поставке: " + href,
@@ -585,7 +591,9 @@ export async function exportPrairieLearn(
       q.purpose !== undefined &&
         !["demonstration", "discussion", "independent-study", "control"]
           .includes(q.purpose) ||
-      q.answerType !== "manual" ||
+      !["manual", "numeric", "multipart", "matching", "single-choice"].includes(
+        q.answerType,
+      ) ||
       !Array.isArray(q.condition) || !Array.isArray(q.publicAnswer)
     ) questionFail("Неверный публичный вопрос", "questions");
     if (
@@ -609,6 +617,70 @@ export async function exportPrairieLearn(
     }
     keys.add(q.key);
     const b = binding.questions[q.id];
+    const answer = context.nativeAnswers?.[q.id];
+    if (answer) {
+      if (
+        answer.type !== q.answerType ||
+        !fields(b, ["topic", "files"], [
+          "grading",
+          "submission",
+          "singleVariant",
+        ]) || typeof b.topic !== "string" || !b.topic.trim() ||
+        !Array.isArray(b.files) || b.files.length
+      ) {
+        questionFail(
+          "Форма ответа требует canonical Core answer без файлов и runtime",
+          "answer",
+        );
+      }
+      const manualAnswer = answer.type === "manual";
+      const method = gradingMethod(b.grading).method;
+      if (manualAnswer !== (method === "manual")) {
+        questionFail(
+          "Метод оценивания не соответствует форме ответа",
+          "answer",
+        );
+      }
+      const rendered = await renderPublicBody(
+        p,
+        q.condition,
+        q.key,
+        questionContext,
+        "questions/" + q.key + "/clientFilesQuestion",
+        "{{options.client_files_question_url}}",
+      );
+      prepared.push(...rendered.files);
+      const native = renderNativeAnswer(answer), base = "questions/" + q.key;
+      text(base + "/server.py", native.server);
+      text(
+        base + "/question.html",
+        "<pl-question-panel>\n" + metadata(q) + rendered.html + "\n" +
+          native.controls + "\n</pl-question-panel>\n",
+      );
+      text(
+        base + "/info.json",
+        JSON.stringify(
+          {
+            uuid: await uuid(q.key),
+            type: "v3",
+            title: q.title,
+            topic: b.topic,
+            gradingMethod: manualAnswer ? "Manual" : "Internal",
+            showCorrectAnswer: false,
+            partialCredit: !manualAnswer,
+            ...(b.singleVariant !== undefined
+              ? { singleVariant: b.singleVariant }
+              : {}),
+          },
+          null,
+          2,
+        ) + "\n",
+      );
+      continue;
+    }
+    if (q.answerType !== "manual") {
+      questionFail("Нет проверенного canonical Core answer", "answer");
+    }
     const manual = gradingMethod(b?.grading).method === "manual";
     if (
       !fields(b, [
