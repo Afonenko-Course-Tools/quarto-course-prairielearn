@@ -6,7 +6,7 @@ function assert(value: unknown, message: string): asserts value {
   if (!value) throw Error(message);
 }
 export const workspaceOptions = {
-  image: "ghcr.io/example/workspace@sha256:" + "a".repeat(64),
+  image: "ghcr.io/example/sp-git-workspace@sha256:" + "a".repeat(64),
   home: "/home/workspace",
   port: 8080,
   gradedFiles: [

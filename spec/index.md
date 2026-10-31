@@ -35,7 +35,7 @@ not a second author configuration or a private GradingJob.
 
 ## Текущая совместимость кандидата 8.3.0
 
-Кандидат Exporter 8.3.0 проверяется с Core-кандидатом 8.3.0 и delivery v3. Body v2 и public results v2
+Кандидат Exporter 8.3.0 проверяется с Core-кандидатом 8.3.0 и строгими delivery v3/v4; v4 остаётся unreleased и требует независимой квалификации. Body v2 и public results v2
 не переименовываются. Manual/mixed/choice требуют согласованного native reader;
 Platform/Gateway проверяются отдельно по exact source/digest, без заявления
 совместимости прежних service releases. Download — необязательный consumer

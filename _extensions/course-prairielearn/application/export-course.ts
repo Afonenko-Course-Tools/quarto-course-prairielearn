@@ -1,3 +1,4 @@
+import { nativeAnswerBinding } from "./native-delivery.ts";
 import { loadPublicationConditions } from "./publication-conditions.ts";
 import { createMetrics as __createMetrics } from "../observability/bridge.ts";
 const __metrics = __createMetrics("course-prairielearn");
@@ -100,6 +101,7 @@ export async function exportCourse(
     nativeBody?: boolean;
     nativeInputs?: Record<string, any>;
     nativeAnswers?: Record<string, any>;
+    nativeResponseSlots?: Record<string, any[]>;
     nativeVerification?: { scenarios: any[]; scenariosHash: string };
     publicationConditions?: string;
     publicationSource?: { repository: string; commit: string; book: string };
@@ -375,11 +377,12 @@ export async function exportCourse(
         const method = gradingMethod(settings.grading).method;
         if (input.nativeAnswers?.[q.id]) {
           binding.questions[q.id] = { ...settings, files: [] };
-          questions[input.courseId + "/" + q.id] = {
-            uuid: await uuid(input.courseId + "/" + q.id),
-            grading: { method },
-            answerType: input.nativeAnswers[q.id].type,
-          };
+          questions[input.courseId + "/" + q.id] = nativeAnswerBinding(
+            await uuid(input.courseId + "/" + q.id),
+            method,
+            input.nativeAnswers[q.id],
+            input.nativeResponseSlots?.[q.id] ?? [],
+          );
           continue;
         }
         if (input.studentArtifact) {
@@ -453,7 +456,7 @@ export async function exportCourse(
           }))
           : await selectedSources(root, fact, profile);
         if (
-          input.registry.schemaVersion !== 1 || !profile ||
+          ![1, 2].includes(input.registry.schemaVersion) || !profile ||
           profile.mode !== fact.check.sourceProfile.mode
         ) throw new Error("PL runtime profile unavailable");
         const image = profile.image ?? input.candidateImage;
@@ -697,8 +700,39 @@ export async function exportCourse(
     }
     if (publicationConditions) await publicationConditions.check();
     const files = await inventory(stage);
+    const version =
+      input.nativeBody || Object.keys(input.nativeAnswers ?? {}).length ||
+        Object.values(questions).some((q: any) =>
+          q.submission?.mode === "workspace"
+        )
+        ? 4
+        : 3;
+    if (version === 4) {
+      for (const [key, value] of Object.entries(questions) as [string, any][]) {
+        if (value.kind === "native-answer") continue;
+        if (value.submission.mode === "workspace") {
+          const prefix = "questions/" + key + "/workspace/.pl-seed/";
+          if (
+            !files[prefix + "starter.zip"] || !files[prefix + "manifest.json"]
+          ) throw Error("PL.WORKSPACE_SEED_REQUIRED");
+          questions[key] = {
+            ...value,
+            kind: "workspace",
+            upstreamGradingMethod: "Manual",
+            singleVariant: true,
+            seed: {
+              schema: "pl-git-workspace-seed-v1",
+              archive: "workspace/.pl-seed/starter.zip",
+              archiveSha256: files[prefix + "starter.zip"],
+              manifest: "workspace/.pl-seed/manifest.json",
+              manifestSha256: files[prefix + "manifest.json"],
+            },
+          };
+        } else questions[key] = { kind: "project", ...value };
+      }
+    }
     const delivery: any = {
-      schemaVersion: 3,
+      schemaVersion: version,
       courseId: input.courseId,
       bookRoot: input.checks.bookRoot,
       sourceSnapshotHash: input.checks.sourceSnapshotHash,

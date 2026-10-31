@@ -294,6 +294,7 @@ export async function prepareNativeCourse(
       const projects: any[] = [],
         nativeInputs: any = {},
         nativeAnswers: any = {},
+        nativeResponseSlots: any = {},
         artifacts: any = {},
         settings: any = {},
         bodies = new Map<string, any>();
@@ -306,7 +307,7 @@ export async function prepareNativeCourse(
               join(options.root, "prairielearn/runtime-profiles.json"),
           ),
         );
-        if (registryInput.value.schemaVersion !== 1) {
+        if (![1, 2].includes(registryInput.value.schemaVersion)) {
           throw Error("PL.RUNTIME_INVALID: registry version");
         }
         return registryInput.value;
@@ -331,6 +332,12 @@ export async function prepareNativeCourse(
               canonical(nativeAnswers[q.id]) !== canonical(answer)
             ) throw Error("PL.ASSIGNMENT_CHANGED: repeated answer");
             nativeAnswers[q.id] = answer;
+            const slots = delivered.conditions[q.id].responseSlots;
+            if (
+              nativeResponseSlots[q.id] &&
+              canonical(nativeResponseSlots[q.id]) !== canonical(slots)
+            ) throw Error("PL.ASSIGNMENT_CHANGED: repeated slots");
+            nativeResponseSlots[q.id] = slots;
             continue;
           }
           if (artifacts[q.id]) continue;
@@ -397,16 +404,6 @@ export async function prepareNativeCourse(
         if (!options.checksOutput) {
           throw Error("PL.INPUT_INVALID: course checks-output required");
         }
-        if (
-          Object.keys(nativeAnswers).length ||
-          Object.values(settings).some((v: any) =>
-            v.submission.mode === "workspace"
-          )
-        ) {
-          throw Error(
-            "PL.NATIVE_DELIVERY_REVISION_REQUIRED: nativeanswer/Workspace public bindings require reviewed closed-union delivery revision",
-          );
-        }
         assertNativeChecksCoverage(witness, projects);
         const sources = selection.expectedSources.map((source) => ({
           source,
@@ -459,6 +456,7 @@ export async function prepareNativeCourse(
           deferPublish: true,
           nativeInputs,
           nativeAnswers,
+          nativeResponseSlots,
           nativeVerification,
           nativeBody: true,
           studentArtifact: async (fact) => artifacts[fact.exerciseId],

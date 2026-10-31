@@ -1,3 +1,43 @@
+function fixtureSlots(a: any) {
+  const slot = (name: string, type: string, i: number, extra: any = {}) => ({
+    name,
+    type,
+    anchor: "fixture-response-" + i,
+    ...extra,
+  });
+  if (a.type === "single-choice") {
+    return Array.from(
+      { length: a.count },
+      (_, i) =>
+        slot("answer", a.type, i, { ordinal: i, labelAnchor: "option-" + i }),
+    );
+  }
+  if (a.type === "matching") {
+    return a.prompts.map((_: any, i: number) =>
+      slot("match-" + i, a.type, i, {
+        ordinal: i,
+        labelAnchor: "prompt-" + i,
+        options: a.options.map((_: any, j: number) => ({
+          anchor: "option-" + j,
+          ordinal: j,
+        })),
+      })
+    );
+  }
+  if (a.type === "multipart") {
+    return a.parts.map((p: any, i: number) =>
+      slot(p.name, p.type, i, { labelAnchor: "part-" + i })
+    );
+  }
+  return [slot("answer", a.type, 0)];
+}
+async function copyTree(from: string, to: string) {
+  await Deno.mkdir(to, { recursive: true });
+  for await (const e of Deno.readDir(from)) {
+    if (e.isDirectory) await copyTree(from + "/" + e.name, to + "/" + e.name);
+    else await Deno.copyFile(from + "/" + e.name, to + "/" + e.name);
+  }
+}
 import { exportCourse } from "../_extensions/course-prairielearn/application/export-course.ts";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 import { infoQuestion } from "../_extensions/course-prairielearn/application/native-validators.js";
@@ -181,7 +221,12 @@ for (const answer of forms) {
           checksOutput: root + "/private-checks.json",
           body: async () => pkg,
           nativeAnswers: { [id]: answer },
+          nativeResponseSlots: { [id]: fixtureSlots(answer) },
         });
+        const evidence = Deno.env.get("PL_DELIVERY4_FIXTURES");
+        if (evidence) {
+          await copyTree(root + "/course", evidence + "/" + answer.type);
+        }
         const courseInfo = JSON.parse(
           await Deno.readTextFile(
             root + "/course/questions/" + key + "/info.json",
