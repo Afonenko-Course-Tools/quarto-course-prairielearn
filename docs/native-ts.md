@@ -109,9 +109,40 @@ composition. Его hashes нельзя подставлять в legacy
 проекцию sources/projects и требуют согласованного mapping или явной миграции
 контракта.
 
-Открыты четыре границы: public pre-child correlation между прежней candidate и
-новой prepared generation; native provenance для delivery-v3; точный pre-child
-assessment ID→source binding; полный набор declared codeprojects для A1 pairs,
-включая невидимые и чужие targets. Видимый catalog не доказывает полноту набора.
-До решения этих границ CLI не угадывают source, не перепривязывают generation и
-не переходят к legacy/CUE fallback. Инертные отказы не являются native positive.
+## Промежуточное подключение a8fa (31 октября)
+
+В новой изолированной ветке обе существующие CLI вызывают public assignment
+`mode: "new"`. `active.json` прежнего A не читается: genuine lease descriptor B
+задаёт новый request B, ordered profiles, witnesses и outputDirectory. Lease
+сверяет B до capture token/child и после него. Consume-existing явно отказывает
+до чтения owner и создания scope; CLI не перепривязывает A. Отсутствующий или
+foreign A в inert controls не является stale-generation проверкой.
+
+Выбор работ использует только уже прочитанные `fileInformation[source].metadata`
+того же owner inspect: direct frontmatter `assessment.id` должен быть уникален.
+Inherited-only/missing ID, повтор и foreign input отвергаются до child. Для 13
+Java/SP labs ROOT подготовил отдельный metadata patch; C не меняет исходники
+курса и не восстанавливает ID из heading/basename. Полный owner input передаётся
+в capture. Новый private output `_generated/prairielearn-native-render` входит в
+ещё открытую квалификацию producer argv/G/K.
+
+`nativeProjectWitness` сохраняет public complete project facts, hidden/nonbank
+объявления, actual formats, sourceRows того же S и common-files/includeGit.
+Собственный `nativeProjectWitnessHash` имеет явно отдельную область и не
+заменяет legacy hashes. Чистые DTO tests не создают authority.
+`withNativeProjectPlans` удерживает настоящие A1 contexts всех actual formats
+вложенными callbacks и создаёт student/full из одного context на проект.
+`withNativeAssignments` передаёт эти exact live pairs и предоставленный QRC
+context public delivery, оставляя private answers отдельно. Этот bridge с a8fa
+пока только скомпилирован; assignment positive не выполнен и не заявлен.
+
+Штатный `prepareNativeCourse` после настоящего validateRelease/public provenance
+отказывает с `PL.NATIVE_CHECKS_CONTRACT_UNQUALIFIED` до A1 inquiries и builder.
+Public ArtifactFile пока не передаёт точный physical source, необходимый для
+прежних CheckProject source selections. ROOT предпочёл минимальное data-only
+расширение существующего Core producer: подробный запрос в
+[native-origin-request.md](native-origin-request.md). До matching immutable API,
+parity controls и OTHER/ROOT решения strict v3 publish закрыт. Последующее
+соединение materialization/QRC/Download и существующих builders, все
+works/forms, standalone ZIP/privacy/citations и producer qualification остаются
+открыты.

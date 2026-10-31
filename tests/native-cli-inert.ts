@@ -96,7 +96,6 @@ for (const command of ["export-course", "export"]) {
         );
       }
       if (
-        control === "unqualified" &&
         !state.error.includes("BODY.PRODUCER_INPUT_UNQUALIFIED")
       ) throw Error("wrong public gate refusal: " + JSON.stringify(state));
       for (
@@ -121,7 +120,12 @@ for (const command of ["export-course", "export"]) {
 }
 console.log(
   JSON.stringify(
-    { status: "REAL_CLI_INERT_REFUSAL_ONLY_NOT_ASSIGNMENT_POSITIVE", rows },
+    {
+      status: "REAL_CLI_INERT_REFUSAL_ONLY_NOT_ASSIGNMENT_POSITIVE",
+      oldAIsUnusedCorrelation: true,
+      staleAControl: false,
+      rows,
+    },
     null,
     2,
   ),

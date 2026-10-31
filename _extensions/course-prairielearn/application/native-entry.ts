@@ -78,36 +78,89 @@ export async function readNativeEntryCandidate(owner: string) {
     throw error;
   }
 }
-export async function nativeEntry(
-  options: {
-    root: string;
-    book: string;
-    output?: string;
-    checksOutput?: string;
-    runtimeRegistry?: string;
-    candidateImage?: string;
-    stagingReceipt?: string;
-    publicationConditions?: string;
-    bindingPath?: string;
-    instance?: string;
-    work?: string;
-    profiles?: string[];
-  },
+/** Только уже наблюдённые Quarto owner facts; не читает/не разбирает QMD. */
+export async function selectNativeOwnerAssignments(
+  observed: Readonly<Record<string, any>>,
+  options: { root: string; book: string; instance?: string; work?: string },
 ) {
+  if (
+    observed.dir !== options.root || !Array.isArray(observed.files?.input) ||
+    !observed.files.input.length
+  ) throw Error("PL.NATIVE_SELECTION_UNQUALIFIED: owner input contract");
+  const expectedSources = observed.files.input.map((input: unknown) => {
+    if (typeof input !== "string" || input !== resolve(input)) {
+      throw Error(
+        "PL.NATIVE_SELECTION_UNQUALIFIED: canonical owner input required",
+      );
+    }
+    const source = relative(options.root, input).replaceAll("\\", "/");
+    if (!safe(source)) {
+      throw Error("PL.NATIVE_SELECTION_UNQUALIFIED: foreign owner input");
+    }
+    return source;
+  });
+  if (new Set(expectedSources).size !== expectedSources.length) {
+    throw Error("PL.NATIVE_SELECTION_UNQUALIFIED: duplicate owner input");
+  }
+  let selected: unknown[];
+  if (options.instance) {
+    // Импорт после публичного gate: declarations включает observability bridge.
+    const { declarations } = await import("./declarations.ts");
+    const declaration = declarations(
+      observed.config?.prairielearn,
+      options.instance,
+    );
+    if (declaration.book !== options.book) {
+      throw Error("PL.INPUT_INVALID: delivery book");
+    }
+    selected = declaration.instance.works;
+  } else selected = [options.work];
+  if (
+    !selected.length || selected.some((id) => typeof id !== "string" || !id) ||
+    new Set(selected).size !== selected.length
+  ) throw Error("PL.INPUT_INVALID: selected assessments");
+  const assessments = selected.map((id) => {
+    const matches = expectedSources.filter((source: string) =>
+      observed.fileInformation?.[source]?.metadata?.assessment?.id === id
+    );
+    if (matches.length !== 1) {
+      throw Error(
+        "PL.NATIVE_SELECTION_UNQUALIFIED: explicit unique frontmatter assessment.id required: " +
+          id,
+      );
+    }
+    return { source: matches[0], id: id as string };
+  });
+  return { expectedSources, assessments };
+}
+export type NativeEntryOptions = {
+  root: string;
+  book: string;
+  output?: string;
+  checksOutput?: string;
+  runtimeRegistry?: string;
+  candidateImage?: string;
+  stagingReceipt?: string;
+  publicationConditions?: string;
+  bindingPath?: string;
+  instance?: string;
+  work?: string;
+  profiles?: string[];
+  mode?: "new" | "existing";
+};
+export async function nativeEntry(options: NativeEntryOptions) {
+  // Consume-existing не реализован: отказ до чтения owner и смены current pointer.
+  if (options.mode !== undefined && options.mode !== "new") {
+    throw Error(
+      "PL.NATIVE_CONSUME_UNSUPPORTED: existing operation cannot be rebound as fresh intent",
+    );
+  }
   if (!safe(options.book)) throw Error("PL.INPUT_INVALID: book");
   const owner = await Deno.realPath(
     join(await Deno.realPath(options.root), options.book),
   );
-  const candidate = await readNativeEntryCandidate(owner);
-  if (
-    options.profiles?.length &&
-    JSON.stringify(options.profiles) !==
-      JSON.stringify(
-        candidate.identity.profiles.filter((p: string) =>
-          p !== "student" && p !== "full"
-        ),
-      )
-  ) throw Error("PL.CAPTURE_CHANGED: functional profiles");
+  // Новая B reservation, не active.json поколения A. Путь входит в qualification argv/G/K.
+  const outputDirectory = join(owner, "_generated/prairielearn-native-render");
   let core: string | undefined;
   for (
     const p of [
@@ -129,47 +182,99 @@ export async function nativeEntry(
   const { withNativeCaptureScope } = await import(
     pathToFileURL(join(core, "capture.ts")).href
   );
+  let selected:
+    | Awaited<ReturnType<typeof selectNativeOwnerAssignments>>
+    | undefined;
+  let descriptor: any;
   await withNativeCaptureScope({
     root: owner,
-    projection: candidate.identity.projection,
-    outputDirectory: candidate.outputDirectory,
+    projection: "author",
+    outputDirectory,
   }, {
     assignment: {
-      prepare: async (nativeOwner: Readonly<Record<string, any>>) => {
-        // Реальный gate предшествует этому callback. Native metadata не разрешаем сами.
-        const inputs = nativeOwner.files?.input;
-        if (
-          !Array.isArray(inputs) ||
-          inputs.some((v: unknown) => typeof v !== "string")
-        ) throw Error("PL.NATIVE_SELECTION_UNQUALIFIED: owner input contract");
-        const actual = inputs.map((p: string) =>
-          relative(owner, resolve(owner, p)).replaceAll("\\", "/")
-        );
-        if (
-          actual.some((p: string) => !safe(p)) ||
-          JSON.stringify([...actual].sort()) !==
-            JSON.stringify([...candidate.expectedSources].sort())
-        ) throw Error("PL.CAPTURE_CHANGED: actual source coverage");
-        const { declarations } = await import("./declarations.ts");
-        const selected = options.instance
-          ? declarations(nativeOwner.config?.prairielearn, options.instance)
-            .instance.works
-          : [options.work];
-        if (
-          !selected.length ||
-          selected.some((id: unknown) => typeof id !== "string" || !id)
-        ) throw Error("PL.INPUT_INVALID: selected assessments");
-        // G3: текущий public owner не задаёт проверенную ID→source таблицу.
-        // Не добавлять YAML/parser/path convention и не угадывать source из ID.
-        throw Error(
-          "PL.NATIVE_SELECTION_UNQUALIFIED: требуется public source binding выбранных работ; assignment child не запущен",
-        );
+      mode: "new",
+      prepare: async (observed: Readonly<Record<string, any>>) => {
+        selected = await selectNativeOwnerAssignments(observed, {
+          ...options,
+          root: owner,
+        });
+        return selected;
       },
     },
-  }, async () => {
-    // G1: old candidate generation нельзя молча связать с новой prepared generation.
-    throw Error(
-      "PL.NATIVE_CORRELATION_UNQUALIFIED: public prepared correlation contract required",
-    );
+  }, async (scope: any) => {
+    await scope.withPreparedOperation(async (lease: any) => {
+      const Core = await import(pathToFileURL(join(core!, "public.ts")).href);
+      descriptor = Core.NativePreparedOperationSchema.parse(lease.descriptor);
+      if (
+        !selected || descriptor.root !== owner ||
+        descriptor.outputDirectory !== outputDirectory ||
+        descriptor.identity.projection !== "author" ||
+        JSON.stringify(descriptor.inputs.map((i: any) => i.source)) !==
+          JSON.stringify(selected.expectedSources) ||
+        JSON.stringify(descriptor.assessments) !==
+          JSON.stringify(selected.assessments)
+      ) throw Error("PL.CAPTURE_CHANGED: prepared selection");
+      if (
+        options.profiles?.length &&
+        JSON.stringify(options.profiles) !==
+          JSON.stringify(
+            descriptor.identity.profiles.filter((p: string) =>
+              p !== "student" && p !== "full"
+            ),
+          )
+      ) throw Error("PL.CAPTURE_CHANGED: functional profiles");
+      const { prepareNativeAdapter } = await import("./native-adapter.ts");
+      await prepareNativeAdapter(Core, {
+        root: owner,
+        profiles: descriptor.identity.profiles,
+        projection: "author",
+        outputDirectory,
+      }, lease);
+      await lease.captureInputs(
+        descriptor,
+        selected.expectedSources,
+        async (token: string) => {
+          // Единственный render whole owner; token выдаёт только настоящая live lease.
+          const result = await new Deno.Command("quarto", {
+            cwd: owner,
+            args: ["render", "--output-dir", relative(owner, outputDirectory)],
+            env: {
+              COURSE_CORE_CAPTURE_TOKEN: token,
+              QUARTO_RUN_NO_NETWORK: "true",
+              QUARTO_PROFILE: descriptor.identity.profiles.join(","),
+            },
+            stdout: "inherit",
+            stderr: "inherit",
+            signal: AbortSignal.timeout(20 * 60 * 1000),
+          }).output();
+          if (!result.success) {
+            throw Error("PL.NATIVE_RENDER_FAILED: exit " + result.code);
+          }
+        },
+      );
+      await lease.assert(descriptor);
+    });
+  });
+  if (!descriptor || !selected) {
+    throw Error("PL.CAPTURE_MISSING: prepared operation");
+  }
+  const Core = await import(pathToFileURL(join(core, "public.ts")).href);
+  const { prepareNativeCourse } = await import("./native-course.ts");
+  return await Core.withCurrentNativeOperation({
+    root: owner,
+    profiles: descriptor.identity.profiles,
+    projection: descriptor.identity.projection,
+    outputDirectory,
+  }, async (operation: any) => {
+    if (
+      JSON.stringify(operation.identity) !== JSON.stringify(descriptor.identity)
+    ) throw Error("PL.CAPTURE_CHANGED: sealed generation");
+    return await prepareNativeCourse({
+      Core,
+      operation,
+      descriptor,
+      selection: selected!,
+      options,
+    });
   });
 }

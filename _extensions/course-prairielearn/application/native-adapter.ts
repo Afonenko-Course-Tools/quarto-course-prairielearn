@@ -1,7 +1,7 @@
 import { validateGradingComponents } from "./grading-policy.ts";
 // @deno-types="../vendor/zod/v4/index.d.ts"
 import { z } from "../vendor/zod/v4/index.js";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { nativeWorkspaceArtifact } from "./native-workspace.ts";
 import { readNativeEntryCandidate } from "./native-entry.ts";
@@ -41,6 +41,7 @@ export type PublicCore = {
   NativeAdapterValidationInputSchema: { parse: (value: unknown) => any };
   ArtifactInventorySchema: { parse: (value: unknown) => any };
   NativeOperationIdentitySchema: { parse: (value: unknown) => any };
+  NativePreparedOperationSchema?: { parse: (value: unknown) => any };
 };
 const ownBase = "_generated/course-spec/prairielearn-native";
 const generation = z.string().uuid();
@@ -73,59 +74,119 @@ async function ownFile(root: string, path: string) {
   }
   return current;
 }
-export async function prepareNativeAdapter(core: PublicCore, expectation: any) {
+async function requestValue(
+  root: string,
+  identity: any,
+  inputs: any[],
+  outputDirectory: string,
+) {
+  if (
+    !inputs.length || inputs.some((input) =>
+      !safePath(input.source) ||
+      !generation.safeParse(input.captureWitness).success
+    ) || new Set(inputs.map((input) => input.source)).size !== inputs.length
+  ) throw Error("PL.CAPTURE_CHANGED: prepared sources");
+  return {
+    schema: "pl-native-business-request-v1",
+    owner: root,
+    identity: structuredClone(identity),
+    outputDirectory,
+    inputs: await Promise.all(
+      inputs.map(async (input) => ({
+        ...input,
+        file: await hash(input.source) + ".json",
+      })),
+    ),
+  };
+}
+/** DTO-проекция не даёт lease authority и не пишет файлы. */
+export async function nativePreparedRequest(core: PublicCore, value: unknown) {
+  if (!core.NativePreparedOperationSchema) {
+    throw Error("PL.PUBLIC_API_REQUIRED: prepared operation");
+  }
+  const d = core.NativePreparedOperationSchema.parse(value);
+  if (
+    d.root !== resolve(d.root) ||
+    d.outputDirectory !== resolve(d.outputDirectory) ||
+    !d.outputDirectory.startsWith(d.root + "/_generated/")
+  ) throw Error("PL.CAPTURE_CHANGED: prepared owner/output");
+  return await requestValue(d.root, d.identity, d.inputs, d.outputDirectory);
+}
+async function saveRequest(root: string, request: any) {
+  const id = generation.parse(request.identity.operation),
+    folder = await directory(root, ownBase + "/" + id);
+  try {
+    const previous = JSON.parse(
+      await Deno.readTextFile(
+        await ownFile(root, ownBase + "/" + id + "/request.json"),
+      ),
+    );
+    if (!isDeepStrictEqual(previous, request)) {
+      throw Error("PL.CAPTURE_CHANGED: preparation");
+    }
+    if ((await requestFor(root)).id !== id) {
+      throw Error("PL.CAPTURE_CHANGED: active preparation");
+    }
+    return;
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound)) throw error;
+  }
+  await Deno.writeTextFile(
+    join(folder, "request.json"),
+    JSON.stringify(request),
+    { createNew: true },
+  );
+  const base = await directory(root, ownBase),
+    pendingFile = join(base, "active.pending.json");
+  await Deno.writeTextFile(pendingFile, JSON.stringify({ operation: id }), {
+    createNew: true,
+  });
+  await Deno.rename(pendingFile, join(base, "active.json"));
+}
+export async function prepareNativeAdapter(
+  core: PublicCore,
+  expectation: any,
+  lease?: { descriptor: unknown; assert(expected: unknown): Promise<void> },
+) {
   const root = await Deno.realPath(expectation.root);
+  if (lease) {
+    if (!core.NativePreparedOperationSchema) {
+      throw Error("PL.PUBLIC_API_REQUIRED: prepared operation");
+    }
+    const descriptor = core.NativePreparedOperationSchema.parse(
+      lease.descriptor,
+    );
+    if (
+      descriptor.root !== root ||
+      descriptor.outputDirectory !== expectation.outputDirectory ||
+      descriptor.identity.projection !== expectation.projection ||
+      expectation.profiles !== undefined &&
+        !isDeepStrictEqual(descriptor.identity.profiles, expectation.profiles)
+    ) throw Error("PL.CAPTURE_CHANGED: lease expectation");
+    await lease.assert(descriptor);
+    await saveRequest(root, await nativePreparedRequest(core, descriptor));
+    await lease.assert(descriptor);
+    return descriptor;
+  }
   const profiles = expectation.profiles ??
     (Deno.env.get("QUARTO_PROFILE") || "").split(",").filter(Boolean);
-  return await core.withPendingNativeOperation(
-    { ...expectation, root, profiles },
-    async (pending) => {
-      const identity = structuredClone(pending.identity),
-        inputs = structuredClone(pending.inputs);
-      const id = generation.parse(identity.operation);
-      const folder = await directory(root, ownBase + "/" + id);
-      const requests = await Promise.all(
-        inputs.map(async (input: any) => ({
-          ...input,
-          file: await hash(input.source) + ".json",
-        })),
-      );
-      const request = {
-        schema: "pl-native-business-request-v1",
-        owner: root,
-        identity,
-        outputDirectory: expectation.outputDirectory,
-        inputs: requests,
-      };
-      try {
-        const previous = JSON.parse(
-          await Deno.readTextFile(
-            await ownFile(root, ownBase + "/" + id + "/request.json"),
-          ),
-        );
-        if (!isDeepStrictEqual(previous, request)) {
-          throw Error("PL.CAPTURE_CHANGED: preparation");
-        }
-        const current = await requestFor(root);
-        if (current.id !== id) {
-          throw Error("PL.CAPTURE_CHANGED: active preparation");
-        }
-        return;
-      } catch (error) {
-        if (!(error instanceof Deno.errors.NotFound)) throw error;
-      }
-      await Deno.writeTextFile(
-        join(folder, "request.json"),
-        JSON.stringify(request),
-        { createNew: true },
-      );
-      const base = await directory(root, ownBase);
-      const pendingFile = join(base, "active.pending.json");
-      await Deno.writeTextFile(pendingFile, JSON.stringify({ operation: id }));
-      await Deno.rename(pendingFile, join(base, "active.json"));
-    },
-  );
+  return await core.withPendingNativeOperation({
+    ...expectation,
+    root,
+    profiles,
+  }, async (pending) => {
+    await saveRequest(
+      root,
+      await requestValue(
+        root,
+        pending.identity,
+        pending.inputs,
+        expectation.outputDirectory,
+      ),
+    );
+  });
 }
+
 async function requestFor(root: string) {
   const active = JSON.parse(
     await Deno.readTextFile(await ownFile(root, ownBase + "/active.json")),
@@ -207,6 +268,7 @@ export function createNativeAdapter(
   const loaded = new Map<string, ReturnType<typeof decodeNativeBusiness>>();
   const effectiveInputs = new Map<string, any>();
   let composing = false;
+  let validatedCourse: { operation: any; request: any; proof: any } | undefined;
   const adapter = {
     name: "prairielearn",
     nativeMetadataReadSet: Object.freeze(
@@ -375,6 +437,7 @@ export function createNativeAdapter(
       if (composing) throw Error("PL.ASSESSMENT_INVALID: recursive validation");
       loaded.clear();
       effectiveInputs.clear();
+      validatedCourse = undefined;
       composing = true;
       try {
         const proof = await operation.validateRelease(request, [adapter]);
@@ -402,6 +465,11 @@ export function createNativeAdapter(
           }
         }
         await operation.assertCurrent();
+        validatedCourse = {
+          operation,
+          request: structuredClone(request),
+          proof,
+        };
         return proof;
       } catch (error) {
         loaded.clear();
@@ -420,7 +488,11 @@ export function createNativeAdapter(
       options: { projectPlans: readonly unknown[]; references?: unknown },
       release: { expectedSources: string[]; courseId?: string },
     ) {
-      const proof = await adapter.validateCourse(operation, release);
+      const cached = validatedCourse;
+      const proof = cached && cached.operation === operation &&
+          isDeepStrictEqual(cached.request, release)
+        ? (await operation.assertCurrent(), cached.proof)
+        : await adapter.validateCourse(operation, release);
       const delivery = await operation.assignmentDelivery(request, options);
       if (
         delivery.schema !== "course-native-assignment-delivery-v1" ||
