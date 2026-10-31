@@ -104,9 +104,16 @@ export async function nativeVerificationInventory(input: {
       ...(contractCases ? { contractCases } : {}),
     });
   }
+  const compare = (a: string, b: string) => {
+    const x = Array.from(a), y = Array.from(b);
+    for (let i = 0; i < Math.min(x.length, y.length); i++) {
+      const d = x[i].codePointAt(0)! - y[i].codePointAt(0)!;
+      if (d) return d;
+    }
+    return x.length - y.length;
+  };
   scenarios.sort((a, b) =>
-    a.qualifiedId.localeCompare(b.qualifiedId) ||
-    a.scenario.localeCompare(b.scenario)
+    compare(a.qualifiedId, b.qualifiedId) || compare(a.scenario, b.scenario)
   );
   const inventory = {
     schema: "pl-native-verification-inventory-v1",

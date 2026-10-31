@@ -51,6 +51,7 @@ export async function selectNativeCompilerInputs(options: {
       name,
       bytes,
       sha256: value.sha256,
+      size: value.size,
       target: value.target,
       reason: value.reason,
       ...(value.rawSource === undefined ? {} : { rawSource: value.rawSource }),
@@ -184,6 +185,27 @@ export async function selectNativeCompilerInputs(options: {
   }
   const references = [];
   for (const ref of check.references ?? []) {
+    const group = /^author\/([^/]+)\//.exec(ref.root)?.[1];
+    if (!group) {
+      throw Error(
+        "PL.SELECTION_INVALID: reference requires explicit A1 author/group target root",
+      );
+    }
+    if (!fullPlan.groups.includes(group)) {
+      if (!ref.optional) {
+        throw Error(
+          "PL.SELECTION_INVALID: missing required reference group " + group,
+        );
+      }
+      references.push({
+        ...ref,
+        group,
+        available: false,
+        targets: [],
+        files: [],
+      });
+      continue;
+    }
     const records = select(
       full.files,
       ref.root,
@@ -198,7 +220,13 @@ export async function selectNativeCompilerInputs(options: {
     );
     // Вспомогательные классы эталона принадлежат той же проверенной A1 solution group.
     validateSources(files);
-    references.push({ name: ref.name, optional: ref.optional, files });
+    references.push({
+      ...ref,
+      group,
+      available: true,
+      targets: records.map((f) => f.target),
+      files,
+    });
   }
   const descriptor = runtimeDescriptor(
     check,

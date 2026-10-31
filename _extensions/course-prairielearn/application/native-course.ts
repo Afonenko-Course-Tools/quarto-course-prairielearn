@@ -1,10 +1,20 @@
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createNativeAdapter } from "./native-adapter.ts";
-import {
-  nativeProjectWitness,
-  requireNativeChecksContract,
-} from "./native-provenance.ts";
+import { nativeProjectWitness } from "./native-provenance.ts";
 import type { NativeEntryOptions } from "./native-entry.ts";
+import { canonical } from "./source-selection.ts";
+import { decodeNativeCheck } from "./native-checks.ts";
+import { validateNativeRaw } from "./native-business.ts";
+import { nativeChecksManifest } from "./native-check-inventory.ts";
+import { nativeVerificationInventory } from "./verification-inventory.ts";
+import { exportCourse } from "./export-course.ts";
+import { exportPrairieLearn } from "./export.ts";
+import {
+  checkedJSON,
+  materializeNativeQuestion,
+  nativeReferenceBindings,
+  publicExtension,
+} from "./native-materialize.ts";
 /** Удерживает все A1 callbacks живыми до выдачи. Один owner в запросе A1;
  * разные фактические formats удерживаются вложенными callbacks, не DTO-копиями. */
 export async function withNativeProjectPlans<T>(
@@ -118,6 +128,36 @@ export async function withNativeAssignments<T>(
     },
   );
 }
+/** Full captured check coverage, not an assumption about instance naming. */
+export function assertNativeChecksCoverage(witness: any, projects: any[]) {
+  const expected = witness.projects.filter((p: any) => p.fact.check).map((
+    p: any,
+  ) => p.source + "\0" + p.fact.exerciseId).sort();
+  const actual = projects.map((p) => p.source + "\0" + p.exerciseId).sort();
+  if (
+    new Set(actual).size !== actual.length ||
+    canonical(expected) !== canonical(actual)
+  ) {
+    throw Error(
+      "PL.NATIVE_CHECKS_SCOPE_INCOMPLETE: checks-output requires every captured project-check, including hidden/nonbank/nonPL; missing=" +
+        JSON.stringify(expected.filter((p: string) => !actual.includes(p))),
+    );
+  }
+}
+/** Existing question() consumes authored names; the private normalized settings
+ * are converted exactly once, without reconstructing an answer/body. */
+export function authoredNativeSettings(value: any) {
+  const { singleVariant, grading, submission, ...rest } = value;
+  const { aceMode, ...sub } = submission;
+  return {
+    ...rest,
+    submission: { ...sub, ...(aceMode ? { "ace-mode": aceMode } : {}) },
+    ...(singleVariant === undefined ? {} : { "single-variant": singleVariant }),
+    ...(grading
+      ? { grading: grading.method === "external" ? "external" : grading }
+      : {}),
+  };
+}
 export async function prepareNativeCourse(
   input: {
     Core: any;
@@ -128,26 +168,362 @@ export async function prepareNativeCourse(
       assessments: { source: string; id: string }[];
     };
     options: NativeEntryOptions;
+    observedConfig: any;
   },
-): Promise<never> {
-  // До A1 inquiries/materialization/exporter: контракт private checks ещё не принят.
-  // Не создавать fake CheckProject/legacy release или второй exporter для обхода.
-  const adapter = createNativeAdapter({
-    root: input.descriptor.root,
-    core: input.Core,
-    preparedIdentity: input.descriptor.identity,
+) {
+  const { Core, operation, descriptor, selection, options } = input;
+  if (!options.output) throw Error("PL.INPUT_INVALID: output required");
+  const output = options.output;
+  // Existing flags are explicit dependencies; never silently replace a stage or
+  // publication-source receipt with a second materialization/guessed provenance.
+  if (options.stagingReceipt) {
+    throw Error(
+      "PL.NATIVE_STAGE_RECEIPT_UNQUALIFIED: native A1 replaces stage source reading; receipt integration pending review",
+    );
+  }
+  if (options.publicationConditions) {
+    throw Error(
+      "PL.NATIVE_PUBLICATION_SOURCE_UNQUALIFIED: explicit publication source binding required",
+    );
+  }
+  const references = await nativeReferenceBindings({
+    owner: descriptor.root,
+    outputDirectory: descriptor.outputDirectory,
+    book: options.book,
+    config: input.observedConfig,
+    operation,
   });
-  await adapter.validateCourse(input.operation, {
-    expectedSources: input.selection.expectedSources,
-  });
-  await nativeProjectWitness(
-    input.Core,
-    await input.operation.assignmentProvenance(),
-    {
-      identity: input.descriptor.identity,
-      sources: input.selection.expectedSources,
-    },
-  );
-  await input.operation.assertCurrent();
-  return requireNativeChecksContract();
+  const Download = await publicExtension(descriptor.root, "project-download");
+  let staged: any;
+  try {
+    return await withNativeAssignments({
+      ...input,
+      references: references.references,
+    }, async (prepared) => {
+      const { adapter, witness, projectPlans, deliveries } = prepared;
+      const courseId = deliveries[0]?.publicPackage.owner;
+      if (
+        !courseId ||
+        deliveries.some((d: any) => d.publicPackage.owner !== courseId)
+      ) throw Error("PL.ASSIGNMENT_CHANGED: course owner");
+      const rows = witness.sourceRows,
+        bySource = new Map(rows.map((r: any) => [r.source, r.sha256]));
+      const content: any = {
+        assessments: [],
+        exercises: [],
+        projects: witness.projects.map((p: any) => p.fact),
+      };
+      for (const source of selection.expectedSources) {
+        const value = adapter.validatedInput(source),
+          business = adapter.business(source);
+        if (value.assessment) {
+          content.assessments.push({
+            ...value.assessment,
+            source,
+            extensions: { prairielearn: business.assessment },
+          });
+        }
+        for (const declaration of value.declarations) {
+          content.exercises.push({
+            id: declaration.id,
+            source,
+            target: "prairielearn",
+            project: declaration.attributes.project,
+            extensions: {
+              prairielearn: authoredNativeSettings(
+                business.questions[declaration.id],
+              ),
+            },
+          });
+        }
+      }
+      const projects: any[] = [],
+        nativeInputs: any = {},
+        nativeAnswers: any = {},
+        artifacts: any = {},
+        settings: any = {},
+        bodies = new Map<string, any>();
+      let registryInput: any;
+      const registry = async () => {
+        registryInput ??= await checkedJSON(
+          resolve(
+            options.runtimeRegistry ??
+              Deno.env.get("PRAIRIELEARN_RUNTIME_REGISTRY") ??
+              join(options.root, "prairielearn/runtime-profiles.json"),
+          ),
+        );
+        if (registryInput.value.schemaVersion !== 1) {
+          throw Error("PL.RUNTIME_INVALID: registry version");
+        }
+        return registryInput.value;
+      };
+      for (const delivered of deliveries) {
+        bodies.set(
+          delivered.publicPackage.works[0].id,
+          delivered.publicPackage,
+        );
+        for (const q of delivered.publicPackage.questions) {
+          const value = delivered.nativeSettings[q.id],
+            answer = delivered.nativeAnswers[q.id];
+          if (
+            settings[q.id] && canonical(settings[q.id]) !== canonical(value)
+          ) {
+            throw Error("PL.ASSIGNMENT_CHANGED: repeated question policy");
+          }
+          settings[q.id] = value;
+          if (answer) {
+            if (
+              nativeAnswers[q.id] &&
+              canonical(nativeAnswers[q.id]) !== canonical(answer)
+            ) throw Error("PL.ASSIGNMENT_CHANGED: repeated answer");
+            nativeAnswers[q.id] = answer;
+            continue;
+          }
+          if (artifacts[q.id]) continue;
+          const facts = witness.projects.filter((p: any) =>
+            p.source === q.source && p.fact.exerciseId === q.id
+          );
+          const pairs = projectPlans.filter((p: any) =>
+            p.source === q.source && p.exerciseId === q.id
+          );
+          if (facts.length !== 1 || pairs.length !== 1) {
+            throw Error("PL.PROVENANCE_CHANGED: selected project/plan");
+          }
+          const fact = facts[0].fact,
+            business = adapter.business(q.source),
+            declaration = adapter.validatedInput(q.source).declarations.find((
+              d: any,
+            ) => d.id === q.id);
+          if (
+            fact.check &&
+            canonical(
+                decodeNativeCheck(
+                  business.raw.projectChecks,
+                  declaration.attributes["project-check"],
+                ),
+              ) !== canonical(fact.check)
+          ) throw Error("PL.CHECKS_CHANGED: Core/C policy parity");
+          const runtime = fact.check
+            ? (await registry()).profiles?.[fact.check.runtime]
+            : undefined;
+          if (fact.check && !runtime) {
+            throw Error("PL.RUNTIME_INVALID: selected profile");
+          }
+          const materialized = await materializeNativeQuestion({
+            Core,
+            operation,
+            pair: pairs[0],
+            condition: delivered.conditions[q.id],
+            fact,
+            settings: value,
+            sourceRows: rows,
+            courseId,
+            runtime,
+            bindings: (plan, condition, submission) =>
+              references.bindings(Core, plan, condition, submission),
+            Download,
+            adapter,
+            expectedSources: selection.expectedSources,
+          });
+          artifacts[q.id] = materialized;
+          if (materialized.project) {
+            projects.push(materialized.project);
+            nativeInputs[q.id] = materialized.selection;
+          }
+        }
+      }
+      const fence = async () => {
+        await operation.assertCurrent();
+        await references.check();
+        await registryInput?.assert();
+      };
+      await fence();
+      let result: any;
+      if (options.instance) {
+        if (!options.checksOutput) {
+          throw Error("PL.INPUT_INVALID: course checks-output required");
+        }
+        if (
+          Object.keys(nativeAnswers).length ||
+          Object.values(settings).some((v: any) =>
+            v.submission.mode === "workspace"
+          )
+        ) {
+          throw Error(
+            "PL.NATIVE_DELIVERY_REVISION_REQUIRED: nativeanswer/Workspace public bindings require reviewed closed-union delivery revision",
+          );
+        }
+        assertNativeChecksCoverage(witness, projects);
+        const sources = selection.expectedSources.map((source) => ({
+          source,
+          sha256: bySource.get(source) as string,
+        })).sort((a, b) => a.source.localeCompare(b.source));
+        const selectionScope = {
+          schema: "pl-native-selected-checks-v1",
+          identity: descriptor.identity,
+          assessments: selection.assessments,
+          sources,
+          automaticIds: projects.map((p) => p.qualifiedId).sort(),
+        };
+        const checks = await nativeChecksManifest({
+          courseId,
+          bookRoot: options.book,
+          sources,
+          projects,
+          version: 2,
+          selectionScope,
+        });
+        const nativeVerification = await nativeVerificationInventory({
+          courseId,
+          operation: descriptor.identity.operation,
+          selections: nativeInputs,
+        });
+        const config = validateNativeRaw(
+          adapter.business(selection.assessments[0].source).raw,
+        )
+          .config;
+        result = await exportCourse({
+          courseId,
+          projectRoot: descriptor.root,
+          content,
+          checks,
+          config,
+          registry: registryInput?.value ?? { schemaVersion: 1, profiles: {} },
+          instance: options.instance,
+          output,
+          checksOutput: options.checksOutput,
+          body: async (id) => {
+            if (!bodies.has(id)) {
+              throw Error(
+                "PL.NATIVE_INTENT_INCOMPLETE: selected menu context absent: " +
+                  id,
+              );
+            }
+            return bodies.get(id);
+          },
+          candidateImage: options.candidateImage,
+          deferPublish: true,
+          nativeInputs,
+          nativeAnswers,
+          nativeVerification,
+          nativeBody: true,
+          studentArtifact: async (fact) => artifacts[fact.exerciseId],
+        });
+      } else {
+        if (
+          options.checksOutput || !options.bindingPath ||
+          deliveries.length !== 1
+        ) {
+          throw Error(
+            "PL.INPUT_INVALID: standalone binding and one selected work required",
+          );
+        }
+        const binding = await checkedJSON(resolve(options.bindingPath));
+        const scratch = await Deno.makeTempDir({
+          dir: dirname(resolve(output)),
+          prefix: ".pl-native-inputs-",
+        });
+        try {
+          const paths: any = {};
+          for (const q of deliveries[0].publicPackage.questions) {
+            const expected = settings[q.id],
+              provided = binding.value.questions?.[q.id],
+              selected = nativeInputs[q.id];
+            if (
+              !provided ||
+              canonical({
+                  topic: provided.topic,
+                  submission: provided.submission,
+                  grading: provided.grading ?? { method: "external" },
+                  singleVariant: provided.singleVariant,
+                }) !== canonical(expected)
+            ) throw Error("PL.BINDING_CHANGED: authored settings");
+            if (nativeAnswers[q.id]) continue;
+            paths[q.id] = "/" + q.id;
+            for (const folder of ["student", "tests"]) {
+              await Deno.mkdir(join(scratch, q.id, folder), {
+                recursive: true,
+              });
+            }
+            if (selected) {
+              if (
+                canonical(provided.files) !==
+                  canonical(selected.sources.map((f: any) => f.name))
+              ) throw Error("PL.BINDING_CHANGED: primary files");
+              for (
+                const [folder, files] of [["student", selected.sources], [
+                  "tests",
+                  selected.tests,
+                ]] as const
+              ) {
+                for (const f of files) {
+                  const path = join(scratch, q.id, folder, f.name);
+                  await Deno.mkdir(dirname(path), { recursive: true });
+                  await Deno.writeFile(path, f.bytes);
+                }
+              }
+              await Deno.writeTextFile(
+                join(scratch, q.id, "tests/grading-job.json"),
+                JSON.stringify(selected.descriptor),
+              );
+              const profile = registryInput.value.profiles[
+                projects.find((p) => p.exerciseId === q.id).check.runtime
+              ];
+              if (
+                !profile.image ||
+                provided.externalGradingOptions?.image !== profile.image ||
+                provided.externalGradingOptions.enableNetworking !== false
+              ) {
+                throw Error(
+                  "PL.RUNTIME_INVALID: exact registered image binding required",
+                );
+              }
+            }
+          }
+          result = await exportPrairieLearn(
+            deliveries[0].publicPackage,
+            {
+              projectRoot: scratch,
+              projects: paths,
+              studentArtifacts: artifacts,
+              nativeAnswers,
+              deferPublish: true,
+              nativeBody: true,
+            },
+            binding.value,
+            output,
+          );
+          const originalFence = fence;
+          await binding.assert();
+          await originalFence();
+          const publish = result.publish;
+          result.publish = async () => {
+            await binding.assert();
+            await originalFence();
+            return await publish();
+          };
+        } finally {
+          await Deno.remove(scratch, { recursive: true });
+        }
+      }
+      staged = result;
+      try {
+        await fence();
+      } catch (error) {
+        await result?.discard();
+        throw error;
+      }
+      return {
+        ...result,
+        publish: async () => {
+          throw Error(
+            "PL.NATIVE_RELEASE_UNQUALIFIED: independent whole Core+C review and exact R/M/E/G/prior-P qualification required before publish",
+          );
+        },
+      };
+    });
+  } catch (error) {
+    await staged?.discard();
+    throw error;
+  }
 }

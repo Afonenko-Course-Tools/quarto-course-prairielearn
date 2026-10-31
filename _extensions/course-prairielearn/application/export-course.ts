@@ -97,8 +97,10 @@ export async function exportCourse(
     body: (work: string) => Promise<any>;
     candidateImage?: string;
     deferPublish?: boolean;
+    nativeBody?: boolean;
     nativeInputs?: Record<string, any>;
     nativeAnswers?: Record<string, any>;
+    nativeVerification?: { scenarios: any[]; scenariosHash: string };
     publicationConditions?: string;
     publicationSource?: { repository: string; commit: string; book: string };
     studentArtifact?: (
@@ -326,6 +328,7 @@ export async function exportCourse(
           },
           "clientFilesCourse",
           "{{ client_files_course }}",
+          { preserveBibliography: input.nativeBody },
         );
         overviewParts.push(rendered.html);
         for (const file of rendered.files) {
@@ -547,6 +550,7 @@ export async function exportCourse(
         p,
         {
           projectRoot: scratch,
+          nativeBody: input.nativeBody,
           projects,
           studentArtifacts,
           nativeAnswers: input.nativeAnswers,
@@ -699,14 +703,15 @@ export async function exportCourse(
       bookRoot: input.checks.bookRoot,
       sourceSnapshotHash: input.checks.sourceSnapshotHash,
       inventoryHash: input.checks.inventoryHash,
-      verificationInventoryHash: await verificationInventoryHash(
-        input.checks,
-        input.projectRoot,
-        Object.keys(questions).filter((key) =>
-          questions[key].grading?.method !== "manual" &&
-          !input.nativeAnswers?.[key.slice(input.courseId.length + 1)]
+      verificationInventoryHash: input.nativeVerification?.scenariosHash ??
+        await verificationInventoryHash(
+          input.checks,
+          input.projectRoot,
+          Object.keys(questions).filter((key) =>
+            questions[key].grading?.method !== "manual" &&
+            !input.nativeAnswers?.[key.slice(input.courseId.length + 1)]
+          ),
         ),
-      ),
       questions: Object.keys(questions).sort(),
       gradingPayloads: questions,
       works: works.map((w: any) => ({
@@ -729,6 +734,22 @@ export async function exportCourse(
       files,
       ...(input.candidateImage ? { candidate: true } : {}),
     };
+    if (input.nativeVerification) {
+      const actual = Object.keys(questions).filter((key) =>
+        questions[key].grading.method !== "manual" &&
+        !input.nativeAnswers?.[key.slice(input.courseId.length + 1)]
+      ).sort();
+      const expected = [
+        ...new Set(
+          input.nativeVerification.scenarios.map((s) => s.qualifiedId),
+        ),
+      ].sort();
+      if (
+        canonical(actual) !== canonical(expected) ||
+        await hash(canonical(input.nativeVerification.scenarios)) !==
+          input.nativeVerification.scenariosHash
+      ) throw Error("PL.VERIFICATION_CHANGED: native scenario scope");
+    }
     delivery.deliveryHash = await hash(canonical(delivery));
     if (publicationConditions) {
       console.log(

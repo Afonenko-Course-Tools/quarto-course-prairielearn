@@ -30,6 +30,7 @@ const fields = (v: any, required: string[], optional: string[] = []) =>
   Object.keys(v).every((k) => [...required, ...optional].includes(k));
 export interface ProjectContext {
   deferPublish?: boolean;
+  nativeBody?: boolean;
   nativeAnswers?: Record<string, any>;
   projectRoot: string;
   projects: Record<string, string>;
@@ -195,6 +196,7 @@ export async function renderPublicBody(
   questionContext: DiagnosticContext,
   resourceBase: string,
   clientFilesToken: string,
+  options: { preserveBibliography?: boolean } = {},
 ): Promise<{ html: string; files: { name: string; data: Uint8Array }[] }> {
   const questionFail = (
     message: string,
@@ -298,7 +300,9 @@ export async function renderPublicBody(
     );
   };
   // A copy; bibliography links are removed only for targets removed above.
-  const blocks = projectBibliography(projectBibliography(nodes), true);
+  const blocks = options.preserveBibliography
+    ? structuredClone(nodes)
+    : projectBibliography(projectBibliography(nodes), true);
   const indexAnchors = (value: any) => {
     if (Array.isArray(value)) {
       value.forEach(indexAnchors);
@@ -321,7 +325,13 @@ export async function renderPublicBody(
   indexAnchors(blocks);
   const map = (node: any) => {
     if (!node || typeof node !== "object") return;
-    if (["RawBlock", "RawInline", "Cite", "Note"].includes(node.t)) {
+    if (
+      ["RawBlock", "RawInline", "Note"].includes(node.t) ||
+      node.t === "Cite" &&
+        (!options.preserveBibliography || !Array.isArray(node.c) ||
+          node.c.length !== 2 || !Array.isArray(node.c[0]) ||
+          !Array.isArray(node.c[1]))
+    ) {
       questionFail("Неподдерживаемый узел условия: " + node.t, "condition");
     }
     for (const attr of nodeAttrs(node)) {
@@ -649,6 +659,7 @@ export async function exportPrairieLearn(
         questionContext,
         "questions/" + q.key + "/clientFilesQuestion",
         "{{options.client_files_question_url}}",
+        { preserveBibliography: context.nativeBody },
       );
       prepared.push(...rendered.files);
       const native = renderNativeAnswer(answer), base = "questions/" + q.key;
@@ -878,6 +889,7 @@ export async function exportPrairieLearn(
       questionContext,
       base + "/clientFilesQuestion",
       "{{options.client_files_question_url}}",
+      { preserveBibliography: context.nativeBody },
     );
     prepared.push(...rendered.files);
     const html = rendered.html;

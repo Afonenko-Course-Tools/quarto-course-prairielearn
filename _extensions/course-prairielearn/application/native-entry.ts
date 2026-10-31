@@ -185,7 +185,7 @@ export async function nativeEntry(options: NativeEntryOptions) {
   let selected:
     | Awaited<ReturnType<typeof selectNativeOwnerAssignments>>
     | undefined;
-  let descriptor: any;
+  let descriptor: any, observedConfig: any;
   await withNativeCaptureScope({
     root: owner,
     projection: "author",
@@ -194,6 +194,7 @@ export async function nativeEntry(options: NativeEntryOptions) {
     assignment: {
       mode: "new",
       prepare: async (observed: Readonly<Record<string, any>>) => {
+        observedConfig = structuredClone(observed.config);
         selected = await selectNativeOwnerAssignments(observed, {
           ...options,
           root: owner,
@@ -260,21 +261,32 @@ export async function nativeEntry(options: NativeEntryOptions) {
   }
   const Core = await import(pathToFileURL(join(core, "public.ts")).href);
   const { prepareNativeCourse } = await import("./native-course.ts");
-  return await Core.withCurrentNativeOperation({
-    root: owner,
-    profiles: descriptor.identity.profiles,
-    projection: descriptor.identity.projection,
-    outputDirectory,
-  }, async (operation: any) => {
-    if (
-      JSON.stringify(operation.identity) !== JSON.stringify(descriptor.identity)
-    ) throw Error("PL.CAPTURE_CHANGED: sealed generation");
-    return await prepareNativeCourse({
-      Core,
-      operation,
-      descriptor,
-      selection: selected!,
-      options,
+  let prepared: any;
+  try {
+    prepared = await Core.withCurrentNativeOperation({
+      root: owner,
+      profiles: descriptor.identity.profiles,
+      projection: descriptor.identity.projection,
+      outputDirectory,
+    }, async (operation: any) => {
+      if (
+        JSON.stringify(operation.identity) !==
+          JSON.stringify(descriptor.identity)
+      ) throw Error("PL.CAPTURE_CHANGED: sealed generation");
+      prepared = await prepareNativeCourse({
+        Core,
+        operation,
+        descriptor,
+        selection: selected!,
+        options,
+        observedConfig,
+      });
+      return prepared;
     });
-  });
+    // Core final fence has completed before any prepared output can publish.
+    return await prepared.publish();
+  } catch (error) {
+    await prepared?.discard();
+    throw error;
+  }
 }

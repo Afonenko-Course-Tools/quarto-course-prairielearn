@@ -19,7 +19,7 @@ export function checksCanonical(value: any): string {
 /** Только value projection уже выбранного raw copy; не даёт operation/A1 authority
  * и никогда не читает rawSource. Production integration должна получать inventory
  * непосредственно от guarded materializeProject в живом callback той же операции.
- * Shared origin пока явно отказывает: legacy projectRelativePath не выражает его.
+ * Version2 выражает shared origin явно; legacy1 его отклоняет.
  */
 export async function nativeRawSourceSelection(
   input: {
@@ -28,6 +28,7 @@ export async function nativeRawSourceSelection(
     projectRoot: string;
     submissionRelativePath: string;
     sourceRows: readonly { source: string; sha256: string }[];
+    version?: 1 | 2;
   },
 ) {
   const file = input.Core.ArtifactFileSchema.parse(input.file);
@@ -56,14 +57,16 @@ export async function nativeRawSourceSelection(
     );
   }
   const path = posix.relative(input.projectRoot, file.rawSource);
-  if (!safePath(path)) {
+  if (!safePath(path) && input.version !== 2) {
     throw Error(
       "PL.NATIVE_ORIGIN_OUTSIDE_PROJECT: shared raw source cannot be represented by legacy projectRelativePath: " +
         file.rawSource,
     );
   }
   return {
-    projectRelativePath: path,
+    ...(safePath(path)
+      ? { projectRelativePath: path }
+      : { ownerRelativePath: file.rawSource }),
     submissionRelativePath: input.submissionRelativePath,
     sha256: file.sha256,
   };
@@ -77,24 +80,87 @@ export async function nativeChecksManifest(
     bookRoot: string;
     sources: { source: string; sha256: string }[];
     projects: any[];
+    version?: 1 | 2;
+    selectionScope?: any;
   },
 ) {
   const sources = [...input.sources].sort((a, b) =>
     a.source.localeCompare(b.source)
   );
-  const projects = [...input.projects].sort((a, b) =>
+  let projects = [...input.projects].sort((a, b) =>
     a.qualifiedId.localeCompare(b.qualifiedId)
   );
   if (
     new Set(sources.map((s) => s.source)).size !== sources.length ||
     new Set(projects.map((p) => p.qualifiedId)).size !== projects.length
   ) throw Error("PL.CHECKS_INVALID: duplicate normalized scope");
+  let selectionScope, selectionScopeHash;
+  if (input.version === 2) {
+    selectionScope = input.selectionScope;
+    const expected = projects.map((p) => p.qualifiedId);
+    if (
+      !selectionScope ||
+      selectionScope.schema !== "pl-native-selected-checks-v1" ||
+      JSON.stringify(selectionScope.automaticIds) !==
+        JSON.stringify(expected) ||
+      checksCanonical(selectionScope.sources) !== checksCanonical(sources) ||
+      new Set(
+          selectionScope.assessments.map((a: any) => a.source + "\0" + a.id),
+        ).size !== selectionScope.assessments.length
+    ) {
+      throw Error("PL.CHECKS_INVALID: exact selected automatic scope required");
+    }
+    selectionScopeHash = await hash(checksCanonical(selectionScope));
+  } else if (input.selectionScope) {
+    throw Error("PL.CHECKS_INVALID: native scope cannot be downgraded");
+  }
   return {
-    schemaVersion: 1,
+    schemaVersion: input.version ?? 1,
+    ...(selectionScope ? { selectionScope, selectionScopeHash } : {}),
     courseId: input.courseId,
     bookRoot: input.bookRoot,
-    sourceSnapshotHash: await hash(checksCanonical({ sources, projects })),
-    inventoryHash: await hash(checksCanonical(projects)),
+    sourceSnapshotHash: await hash(
+      checksCanonical({
+        sources,
+        projects: input.version === 2
+          ? projects.map(legacyChecksProject)
+          : projects,
+      }),
+    ),
+    inventoryHash: await hash(
+      checksCanonical(
+        input.version === 2 ? projects.map(legacyChecksProject) : projects,
+      ),
+    ),
     projects,
+  };
+}
+
+/** Прежние CheckProject поля. Native transport/intent не входит в hash scope. */
+export function legacyChecksProject(value: any) {
+  const {
+    selectionOriginVersion: _v,
+    nativePlanGroups: _g,
+    selectionScopeHash: _s,
+    ...project
+  } = value;
+  return {
+    ...project,
+    references: project.references.map((ref: any) => {
+      const { group: _g, targets: _t, ...legacy } = ref;
+      return legacy;
+    }),
+    contractFixtures: project.contractFixtures.map((file: any) => {
+      const { logicalTarget: _t, ...legacy } = file;
+      return legacy;
+    }),
+    ...(project.contractCasesHash
+      ? {
+        contractCasesHash: (() => {
+          const { logicalTarget: _t, ...legacy } = project.contractCasesHash;
+          return legacy;
+        })(),
+      }
+      : {}),
   };
 }
