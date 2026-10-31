@@ -1,5 +1,7 @@
 # Native Checks2/Job2 и существующая PL composition
 
+Исторический bounded checkpoint d0e510742479da401b3db851f2c12675aefd1bf7. Новая current-operation A1 дельта и измерения: [native-operation-reuse-consumer.md](native-operation-reuse-consumer.md). Старые цифры ниже не переносятся на новую редакцию автоматически.
+
 Это code checkpoint, не принятая qualification/release. Core public163bc8ab; C base7b8c1c55; Platform base581cc17f. Обязательное ROOT ruling c4-origin-code-root-ruling-20261031.md и subsequent уточнения scope/hash соблюдаются. API/JAR patch ROOT0e17b899 не включён; historical38bc не runtime authority.
 
 ## Origin и named reference

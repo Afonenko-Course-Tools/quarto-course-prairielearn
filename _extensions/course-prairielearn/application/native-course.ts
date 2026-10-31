@@ -15,59 +15,112 @@ import {
   nativeReferenceBindings,
   publicExtension,
 } from "./native-materialize.ts";
-/** Удерживает все A1 callbacks живыми до выдачи. Один owner в запросе A1;
- * разные фактические formats удерживаются вложенными callbacks, не DTO-копиями. */
+export type NativeProjectPlansResult<T> = {
+  value: T;
+  projectContextMetrics: Readonly<{
+    inside: Readonly<Record<string, number>>;
+    final: Readonly<Record<string, number>>;
+  }>;
+};
+/** Один genuine operation batch держит все actual formats/планы до выдачи.
+ * Metrics читаются после await, когда закрывающий A1 fence уже выполнен. */
 export async function withNativeProjectPlans<T>(
   Core: any,
   root: string,
   profiles: string[],
   witness: any,
   use: (plans: any[]) => Promise<T>,
-): Promise<T> {
+  operation: any,
+): Promise<NativeProjectPlansResult<T>> {
+  if (typeof operation?.withProjectContexts !== "function") {
+    throw Error(
+      "PL.NATIVE_PROJECT_CONTEXT_REUSE_REQUIRED: public current-operation A1 batch unavailable; no standalone fallback",
+    );
+  }
   const formats = [
     ...new Set(witness.projects.map((p: any) => p.format)),
   ] as string[];
-  const plans: any[] = [];
-  async function next(index: number): Promise<T> {
-    if (index === formats.length) return await use(plans);
-    const format = formats[index],
-      rows = witness.projects.filter((p: any) => p.format === format);
-    const inputs = [
+  const requests = formats.map((format) => ({
+    owner: root,
+    profiles,
+    format,
+    inputs: [
       ...new Set(
-        rows.map((p: any) => p.fact.projectRoot + "/native-input.qmd"),
+        witness.projects.filter((p: any) => p.format === format).map((p: any) =>
+          p.fact.projectRoot + "/native-input.qmd"
+        ),
       ),
-    ] as string[];
-    return await Core.readProjectContexts([{
-      owner: root,
-      inputs,
-      profiles,
-      format,
-    }], async (groups: any[]) => {
-      const contexts = groups[0]?.contexts;
-      if (!contexts || contexts.length !== inputs.length) {
-        throw Error("PL.PROVENANCE_CHANGED: A1 context coverage");
+    ] as string[],
+  }));
+  let retained: any, inside: Readonly<Record<string, number>> | undefined;
+  const metrics = () => {
+    const snapshot = retained?.metrics;
+    if (
+      !snapshot || typeof snapshot.inspectCalls !== "number" ||
+      typeof snapshot.fullWalks !== "number" ||
+      typeof snapshot.sourceBytesRead !== "number"
+    ) {
+      throw Error(
+        "PL.NATIVE_METRICS_UNAVAILABLE: fresh public A1 batch observations required",
+      );
+    }
+    return snapshot as Readonly<Record<string, number>>;
+  };
+  const value = await operation.withProjectContexts(
+    requests,
+    async (batch: any) => {
+      retained = batch;
+      if (batch.groups.length !== requests.length) {
+        throw Error(
+          "PL.PROVENANCE_CHANGED: A1 group coverage",
+        );
       }
-      const pairs = new Map<string, any>();
-      for (let i = 0; i < inputs.length; i++) {
-        if (contexts[i].input !== join(root, inputs[i])) {
-          throw Error("PL.PROVENANCE_CHANGED: A1 input order");
+      const plans: any[] = [];
+      for (let index = 0; index < requests.length; index++) {
+        const request = requests[index],
+          contexts = batch.groups[index].contexts;
+        if (contexts.length !== request.inputs.length) {
+          throw Error(
+            "PL.PROVENANCE_CHANGED: A1 context coverage",
+          );
         }
-        pairs.set(inputs[i], {
-          student: await Core.planProject(contexts[i], { audience: "student" }),
-          full: await Core.planProject(contexts[i], { audience: "full" }),
-        });
+        const pairs = new Map<string, any>();
+        for (let i = 0; i < request.inputs.length; i++) {
+          const input = request.inputs[i];
+          if (contexts[i].input !== join(root, input)) {
+            throw Error(
+              "PL.PROVENANCE_CHANGED: A1 input order",
+            );
+          }
+          pairs.set(input, {
+            student: await Core.planProject(contexts[i], {
+              audience: "student",
+            }),
+            full: await Core.planProject(contexts[i], { audience: "full" }),
+          });
+        }
+        for (
+          const row of witness.projects.filter((p: any) =>
+            p.format === request.format
+          )
+        ) {
+          plans.push({
+            source: row.source,
+            exerciseId: row.fact.exerciseId,
+            ...pairs.get(row.fact.projectRoot + "/native-input.qmd"),
+          });
+        }
       }
-      for (const row of rows) {
-        plans.push({
-          source: row.source,
-          exerciseId: row.fact.exerciseId,
-          ...pairs.get(row.fact.projectRoot + "/native-input.qmd"),
-        });
-      }
-      return await next(index + 1);
-    });
+      const result = await use(plans);
+      inside = metrics();
+      return result;
+    },
+  );
+  const final = metrics();
+  if (!inside) {
+    throw Error("PL.NATIVE_METRICS_UNAVAILABLE: callback observation missing");
   }
-  return await next(0);
+  return { value, projectContextMetrics: Object.freeze({ inside, final }) };
 }
 /** Existing builder bridge: public body, private canonical answers and exact live
  * conditions остаются связанными с одной operation. References даёт QRC owner. */
@@ -91,7 +144,7 @@ export async function withNativeAssignments<T>(
       deliveries: any[];
     },
   ) => Promise<T>,
-): Promise<T> {
+): Promise<NativeProjectPlansResult<T>> {
   const { Core, operation, descriptor, selection } = input;
   const adapter = createNativeAdapter({
     root: descriptor.root,
@@ -126,6 +179,7 @@ export async function withNativeAssignments<T>(
       await operation.assertCurrent();
       return await use({ adapter, proof, witness, projectPlans, deliveries });
     },
+    operation,
   );
 }
 /** Full captured check coverage, not an assumption about instance naming. */
@@ -196,7 +250,7 @@ export async function prepareNativeCourse(
   const Download = await publicExtension(descriptor.root, "project-download");
   let staged: any;
   try {
-    return await withNativeAssignments({
+    const composed = await withNativeAssignments({
       ...input,
       references: references.references,
     }, async (prepared) => {
@@ -522,6 +576,10 @@ export async function prepareNativeCourse(
         },
       };
     });
+    return {
+      ...composed.value,
+      nativeProjectContextMetrics: composed.projectContextMetrics,
+    };
   } catch (error) {
     await staged?.discard();
     throw error;
