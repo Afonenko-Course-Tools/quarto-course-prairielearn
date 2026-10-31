@@ -94,15 +94,24 @@ async function command(
     error.name = "ExternalToolFailure";
     return error;
   };
-  const childEnv = auxiliary
-    ? await auxiliary.before()
-    : __metrics.childEnv({});
+  // Native composition сохраняет собственный frozen env и pre/post fences.
+  // Ordinary ABI identity не требует разрешения на чтение полного env.
+  const ordinaryEnvironment = () => {
+    const baseEnv = {};
+    const env = __metrics.childEnv(baseEnv);
+    return env === baseEnv ? { env } : {
+      env: __metrics.childEnv(Deno.env.toObject()),
+      clearEnv: true,
+    };
+  };
+  const environment = auxiliary
+    ? { env: await auxiliary.before(), clearEnv: true }
+    : undefined;
   let child: Deno.ChildProcess;
   try {
     child = new Deno.Command(tool, {
       args,
-      env: childEnv,
-      ...(auxiliary ? { clearEnv: true } : {}),
+      ...(environment ?? ordinaryEnvironment()),
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",

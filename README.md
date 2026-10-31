@@ -2,7 +2,7 @@
 type: documentation
 component: course-prairielearn
 status: current
-updated: 2026-10-22
+updated: 2026-10-31
 ---
 
 # Задания курса в PrairieLearn
@@ -20,16 +20,18 @@ updated: 2026-10-22
 Кандидат выпуска этого ref — **8.4.0**. Адресные ordinary/native проверки
 выполнены с точным Core `198927766da83882b9c13bc13516c74fab35711d`;
 новая paired CI и release compatibility ещё не подтверждены.
-Он продолжает принятую линию 8.2.5 без Performance 8.2.2 и допускает
+Он объединяет принятую линию 8.2.5 и фасад ABI 1 из main 8.2.2 и допускает
 необязательные selected refs в active owned overlay. Адаптер проверяет закрытую
 структуру refs и их порядок относительно связанного witness; selected bytes,
 SHA256, identity и currentness по-прежнему проверяет Core. Отсутствие нового поля
 сохраняет прежний путь. Тег 8.4.0 ещё не опубликован; полный CI и genuine
 installed integration этого кандидата пока не подтверждены.
 Optional-primary требует отдельно проверенного exact Core/Platform состава и image digest.
-Оба CI jobs пока закрепляют прежний Core `3ccc9e81eb2fc297cd0f283a51e040f71572ce18`;
-необходимое обновление paired CI остаётся OPEN, SHA нового pin не угадан.
-default main с Performance в эту поставку не включается.
+Обе задачи CI и installed overlay закрепляют Core 8.4.0 `0613a4c6409d6cf766f926b8e096fd35d2a88422`.
+Успешный paired CI итогового HEAD ещё не подтверждён. QRC закреплён на
+`615b76f75dc75e60e0bb07b690b836e8ec8094f5`, Site — на ранее принятом
+`0342fb7cd22e6c06aa345239c5d6e2ee6c3eb7ff`; следующий Site-кандидат
+не подставляется до собственной приёмки. Неиспользуемый Download не является зависимостью CI.
 Предыдущие Core 7.2.0 и exporter 7.1.0 опубликованы. Core 7.2.0 собирает факты API-предпроверки
 и политики дополнительных Java-исходников, которые переносит этот exporter.
 Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
@@ -249,6 +251,19 @@ Counters обходов не являются числом посещённых 
 
 Прежний `COURSE_BUILD_TRACE` удалён; для новых измерений используются фасады ABI 1.
 Копии `observability/bridge.ts` и `bridge.lua` синхронизируются из проекта Performance.
+Сохранены `attributes.extension_id: "course-prairielearn"` и явный необязательный
+`document_id`; пакетная операция не выбирает произвольный документ.
+
+В ordinary Pandoc (`application/export.ts`) и grading inspect активный агент
+получает полный снимок через `childEnv` и `clearEnv: true`; identity/off,
+отсутствующий агент и недоступный режим не требуют полного чтения env.
+Native CLI вместо прежних Docker/inspect-команд вызывает публичный Core capture
+lease; executable/argv/cwd/env native render проверяет Core. C auxiliary children
+сохраняют отдельный frozen env и pre/post currentness: фасад не меняет
+квалифицированное окружение. Тесты `performance-context.ts`,
+`performance-permissions.ts`, `performance-native-auxiliary.ts` и
+`performance-native-boundary.ts` проверяют
+действующие границы; отрицательная fixture capture не является prior P.
 
 ## Совместимое обновление producer и consumer
 
@@ -285,13 +300,13 @@ kind равен `gradle-jar-v1`. Запрещены unknown fields, другой
 готовый JAR и student public tests не входят в native payload. API-precheck и
 optional дополнительные Java sources сохраняют собственные границы.
 
-Это локальный source candidate с Core 8.2.2. Полный Platform candidate, exact
+Этот раздел описывает сохранённый контракт из Core 8.2.2. Полный Platform candidate, exact
 registry/image и реальные build/archive/install/course proofs принимаются
 отдельно; unit fixture digest не является опубликованным OCI pin. Старые
 Core/Exporter 8.0.0 и immutable assets не меняются.
 
-Точная source dependency Core-кандидата: `7c9388cb4d982caf66657ea8f96c09243d64a147`.
-Оба CI jobs закрепляют этот commit; hosted exact-head CI ещё должен выполниться
+Точная source dependency текущего Core-кандидата: `0613a4c6409d6cf766f926b8e096fd35d2a88422`.
+Обе задачи CI закрепляют этот commit; hosted exact-head CI ещё должен выполниться
 после отдельного разрешённого push. Локальная установка не подтверждает published tag.
 
 ## Контекст меню и строгая дедупликация в кандидате8.2.1
@@ -307,3 +322,10 @@ source mapping, grading/submission, ресурсов, starter и всего nati
 Это исходники нового кандидата от immutable Exporter8.1 commit0d5e20e6.
 Существующий опубликованный8.1 и открытый PR22 не меняются. Тег8.2, hostedCI,
 полный экспорт курсов, серверная поставка и Student proof здесь не заявлены.
+
+## Незавершённый переход без CUE
+
+Целевой контракт требует удаления CUE из runtime, разработки, справочных
+схем, тестов и CI. В этом preserving merge сохранены прежние CUE/Lua пути
+до отдельной эквивалентной TS-миграции. Наличие TS native decoder само по себе
+не закрывает этот долг; кандидат 8.4.0 пока не готов к выпуску.

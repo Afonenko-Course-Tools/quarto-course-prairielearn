@@ -2,7 +2,7 @@
 type: specification
 component: course-prairielearn
 status: current
-updated: 2026-10-26
+updated: 2026-10-31
 ---
 
 # Спецификация заданий и контрольных работ
@@ -13,7 +13,7 @@ updated: 2026-10-26
 новая paired Core CI и release compatibility остаются OPEN.
 Теги и OCI digests не подтверждаются version metadata; Body v2/native v3 сохранены.
 
-Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/7d8a472a0fe4f05b5543fb856336a6d15278ef3a/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
+Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0613a4c6409d6cf766f926b8e096fd35d2a88422/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
@@ -25,6 +25,21 @@ updated: 2026-10-26
 `course-role` необязателен. Native упражнения вне банка сохраняют обычные правила Quarto.
 `course.id` задаётся в корне курса и передаётся в контекст полного экспорта.
 Обычная нативная разметка не требует экспортных метаданных.
+
+## Версия API и проверяемый Core
+
+Контракт API Core 8.1, Body v2 и delivery v3 сохраняется. Metadata descriptor
+адаптера указывает companion bundle `core-version: 8.4.0`, а словарный `contract.json`
+сохраняет API-декларацию `core_version: "8.1.0"`. Текущие native consumers
+не используют эти поля для проверки равенства bundle или минимальной версии:
+entrypoints загружают установленные публичные модули Core, а транспорт адаптера
+передаёт `name`, `rules` и `directory`. Из этих полей нельзя вывести проверенный
+диапазон поддерживаемых bundle.
+
+Для этого кандидата CI отдельно закрепляет Core 8.4.0:
+`0613a4c6409d6cf766f926b8e096fd35d2a88422`. Это проверяемый companion, а не
+автоматическое повышение API или объявление опубликованной совместимости.
+Нативная интеграция и поставка Java требуют собственных итоговых результатов.
 
 ## Область ответственности
 
@@ -615,3 +630,19 @@ patterns `explanation.m[d]` и `.pl-seed/identity.jso[n]`. Они выбираю
 реальные имена, но native question-variant не превращает их в обязательные
 поля самостоятельной локальной загрузки. Локальная сдача архива разрешена
 без запуска Workspace; её полнота по условию остаётся предметом Manual.
+
+## Контекст наблюдения после объединения main
+
+Фасад ABI 1 сохраняет `attributes.extension_id` и явный необязательный
+`document_id`. Ordinary Pandoc и grading inspect используют полный снимок
+`childEnv` с `clearEnv: true` только при активном агенте. Identity/off,
+недоступное чтение режима и отсутствие агента сохраняют scoped env permissions
+и обычное наследование без полного чтения env.
+
+Прежние Docker/inspect children `entrypoints/export-course.ts` заменены
+`application/native-entry.ts` → публичным Core capture lease. Возвращать
+старый collector или частные Core imports для наблюдения нельзя. Native render
+исполняет Core по qualified policy; C auxiliary Pandoc/Python/Git сохраняют
+собственный frozen env и pre/post currentness без добавления ambient span.
+Тесты Performance используют локальную fixture; они не доказывают prior P,
+полный экспорт курса или hosted CI.

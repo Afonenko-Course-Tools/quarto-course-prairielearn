@@ -17,8 +17,8 @@ updated: 2026-10-26
 | --- | --- | --- | --- | --- |
 | [PrairieLearn: действующий контракт](../docs/authoring.md) | specification | course-prairielearn | current | native/CUE binding и selected participant delivery; client/tests/reference |
 | [Диагностика](../docs/diagnostics.md) | reference | course-prairielearn | current | Собственные ID и внешние причины этого адаптера |
-| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/7d8a472a0fe4f05b5543fb856336a6d15278ef3a/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
-| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/7d8a472a0fe4f05b5543fb856336a6d15278ef3a/spec/index.md) | specification/index | course-core | current | Банк, условия, решения и назначения |
+| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0613a4c6409d6cf766f926b8e096fd35d2a88422/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
+| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0613a4c6409d6cf766f926b8e096fd35d2a88422/spec/index.md) | specification/index | course-core | current | Банк, условия, решения и назначения |
 
 Банк и назначения принадлежат текущему Core; этот адаптер проверяет свой вход
 на собственной границе. Неизменяемые выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases).
@@ -41,7 +41,7 @@ Platform/Gateway проверяются отдельно по exact source/diges
 совместимости прежних service releases. Download — необязательный consumer
 готового Core inventory, не зависимость этого экспортёра.
 
-Новая линия основана на принятом 8.2.5 и не включает Performance 8.2.2.
+Новая линия объединяет принятый 8.2.5 с ABI 1 фасадом из main 8.2.2.
 Оба полных hosted CI jobs закрепляют Core-кандидат 8.4.0
 `0613a4c6409d6cf766f926b8e096fd35d2a88422`. Exporter 8.4.0 ещё не опубликован;
 Успешный paired CI на новом точном составе ещё не подтверждён.
@@ -78,6 +78,15 @@ witness; SHA256, filesystem identity и currentness проверяет Core до
 адаптера. Restored/completed run не разрешает новую запись. Ordinary/v2
 поведение сохраняется; публичных author flags и новых delivery schemas нет.
 
-Installed regression закрепляет Core-кандидат 8.2.2
-`7c9388cb4d982caf66657ea8f96c09243d64a147`. Локальные проверки и этот
+Installed regression закрепляет Core-кандидат 8.4.0
+`0613a4c6409d6cf766f926b8e096fd35d2a88422`. Локальные проверки и этот
 ref не подтверждают публикацию выпуска.
+
+## Сохранение ABI 1 при объединении main
+
+Сохранены `attributes.extension_id` и явный `document_id`, ordinary active
+child snapshot/clearEnv и identity scoped permissions. Новый native entry
+использует только публичный Core capture seam, а C auxiliary children —
+принятый frozen env с pre/post currentness. Подробности и граница проверок
+приведены в [спецификации](../docs/authoring.md#контекст-наблюдения-после-объединения-main).
+Информационное `core-version: 8.4.0` не заменяет точный CI SHA или runtime qualification.
