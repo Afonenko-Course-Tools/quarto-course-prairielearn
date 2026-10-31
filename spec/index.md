@@ -2,7 +2,7 @@
 type: specification-index
 component: course-prairielearn
 status: current
-version: 8.3.0
+version: 8.4.0
 updated: 2026-10-26
 ---
 
@@ -33,9 +33,9 @@ Pinned official PrairieLearn JSON schemas and bundled offline Ajv validators are
 recorded in `spec/upstream/provenance.json`. The runner descriptor is Platform-owned,
 not a second author configuration or a private GradingJob.
 
-## Текущая совместимость кандидата 8.3.0
+## Текущая совместимость кандидата 8.4.0
 
-Кандидат Exporter 8.3.0 проверяется с Core-кандидатом 8.3.0 и строгими delivery v3/v4; v4 остаётся unreleased и требует независимой квалификации. Body v2 и public results v2
+Кандидат Exporter 8.4.0 адресно проверен с exact Core `198927766da83882b9c13bc13516c74fab35711d` и строгими delivery v3/v4; v4 остаётся unreleased и требует независимой квалификации. Body v2 и public results v2
 не переименовываются. Manual/mixed/choice требуют согласованного native reader;
 Platform/Gateway проверяются отдельно по exact source/digest, без заявления
 совместимости прежних service releases. Download — необязательный consumer
@@ -43,8 +43,9 @@ Platform/Gateway проверяются отдельно по exact source/diges
 
 Новая линия основана на принятом 8.2.5 и не включает Performance 8.2.2.
 Оба полных hosted CI jobs закрепляют Core-кандидат 8.3.0
-`3ccc9e81eb2fc297cd0f283a51e040f71572ce18`. Exporter 8.3.0 ещё не опубликован;
-полный CI, installed integration и готовность курса проверяются отдельно.
+`3ccc9e81eb2fc297cd0f283a51e040f71572ce18`. Exporter 8.4.0 ещё не опубликован;
+Необходимая новая paired Core CI ещё OPEN; прежний pin не подтверждает новый состав.
+Installed integration и готовность курса проверяются отдельно.
 
 Active pointer-v3 может содержать необязательный `commonPathDocuments`:
 плотный список закрытых refs `source/format/file/sha1/sha256` с уникальными
