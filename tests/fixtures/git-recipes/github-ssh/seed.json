@@ -1,0 +1,9 @@
+{
+  "S0": {
+    "README.md": "# Каталог оборудования\n\ncode — код оборудования, room — помещение.\n",
+    "catalog.tsv": "code\troom\nmeter-01\t201\n"
+  },
+  "S1": {
+    "catalog.tsv": "code\troom\nmeter-01\t201\nmeter-02\t203\n"
+  }
+}

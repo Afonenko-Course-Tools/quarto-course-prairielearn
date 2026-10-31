@@ -19,34 +19,63 @@ export function closed(v: any, required: string[], optional: string[] = []) {
     );
   }
 }
-export function question(v: any) {
-  closed(v, ["topic", "submission"], ["single-variant", "grading"]);
+function readQuestion(v: any, complete: boolean) {
+  closed(
+    v,
+    complete ? ["topic", "submission"] : [],
+    complete
+      ? ["single-variant", "grading"]
+      : ["topic", "submission", "single-variant", "grading"],
+  );
   if (
     Object.hasOwn(v, "single-variant") &&
     typeof v["single-variant"] !== "boolean"
-  ) throw Error("PL single-variant requires boolean");
-  if (typeof v.topic !== "string" || !v.topic.trim()) {
-    throw new Error("PL topic required");
+  ) {
+    throw Error("PL single-variant requires boolean");
   }
-  const submission = parseSubmission(v.submission, true);
   if (
-    submission.mode === "workspace" &&
-    (v.grading?.method !== "manual" || v["single-variant"] === false)
+    Object.hasOwn(v, "topic") &&
+    (typeof v.topic !== "string" || !v.topic.trim())
+  ) {
+    throw Error("PL topic required");
+  }
+  const submission = Object.hasOwn(v, "submission")
+    ? parseSubmission(v.submission, true)
+    : undefined;
+  const grading = gradingMethod(v.grading);
+  if (
+    submission?.mode === "workspace" &&
+    (grading.method !== "manual" || v["single-variant"] === false)
   ) {
     throw Error(
       "PL.WORKSPACE_INVALID: Workspace требует Manual и single-variant: true",
     );
   }
+  return { submission, grading };
+}
+/** Частичная native publication policy: отсутствие поля не становится default delivery. */
+export function publicationQuestion(v: any) {
+  const { submission, grading } = readQuestion(v, false);
   return {
-    topic: v.topic,
-    ...(v.grading !== undefined && v.grading !== "external"
-      ? { grading: gradingMethod(v.grading) }
-      : {}),
+    ...(Object.hasOwn(v, "topic") ? { topic: v.topic } : {}),
+    ...(submission ? { submission } : {}),
+    grading,
     ...(Object.hasOwn(v, "single-variant")
       ? { singleVariant: v["single-variant"] }
       : {}),
-    ...(submission.mode === "workspace" ? { singleVariant: true } : {}),
-    submission,
+    ...(submission?.mode === "workspace" ? { singleVariant: true } : {}),
+  };
+}
+export function question(v: any) {
+  const { submission, grading } = readQuestion(v, true);
+  return {
+    topic: v.topic,
+    ...(v.grading !== undefined && v.grading !== "external" ? { grading } : {}),
+    ...(Object.hasOwn(v, "single-variant")
+      ? { singleVariant: v["single-variant"] }
+      : {}),
+    ...(submission!.mode === "workspace" ? { singleVariant: true } : {}),
+    submission: submission!,
   };
 }
 export function gradingMethod(

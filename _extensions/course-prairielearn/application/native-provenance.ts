@@ -1,5 +1,27 @@
+import { decodeNativeCheck } from "./native-checks.ts";
 import { isDeepStrictEqual } from "node:util";
 import { canonical, hash, safePath } from "./source-selection.ts";
+/** PL policy принадлежит C. Core передаёт selector и raw plane из той же
+ * preprojection capture, включая скрытые/non-PL проекты. Никакого IO/authority. */
+export function normalizeNativeProjectFact(value: any, projectChecks: unknown) {
+  const { projectCheck, ...fact } = structuredClone(value);
+  if (projectCheck === undefined) {
+    if (fact.check !== undefined) {
+      throw Error(
+        "PL.CHECKS_CHANGED: normalized check without authentic selector",
+      );
+    }
+    return fact;
+  }
+  if (typeof projectCheck !== "string" || !projectCheck) {
+    throw Error("PL.CHECKS_CHANGED: invalid check selector");
+  }
+  const check = decodeNativeCheck(projectChecks, projectCheck);
+  if (fact.check !== undefined && !isDeepStrictEqual(fact.check, check)) {
+    throw Error("PL.CHECKS_CHANGED: selector/plane normalized policy mismatch");
+  }
+  return { ...fact, check };
+}
 /** Чистая C-проекция public DTO. Не создаёт operation/A1 authority, не читает S. */
 export async function nativeProjectWitness(
   Core: any,
@@ -29,7 +51,8 @@ export async function nativeProjectWitness(
   }
   const keys = new Set<string>(), projects: any[] = [];
   for (const doc of p.documents) {
-    for (const fact of doc.projects) {
+    for (const generic of doc.projects) {
+      const fact = normalizeNativeProjectFact(generic, doc.projectChecks);
       const key = doc.source + "\0" + fact.exerciseId;
       const declared = p.projects.filter((row: any) =>
         row.source === doc.source && row.id === fact.exerciseId

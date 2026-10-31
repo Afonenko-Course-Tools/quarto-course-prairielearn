@@ -36,11 +36,11 @@ default-exercise-time: 7
 default-exercise-course-role: false
 default-exercise-target: prairielearn
 filters:
- - {at: pre-ast, path: ${plPath}/native-ts/raw-capture.lua}
  - {at: pre-ast, path: ${corePath}/native-ts/early-context.lua}
  - {at: post-quarto, path: ${corePath}/native-ts/late-kind.lua}
  - {at: post-render, path: ${corePath}/native-ts/late-filter.lua}
 `;
+await put(".gitignore", "/.quarto/\n**/*.quarto_ipynb\n");
 await put(
   "_quarto.yml",
   config.replace("default: student", "default: " + profile).replace(
@@ -181,61 +181,33 @@ await Core.withCurrentNativeOperation({
     );
     return;
   }
-  const base = join(root, "_generated/course-spec/prairielearn-native"),
-    active = JSON.parse(await Deno.readTextFile(join(base, "active.json"))),
-    request = JSON.parse(
-      await Deno.readTextFile(join(base, active.operation, "request.json")),
-    );
+  // Сериализованный input — данные, не Core authority: чистый вызов не
+  // наполняет cache и не даёт читать business/private answers.
+  const external = PL.createNativeAdapter({ root, core: Core });
+  await external.validate(structuredClone(input));
+  let cached = false;
+  try {
+    external.business("index.qmd");
+    cached = true;
+  } catch {}
+  if (cached) throw Error("DTO validation created business authority");
   for (
-    const [slot, source, mutate] of [
-      [
-        "config",
-        "index.qmd",
-        (r: any) => r.business.config["question-defaults"].topic = "Forged",
-      ],
-      [
-        "assessment",
-        "slides.qmd",
-        (r: any) => r.business.assessment.attempts = "4",
-      ],
-      [
-        "projectChecks",
-        "index.qmd",
-        (r: any) => r.business.projectChecks.profiles.unused = {},
-      ],
-      [
-        "materialization",
-        "index.qmd",
-        (r: any) =>
-          r.business.materialization.projects["exr-unused"] = {
-            "include-git": false,
-            "common-files": [],
-          },
-      ],
-    ] as const
+    const readSet of [[], ["configuration"], [
+      "configuration",
+      "assessment",
+      "projectChecks",
+      "projectChecks",
+    ]]
   ) {
-    const ref = request.inputs.find((i: any) => i.source === source),
-      path = join(base, active.operation, ref.file),
-      original = await Deno.readTextFile(path);
-    for (const mode of ["mutate", "delete"]) {
-      const raw = JSON.parse(original);
-      if (mode === "mutate") mutate(raw);
-      else delete raw.business[slot];
-      await Deno.writeTextFile(path, JSON.stringify(raw));
-      let error = "";
-      try {
-        await PL.createNativeAdapter({ root, core: Core }).validateCourse(op, {
-          expectedSources: ["index.qmd", "slides.qmd"],
-        });
-      } catch (e) {
-        error = String(e);
-      } finally {
-        await Deno.writeTextFile(path, original);
-      }
-      if (!error.includes("PL.CAPTURE_CHANGED")) {
-        throw Error("accepted " + mode + " " + slot + ": " + error);
-      }
+    const bad = structuredClone(input);
+    bad.nativeMetadata.readSet = readSet;
+    let refused = false;
+    try {
+      await external.validate(bad);
+    } catch {
+      refused = true;
     }
+    if (!refused) throw Error("Incomplete/duplicate metadata readSet accepted");
   }
 
   if (

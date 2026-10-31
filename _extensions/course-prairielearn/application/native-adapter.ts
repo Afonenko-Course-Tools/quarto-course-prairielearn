@@ -1,3 +1,4 @@
+import { nativeBusinessInput, nativeMetadataReadSet } from "./native-input.ts";
 import { assertNativeSeedTargets } from "./native-business.ts";
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { validateGradingComponents } from "./grading-policy.ts";
@@ -7,33 +8,10 @@ import { join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { nativeWorkspaceArtifact } from "./native-workspace.ts";
 import { readNativeEntryCandidate } from "./native-entry.ts";
-import {
-  decodeNativeCheck,
-  nativeCheckScalars,
-  NativeProjectChecksSchema,
-} from "./native-checks.ts";
-import {
-  decodeNativeBusiness,
-  NativeBusinessSchema,
-  nativePolicy,
-  validateNativeRaw,
-} from "./native-business.ts";
+import { decodeNativeCheck } from "./native-checks.ts";
+import { decodeNativeBusiness } from "./native-business.ts";
 import { hash, safePath } from "./source-selection.ts";
 
-const originSchema = z.strictObject({
-  operation: z.uuid(),
-  captureWitness: z.uuid(),
-  source: z.string().refine(safePath),
-  format: z.enum(["html", "revealjs"]),
-  projection: z.enum(["student", "author"]),
-  profiles: z.array(z.string()).max(16),
-});
-export const NativeRawCaptureSchema = z.strictObject({
-  schema: z.literal("pl-native-business-capture-v1"),
-  origin: originSchema,
-  business: NativeBusinessSchema,
-});
-export type NativeRawCapture = z.output<typeof NativeRawCaptureSchema>;
 // Runtime-схемы Core поставляет composition через его публичный модуль.
 export type PublicCore = {
   withPendingNativeOperation: (
@@ -93,12 +71,7 @@ async function requestValue(
     owner: root,
     identity: structuredClone(identity),
     outputDirectory,
-    inputs: await Promise.all(
-      inputs.map(async (input) => ({
-        ...input,
-        file: await hash(input.source) + ".json",
-      })),
-    ),
+    inputs: structuredClone(inputs),
   };
 }
 /** DTO-проекция не даёт lease authority и не пишет файлы. */
@@ -227,38 +200,6 @@ export async function readNativeAdapterExpectation(
     },
   };
 }
-/** Только собственный raw capture; эта запись не является Core release proof. */
-export async function captureNativeBusiness(
-  root: string,
-  source: string,
-  business: unknown,
-  format: "html" | "revealjs",
-) {
-  root = await Deno.realPath(root);
-  const { id, request } = await requestFor(root);
-  const input = request.inputs.find((item: any) => item.source === source);
-  if (!input || input.file !== await hash(source) + ".json") {
-    throw Error("PL.CAPTURE_CHANGED: source");
-  }
-  const capture = NativeRawCaptureSchema.parse({
-    schema: "pl-native-business-capture-v1",
-    origin: {
-      operation: id,
-      captureWitness: input.captureWitness,
-      source,
-      format,
-      projection: request.identity.projection,
-      profiles: request.identity.profiles,
-    },
-    business: validateNativeRaw(business, { source }).raw,
-  });
-  await Deno.writeTextFile(
-    join(root, ownBase, id, input.file),
-    JSON.stringify(capture),
-    { createNew: true },
-  );
-  return capture;
-}
 export function createNativeAdapter(
   options: { root: string; core: PublicCore; preparedIdentity?: unknown },
 ) {
@@ -270,113 +211,40 @@ export function createNativeAdapter(
   const loaded = new Map<string, ReturnType<typeof decodeNativeBusiness>>();
   const effectiveInputs = new Map<string, any>();
   let composing = false;
-  let validatedCourse: { operation: any; request: any; proof: any } | undefined;
+  let validatingRequest: Awaited<ReturnType<typeof requestFor>> | undefined;
+  let validatedCourse: {
+    operation: any;
+    identity: any;
+    request: any;
+    proof: any;
+  } | undefined;
   const adapter = {
     name: "prairielearn",
-    nativeMetadataReadSet: Object.freeze(
-      [
-        "configuration",
-        "assessment",
-        "projectChecks",
-        "projectMaterialization",
-      ] as const,
-    ),
+    nativeMetadataReadSet,
     async validate(value: unknown) {
-      const input = options.core.NativeAdapterValidationInputSchema.parse(
-        value,
-      );
-      const root = await Deno.realPath(options.root);
-      const { id, request } = await requestFor(root);
-      if (
-        id !== input.origin.operation ||
-        preparedIdentity &&
-          !isDeepStrictEqual(request.identity, preparedIdentity)
-      ) {
-        throw Error("PL.CAPTURE_CHANGED: generation");
-      }
-      const ref = request.inputs.find((item: any) =>
-        item.source === input.origin.source
-      );
-      if (
-        !ref || ref.captureWitness !== input.origin.captureWitness ||
-        ref.file !== await hash(input.origin.source) + ".json"
-      ) throw Error("PL.CAPTURE_CHANGED: witness");
-      const raw = NativeRawCaptureSchema.parse(
-        JSON.parse(
-          await Deno.readTextFile(
-            await ownFile(root, ownBase + "/" + id + "/" + ref.file),
-          ),
-        ),
-      );
-      if (JSON.stringify(raw.origin) !== JSON.stringify(input.origin)) {
-        throw Error("PL.CAPTURE_CHANGED: origin");
-      }
-      for (const declaration of input.declarations) {
-        const original = raw.business.declarations.find((d) =>
-          d.id === declaration.id
+      const { input, raw } = nativeBusinessInput(options.core, value);
+      // Direct DTO validation остаётся чистой: state может заполнить только
+      // callback полной composition внутри genuine Core operation.
+      if (composing) {
+        const current = validatingRequest;
+        if (
+          !current || input.origin.operation !== current.id ||
+          !isDeepStrictEqual(
+            input.origin.profiles,
+            current.request.identity.profiles,
+          ) ||
+          input.origin.projection !== current.request.identity.projection
+        ) {
+          throw Error("PL.CAPTURE_CHANGED: generation/profiles/projection");
+        }
+        const ref = current.request.inputs.find((item: any) =>
+          item.source === input.origin.source
         );
-        if (!original) {
-          throw Error("PL.CAPTURE_CHANGED: missing raw declaration");
-        }
-        for (const [key, value] of Object.entries(declaration.attributes)) {
-          if (
-            key.startsWith("prairielearn-") &&
-            original.attributes[key] !== value
-          ) throw Error("PL.CAPTURE_CHANGED: authored adapter attribute");
+        if (!ref || ref.captureWitness !== input.origin.captureWitness) {
+          throw Error("PL.CAPTURE_CHANGED: source/witness");
         }
       }
-      const slots = adapter.nativeMetadataReadSet;
-      const envelope = input.nativeMetadata;
-      if (
-        !envelope || !Array.isArray(envelope.readSet) ||
-        envelope.readSet.length !== slots.length ||
-        slots.some((slot) => !envelope.readSet.includes(slot)) ||
-        !envelope.values ||
-        Object.keys(envelope.values).some((key) => !slots.includes(key as any))
-      ) {
-        throw Error("PL.CAPTURE_CHANGED: missing or incomplete nativeMetadata");
-      }
-      const mapping = {
-        configuration: "config",
-        assessment: "assessment",
-        projectChecks: "projectChecks",
-        projectMaterialization: "materialization",
-      } as const;
-      const authoritativeRaw: any = { declarations: raw.business.declarations };
-      for (const slot of slots) {
-        if (Object.hasOwn(envelope.values, slot)) {
-          authoritativeRaw[mapping[slot]] = envelope.values[slot];
-        }
-      }
-      // Обе стороны проходят тот же прежний PL canon. Отсутствие slot сохраняет отдельный смысл.
-      const planes = (value: unknown) => {
-        const checked = validateNativeRaw(value, {
-            source: input.origin.source,
-          }),
-          r = checked.raw;
-        return {
-          ...(Object.hasOwn(r, "config")
-            ? { configuration: checked.config }
-            : {}),
-          ...(Object.hasOwn(r, "assessment")
-            ? { assessment: nativePolicy(r.assessment) }
-            : {}),
-          ...(Object.hasOwn(r, "projectChecks")
-            ? {
-              projectChecks: NativeProjectChecksSchema.parse(
-                nativeCheckScalars(r.projectChecks),
-              ),
-            }
-            : {}),
-          ...(Object.hasOwn(r, "materialization")
-            ? { projectMaterialization: checked.materialization }
-            : {}),
-        };
-      };
-      if (!isDeepStrictEqual(planes(raw.business), planes(authoritativeRaw))) {
-        throw Error("PL.CAPTURE_CHANGED: authored native metadata");
-      }
-      const business = decodeNativeBusiness(authoritativeRaw, input, {
+      const business = decodeNativeBusiness(raw, input, {
         deferComposition: composing,
       });
       const sources: { path: string; kind: "directory" | "file" }[] = [];
@@ -419,7 +287,7 @@ export function createNativeAdapter(
           throw Error("PL.PROJECT_CHECK_INVALID: требуется project-check");
         }
         if (settings.grading.method !== "manual") {
-          decodeNativeCheck(authoritativeRaw.projectChecks, check);
+          decodeNativeCheck(raw.projectChecks, check);
         }
         sources.push({ path, kind: "directory" });
         for (
@@ -428,8 +296,10 @@ export function createNativeAdapter(
               ?.["common-files"] ?? []
         ) sources.push({ path: common.source, kind: "file" });
       }
-      loaded.set(input.origin.source, business);
-      effectiveInputs.set(input.origin.source, input);
+      if (composing) {
+        loaded.set(input.origin.source, business);
+        effectiveInputs.set(input.origin.source, input);
+      }
       return { sources };
     },
     async validateCourse(
@@ -437,11 +307,46 @@ export function createNativeAdapter(
       request: { expectedSources: string[]; courseId?: string },
     ) {
       if (composing) throw Error("PL.ASSESSMENT_INVALID: recursive validation");
+      if (
+        validatedCourse && validatedCourse.operation === operation &&
+        isDeepStrictEqual(validatedCourse.identity, operation.identity) &&
+        isDeepStrictEqual(validatedCourse.request, request)
+      ) {
+        try {
+          await operation.assertCurrent();
+          return validatedCourse.proof;
+        } catch (error) {
+          validatedCourse = undefined;
+          loaded.clear();
+          effectiveInputs.clear();
+          throw error;
+        }
+      }
       loaded.clear();
       effectiveInputs.clear();
       validatedCourse = undefined;
       composing = true;
       try {
+        const root = await Deno.realPath(options.root);
+        validatingRequest = await requestFor(root);
+        if (
+          !isDeepStrictEqual(
+            validatingRequest.request.identity,
+            operation.identity,
+          ) ||
+          preparedIdentity &&
+            !isDeepStrictEqual(
+              validatingRequest.request.identity,
+              preparedIdentity,
+            ) ||
+          !isDeepStrictEqual(
+            validatingRequest.request.inputs.map((i: any) => i.source),
+            request.expectedSources,
+          )
+        ) {
+          throw Error("PL.CAPTURE_CHANGED: operation/prepared/source coverage");
+        }
+        await operation.assertCurrent();
         const proof = await operation.validateRelease(request, [adapter]);
         if (
           loaded.size !== request.expectedSources.length ||
@@ -468,8 +373,14 @@ export function createNativeAdapter(
           }
         }
         await operation.assertCurrent();
+        if (!isDeepStrictEqual(await requestFor(root), validatingRequest)) {
+          throw Error(
+            "PL.CAPTURE_CHANGED: correlation changed during validation",
+          );
+        }
         validatedCourse = {
           operation,
+          identity: structuredClone(operation.identity),
           request: structuredClone(request),
           proof,
         };
@@ -480,6 +391,7 @@ export function createNativeAdapter(
         throw error;
       } finally {
         composing = false;
+        validatingRequest = undefined;
       }
     },
     /** Exact public Core delivery; планы и QRC context приходят от существующей
@@ -491,11 +403,7 @@ export function createNativeAdapter(
       options: { projectPlans: readonly unknown[]; references?: unknown },
       release: { expectedSources: string[]; courseId?: string },
     ) {
-      const cached = validatedCourse;
-      const proof = cached && cached.operation === operation &&
-          isDeepStrictEqual(cached.request, release)
-        ? (await operation.assertCurrent(), cached.proof)
-        : await adapter.validateCourse(operation, release);
+      const proof = await adapter.validateCourse(operation, release);
       const delivery = await operation.assignmentDelivery(request, options);
       if (
         delivery.schema !== "course-native-assignment-delivery-v1" ||
@@ -553,7 +461,9 @@ export function createNativeAdapter(
     /** Закрытое состояние PL composition; не включать в public Body/catalog/README. */
     validatedInput(source: string) {
       const input = effectiveInputs.get(source);
-      if (!input) throw Error("PL.CAPTURE_MISSING: validation не выполнена");
+      if (!validatedCourse || !input) {
+        throw Error("PL.CAPTURE_MISSING: validation не выполнена");
+      }
       return structuredClone(input);
     },
     async workspaceArtifact(
@@ -611,7 +521,9 @@ export function createNativeAdapter(
     /** Значения только после настоящего executable callback; publish владеет outer Core fence. */
     business(source: string) {
       const result = loaded.get(source);
-      if (!result) throw Error("PL.CAPTURE_MISSING: validation не выполнена");
+      if (!validatedCourse || !result) {
+        throw Error("PL.CAPTURE_MISSING: validation не выполнена");
+      }
       return structuredClone(result);
     },
   };

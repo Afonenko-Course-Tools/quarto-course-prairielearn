@@ -1,6 +1,4 @@
 import { dirname, join } from "node:path";
-const sp =
-  "/home/tolya/Java/.cache/codex-tools/refactoring-execution/repos/system-practice-root-metadata-20261031";
 function assert(v: unknown, text: string): asserts v {
   if (!v) throw Error(text);
 }
@@ -20,19 +18,9 @@ async function fixture(name: string, noSite = false) {
   const root = await Deno.makeTempDir({ prefix: "pl-c5-seed-" }),
     project = "projects/" + name;
   async function original(path: string) {
-    const r = await new Deno.Command("git", {
-      args: [
-        "-C",
-        sp,
-        "show",
-        "9807379deadaaabccb0ee7de81e77846f0e960a1:tasks/projects/version-control/" +
-        name + "/" + path,
-      ],
-      stdout: "piped",
-      stderr: "piped",
-    }).output();
-    assert(r.success, new TextDecoder().decode(r.stderr));
-    return r.stdout;
+    return await Deno.readFile(
+      new URL("./fixtures/git-recipes/" + name + "/" + path, import.meta.url),
+    );
   }
   const paths = name === "github-ssh"
     ? ["seed_recipe.py", "seed.json"]

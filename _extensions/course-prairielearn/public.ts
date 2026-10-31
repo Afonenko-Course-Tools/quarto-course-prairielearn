@@ -9,9 +9,7 @@ export {
   NativeBusinessSchema,
 } from "./application/native-business.ts";
 export {
-  captureNativeBusiness,
   createNativeAdapter,
-  NativeRawCaptureSchema,
   prepareNativeAdapter,
 } from "./application/native-adapter.ts";
 
@@ -22,3 +20,5 @@ export {
 } from "./application/native-checks.ts";
 
 export { selectNativeCompilerInputs } from "./application/native-selection.ts";
+
+export { inspectPublication } from "./application/native-publication.ts";

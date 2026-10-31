@@ -1,29 +1,46 @@
-import { readNativeAdapterExpectation } from "../_extensions/course-prairielearn/application/native-adapter.ts";
-import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-const corePath = join(Deno.args[0], "_extensions/course-core"),
-  plPath = join(
-    dirname(dirname(fileURLToPath(import.meta.url))),
-    "_extensions/course-prairielearn",
-  );
-const Core = await import(pathToFileURL(join(corePath, "public.ts")).href),
-  PL = await import(pathToFileURL(join(plPath, "public.ts")).href);
-const root = await Deno.makeTempDir({ prefix: "pl-scope-" }),
+// Genuine ordinary Core producer → C consumer; не assignment/P/actual C CLI.
+import { strict as assert } from "node:assert";
+import { dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+const coreSource = resolve(Deno.args[0]),
+  repo = resolve(new URL("../", import.meta.url).pathname);
+const root = await Deno.makeTempDir({ prefix: "pl-c9-native-" }),
   checks: string[] = [];
-async function put(path: string, text: string) {
-  await Deno.mkdir(dirname(join(root, path)), { recursive: true });
-  await Deno.writeTextFile(join(root, path), text);
+const core = join(root, "_extensions/course-core"),
+  pl = join(root, "_extensions/course-prairielearn");
+async function put(p: string, s: string) {
+  await Deno.mkdir(dirname(join(root, p)), { recursive: true });
+  await Deno.writeTextFile(join(root, p), s);
 }
-const config = `project:
+async function command(args: string[], env: Record<string, string> = {}) {
+  const r = await new Deno.Command(Deno.env.get("QUARTO") || "quarto", {
+    args,
+    cwd: root,
+    env,
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  if (!r.success) {
+    throw Error(
+      root + "\n" + new TextDecoder().decode(r.stdout) +
+        new TextDecoder().decode(r.stderr),
+    );
+  }
+  return r;
+}
+try {
+  await put(".gitignore", "/.quarto/\n**/*.quarto_ipynb\n");
+  await put(
+    "_quarto.yml",
+    `project:
   type: website
+  render: [index.qmd, slides.qmd]
+  resources: ['!project/**']
   output-dir: _site
-  pre-render: [quarto run ${corePath}/entrypoints/native-pre.ts, quarto run pre.ts]
-  post-render: [quarto run ${corePath}/entrypoints/native-post.ts]
-profile:
-  default: student
-format:
-  html:
-    theme: none
+  pre-render: [quarto run ${core}/entrypoints/native-pre.ts, quarto run pre.ts]
+  post-render: [quarto run ${core}/entrypoints/native-post.ts]
+profile: {default: student}
+format: {html: {theme: none}}
 course: {id: scope-fixture, view: student, adapters: [prairielearn]}
 course-core-runtime: native-ts
 exercise-bank: true
@@ -32,26 +49,14 @@ default-exercise-difficulty: introductory
 default-exercise-time: 7
 default-exercise-course-role: false
 default-exercise-target: prairielearn
-filters:
- - {at: pre-ast, path: ${plPath}/native-ts/raw-capture.lua}
- - {at: pre-ast, path: ${corePath}/native-ts/early-context.lua}
- - {at: post-quarto, path: ${corePath}/native-ts/late-kind.lua}
- - {at: post-render, path: ${corePath}/native-ts/late-filter.lua}
-`;
-await put("_quarto.yml", config);
-await put("_quarto-student.yml", "course: {view: student}\n");
-await put("_extensions/prairielearn/contract.json", '{"name":"prairielearn"}');
-await put(
-  "pre.ts",
-  `import * as Core from ${
-    JSON.stringify(pathToFileURL(join(corePath, "public.ts")).href)
-  };import * as PL from ${
-    JSON.stringify(pathToFileURL(join(plPath, "public.ts")).href)
-  };await PL.prepareNativeAdapter(Core,{root:Deno.cwd(),projection:'student',outputDirectory:Deno.cwd()+'/_site'});`,
-);
-await put(
-  "index.qmd",
-  `---
+filters: [course-core, course-prairielearn]
+`,
+  );
+  await put("_quarto-student.yml", "course: {view: student}\n");
+  await put("project/input.txt", "Starter\n");
+  await put(
+    "index.qmd",
+    `---
 prairielearn:
   question-defaults: {topic: Git, grading: {method: manual}, submission: {mode: upload}}
 ---
@@ -60,138 +65,216 @@ prairielearn:
 Условие.
 :::
 `,
-);
-await put(
-  "slides.qmd",
-  "---\nformat: revealjs\n---\n# Пустая страница\n\nNative отсутствие metadata.\n",
-);
-await put("project/input.txt", "Starter\n");
-await Core.withNativeCaptureScope(
-  { root, projection: "student", outputDirectory: root + "/_site" },
-  { expectedSources: ["index.qmd", "slides.qmd"] },
-  async (scope: any) => {
-    for (const source of ["index.qmd", "slides.qmd"]) {
-      await scope.captureInputs([source], async (token: string) => {
-        const r = await new Deno.Command("quarto", {
-          args: ["render", source],
-          cwd: root,
-          env: {
-            COURSE_CORE_CAPTURE_TOKEN: token,
-            QUARTO_RUN_NO_NETWORK: "true",
-            DENO_NO_PACKAGE_JSON: "1",
-          },
-          stdout: "piped",
-          stderr: "piped",
-        }).output();
-        if (!r.success) {
-          throw Error(new TextDecoder().decode(r.stderr));
-        }
-      });
-    }
-  },
-);
-const candidate = await readNativeAdapterExpectation(Core, root);
-if (
-  candidate.identity.profiles.join(",") !== "student" ||
-  candidate.expectation.outputDirectory !== root + "/_site"
-) throw Error("CLI candidate lost actual pending identity");
-await Core.withCurrentNativeOperation({
-  root,
-  profiles: ["student"],
-  projection: "student",
-  outputDirectory: root + "/_site",
-  expectedDocuments: [{ source: "index.qmd", format: "html" }, {
-    source: "slides.qmd",
-    format: "revealjs",
-  }],
-}, async (op: any) => {
-  const adapter = PL.createNativeAdapter({
-    root,
-    core: Core,
-    preparedIdentity: candidate.identity,
-  });
-  const proof = await op.validateRelease({
-    expectedSources: ["index.qmd", "slides.qmd"],
-  }, [adapter]);
-  if (
-    proof.documents.map((d: any) => d.format).sort().join(",") !==
-      "html,revealjs"
-  ) throw Error("mixed formats lost");
-  checks.push(
-    "actual mixed format scope; both captures retained; native default student",
   );
-  if (Object.keys(adapter.business("slides.qmd").questions).length) {
-    throw Error("absent namespace synthesized question");
+  await put(
+    "slides.qmd",
+    "---\nformat: revealjs\n---\n# Пустая страница\n\nNative отсутствие metadata.\n",
+  );
+  await put(
+    "pre.ts",
+    `import * as Core from ${
+      JSON.stringify(pathToFileURL(join(core, "public.ts")).href)
+    };import * as PL from ${
+      JSON.stringify(pathToFileURL(join(pl, "public.ts")).href)
+    };await PL.prepareNativeAdapter(Core,{root:Deno.cwd(),projection:'student',outputDirectory:Deno.cwd()+'/_site'});`,
+  );
+  await command(["add", coreSource, "--no-prompt"]);
+  await command(["add", repo, "--no-prompt"]);
+  const Core = await import(pathToFileURL(join(core, "public.ts")).href),
+    PL = await import(pathToFileURL(join(pl, "public.ts")).href);
+  const { readNativeAdapterExpectation } = await import(
+    pathToFileURL(join(pl, "application/native-adapter.ts")).href
+  );
+  async function capture() {
+    await Core.withNativeCaptureScope(
+      { root, projection: "student", outputDirectory: root + "/_site" },
+      { expectedSources: ["index.qmd", "slides.qmd"] },
+      async (scope: any) => {
+        for (const source of ["index.qmd", "slides.qmd"]) {
+          await scope.captureInputs(
+            [source],
+            (token: string) =>
+              command(["render", source], {
+                COURSE_CORE_CAPTURE_TOKEN: token,
+                QUARTO_RUN_NO_NETWORK: "true",
+                DENO_NO_PACKAGE_JSON: "1",
+              }),
+          );
+        }
+      },
+    );
   }
-  checks.push("four authoritative absent slots accepted");
-  const base = join(root, "_generated/course-spec/prairielearn-native"),
-    active = JSON.parse(await Deno.readTextFile(join(base, "active.json"))),
-    request = JSON.parse(
-      await Deno.readTextFile(join(base, active.operation, "request.json")),
-    ),
-    ref = request.inputs.find((i: any) => i.source === "slides.qmd"),
-    path = join(base, active.operation, ref.file),
-    original = await Deno.readTextFile(path);
-  for (
-    const [plane, value] of [
-      ["config", {}],
-      ["assessment", { attempts: 1, pass: { "at-least": 1 } }],
-      ["projectChecks", { "source-profiles": {}, profiles: {} }],
-      ["materialization", { projects: {} }],
-    ] as const
-  ) {
-    const raw = JSON.parse(original);
-    raw.business[plane] = value;
-    await Deno.writeTextFile(path, JSON.stringify(raw));
-    let error = "";
-    try {
-      await op.validateRelease(
-        { expectedSources: ["index.qmd", "slides.qmd"] },
-        [PL.createNativeAdapter({ root, core: Core })],
-      );
-    } catch (e) {
-      error = String(e);
-    } finally {
-      await Deno.writeTextFile(path, original);
-    }
-    if (!error.includes("PL.CAPTURE_CHANGED")) {
-      throw Error("added absent plane accepted: " + plane + error);
-    }
-    checks.push("added absent " + plane + " refused");
-  }
-  const requestPath = join(base, active.operation, "request.json"),
-    originalRequest = await Deno.readTextFile(requestPath);
-  for (
-    const [label, change] of [
-      ["profiles", (r: any) => r.identity.profiles = ["foreign"]],
-      ["output", (r: any) => r.outputDirectory = root + "/_foreign"],
-      ["owner", (r: any) => r.owner = root + "/foreign"],
-      ["missing-output", (r: any) => delete r.outputDirectory],
-    ] as const
-  ) {
-    const r = JSON.parse(originalRequest);
-    change(r);
-    await Deno.writeTextFile(requestPath, JSON.stringify(r));
-    let error = "";
-    try {
-      const bad = await readNativeAdapterExpectation(Core, root);
-      await Core.withCurrentNativeOperation(
-        bad.expectation,
-        async (current: any) => {
-          await PL.createNativeAdapter({
-            root,
-            core: Core,
-            preparedIdentity: bad.identity,
-          }).validateCourse(current, { expectedSources: bad.expectedSources });
+  await capture();
+  const candidate = await readNativeAdapterExpectation(Core, root);
+  assert.deepEqual(candidate.identity.profiles, ["student"]);
+  await Core.withCurrentNativeOperation(
+    candidate.expectation,
+    async (op: any) => {
+      let validates = 0, currents = 0;
+      const observed = {
+        ...op,
+        validateRelease: (...args: any[]) => {
+          validates++;
+          return op.validateRelease(...args);
         },
+        assertCurrent: () => {
+          currents++;
+          return op.assertCurrent();
+        },
+      };
+      const adapter = PL.createNativeAdapter({
+        root,
+        core: Core,
+        preparedIdentity: candidate.identity,
+      });
+      const request = { expectedSources: ["index.qmd", "slides.qmd"] };
+      const proof = await adapter.validateCourse(observed, request);
+      assert.deepEqual(proof.documents.map((d: any) => d.format).sort(), [
+        "html",
+        "revealjs",
+      ]);
+      assert.equal(
+        Object.keys(adapter.business("slides.qmd").questions).length,
+        0,
       );
-    } catch (e) {
-      error = String(e);
-    } finally {
-      await Deno.writeTextFile(requestPath, originalRequest);
-    }
-    if (!error) throw Error("CLI candidate forgery accepted " + label);
-    checks.push("CLI " + label + " candidate refused");
-  }
-  console.log(JSON.stringify({ root, checks, metrics: op.metrics }, null, 2));
-});
+      await adapter.validateCourse(observed, request);
+      await adapter.validateCourse(observed, request);
+      assert.equal(validates, 1);
+      assert.equal(currents, 4);
+      checks.push(
+        "same op/exact request validates once; currentness before each reuse",
+      );
+      const plain = PL.createNativeAdapter({ root, core: Core });
+      const input = adapter.validatedInput("index.qmd");
+      const read = Deno.readTextFile,
+        readBytes = Deno.readFile,
+        real = Deno.realPath;
+      let io = 0;
+      try {
+        Deno.readTextFile = (() => {
+          io++;
+          throw Error("unexpected read");
+        }) as any;
+        Deno.readFile = Deno.readTextFile as any;
+        Deno.realPath = Deno.readTextFile as any;
+        await plain.validate(structuredClone(input));
+      } finally {
+        Deno.readTextFile = read;
+        Deno.readFile = readBytes;
+        Deno.realPath = real;
+      }
+      assert.equal(io, 0);
+      assert.throws(() => plain.business("index.qmd"));
+      assert.throws(() => plain.validatedInput("index.qmd"));
+      checks.push(
+        "plain DTO: 0 IO and no business/cache/publication authority",
+      );
+      for (
+        const readSet of [[], ["configuration"], [
+          "configuration",
+          "assessment",
+          "projectChecks",
+          "projectChecks",
+        ]]
+      ) {
+        const bad = structuredClone(input);
+        bad.nativeMetadata.readSet = readSet;
+        await assert.rejects(() => plain.validate(bad));
+      }
+      const missing = structuredClone(input);
+      delete missing.nativeMetadata;
+      await assert.rejects(() => plain.validate(missing));
+      for (
+        const [label, change] of [
+          ["source", (v: any) => v.origin.source = "foreign.qmd"],
+          [
+            "witness",
+            (v: any) => v.origin.captureWitness = crypto.randomUUID(),
+          ],
+          ["profiles", (v: any) => v.origin.profiles = ["foreign"]],
+          ["generation", (v: any) => v.origin.operation = crypto.randomUUID()],
+        ] as const
+      ) {
+        const mutant = {
+          ...op,
+          validateRelease: (r: any, validators: any[]) =>
+            op.validateRelease(
+              r,
+              validators.map((v) => ({
+                ...v,
+                validate: (input: any) => {
+                  const copy = structuredClone(input);
+                  change(copy);
+                  return v.validate(copy);
+                },
+              })),
+            ),
+        };
+        await assert.rejects(
+          () =>
+            PL.createNativeAdapter({ root, core: Core }).validateCourse(
+              mutant,
+              request,
+            ),
+          /PL.CAPTURE_CHANGED/,
+        );
+        checks.push(label + " refused inside genuine producer callback");
+      }
+      const folder = join(
+        root,
+        "_generated/course-spec/prairielearn-native",
+        candidate.identity.operation,
+      );
+      assert.deepEqual(
+        (await Array.fromAsync(Deno.readDir(folder))).map((e) => e.name),
+        ["request.json"],
+      );
+      checks.push("0 C per-document business sidecars");
+      const data = await PL.inspectPublication(Core, op, request);
+      assert.equal(data.documents.length, 2);
+      checks.push("genuine installed public partial consumer");
+      await assert.rejects(() =>
+        PL.inspectPublication(Core, op, { expectedSources: ["index.qmd"] })
+      );
+      checks.push("partial owner coverage refused");
+      const copy = {
+        ...op,
+        assertCurrent: async () => {
+          throw Error("STALE");
+        },
+      };
+      await assert.rejects(
+        () => adapter.validateCourse(copy, request),
+        /STALE/,
+      );
+      assert.throws(() => adapter.business("index.qmd"));
+      checks.push("different op/stale refusal clears cached business");
+      console.log(JSON.stringify(
+        {
+          root,
+          checks,
+          metrics: op.metrics,
+          validateReleaseCalls: validates,
+          currentnessCalls: currents,
+          cRemoved: {
+            documentWalks: 0,
+            answerWalks: 0,
+            perDocumentChildren: 0,
+            businessSidecars: 0,
+          },
+          source: "GENUINE_ORDINARY_NOT_ASSIGNMENT_P",
+        },
+        null,
+        2,
+      ));
+    },
+  );
+  const text = await Deno.readTextFile(join(root, "project/input.txt"));
+  await Deno.writeTextFile(join(root, "project/input.txt"), text + "DRIFT");
+  await assert.rejects(() =>
+    Core.withCurrentNativeOperation(candidate.expectation, () => {})
+  );
+} finally {
+  if (Deno.env.get("C35_KEEP_FIXTURE")) console.log("RETAINED", root);
+  else await Deno.remove(root, { recursive: true });
+}

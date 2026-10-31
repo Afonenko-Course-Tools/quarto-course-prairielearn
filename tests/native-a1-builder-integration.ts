@@ -52,6 +52,7 @@ const policy = {
   },
 };
 try {
+  await put(".gitignore", "/.quarto/\n**/*.quarto_ipynb\n");
   await put(
     "_quarto.yml",
     `project:
@@ -73,7 +74,6 @@ default-exercise-time: 7
 default-exercise-course-role: false
 default-exercise-target: prairielearn
 filters:
- - {at: pre-ast, path: ${pl}/native-ts/raw-capture.lua}
  - {at: pre-ast, path: ${core}/native-ts/early-context.lua}
  - {at: post-quarto, path: ${core}/native-ts/late-kind.lua}
  - {at: post-render, path: ${core}/native-ts/late-filter.lua}

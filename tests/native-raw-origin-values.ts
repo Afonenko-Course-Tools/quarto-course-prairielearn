@@ -8,12 +8,6 @@ import { hash } from "../_extensions/course-prairielearn/application/source-sele
 const Core = await import(
   pathToFileURL(Deno.args[0] + "/_extensions/course-core/public.ts").href
 );
-// Private legacy canonical oracle только в test; production импортирует лишь public Core.
-const Legacy = await import(
-  pathToFileURL(
-    Deno.args[0] + "/_extensions/course-core/project-checks/collect.ts",
-  ).href
-);
 const bytes = new TextEncoder().encode("class Main {}"),
   digest = await hash(bytes);
 const file = {
@@ -107,8 +101,9 @@ const manifest = await nativeChecksManifest({
 });
 if (
   manifest.sourceSnapshotHash !==
-    await hash(Legacy.canonical({ sources, projects })) ||
-  manifest.inventoryHash !== await hash(Legacy.canonical(projects))
+    "68944cc7fa91e242f5947b6a44fd301fd72419e045eb38246cff326630118f54" ||
+  manifest.inventoryHash !==
+    "f0000e5cf1468e3d8fe6d09343196b3f42b06f164997b9efb8c0bde73078b6c2"
 ) throw Error("legacy hash scope/normalizer differs");
 const other = await nativeChecksManifest({
   courseId: "course",
@@ -136,7 +131,7 @@ console.log(JSON.stringify(
     refusals,
     sharedOriginLegacyRefused: true,
     sourceReads: reads,
-    actualCoreLegacyCanonicalParity: true,
+    exactCanonicalScopeControls: true,
     targetNotSource: true,
     hashScopesDistinct: true,
   },

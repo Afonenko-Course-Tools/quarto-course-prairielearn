@@ -10,28 +10,21 @@ updated: 2026-10-31
 [Индекс спецификаций](spec/index.md) описывает контракт текущего Git ref.
 Версия определяется descriptor этого ref; код и документация устанавливаемого
 выпуска читаются из одного тега. Изменения main после выпущенного тега —
-**unreleased**. Минимум — Quarto 1.11.5 и CUE 0.17.1.
+**unreleased**. Минимум — Quarto 1.11.5.
 
-Расширение извлекает платформенные параметры заданий и работ, проверяет их CUE
+Расширение извлекает платформенные параметры заданий и работ, проверяет их исполняемым TS-контрактом
 и явно экспортирует выбранные вопросы в нативные каталоги PrairieLearn.
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Кандидат выпуска этого ref — **8.4.0**. Адресные ordinary/native проверки
-выполнены с точным Core `198927766da83882b9c13bc13516c74fab35711d`;
-новая paired CI и release compatibility ещё не подтверждены.
-Он объединяет принятую линию 8.2.5 и фасад ABI 1 из main 8.2.2 и допускает
-необязательные selected refs в active owned overlay. Адаптер проверяет закрытую
-структуру refs и их порядок относительно связанного witness; selected bytes,
-SHA256, identity и currentness по-прежнему проверяет Core. Отсутствие нового поля
-сохраняет прежний путь. Тег 8.4.0 ещё не опубликован; полный CI и genuine
-installed integration этого кандидата пока не подтверждены.
-Optional-primary требует отдельно проверенного exact Core/Platform состава и image digest.
-Обе задачи CI и installed overlay закрепляют Core 8.4.0 `0613a4c6409d6cf766f926b8e096fd35d2a88422`.
-Успешный paired CI итогового HEAD ещё не подтверждён. QRC закреплён на
-`615b76f75dc75e60e0bb07b690b836e8ec8094f5`, Site — на ранее принятом
-`0342fb7cd22e6c06aa345239c5d6e2ee6c3eb7ff`; следующий Site-кандидат
-не подставляется до собственной приёмки. Неиспользуемый Download не является зависимостью CI.
+Кандидат этого ref — **9.0.0**, рассчитанный на native TS Core 9.
+`contract.json` содержит только installed owner name; исполняемая форма,
+нормализация и валидация принадлежат TypeScript этого адаптера.
+Прежний Lua-маршрут предметной модели и производные схемы не устанавливаются.
+Точный Core companion закреплён отдельно в CI; metadata version не доказывает
+готовность установленного состава, prior P или опубликованного OCI digest.
+Кандидат требует независимой рецензии и итогового paired CI перед выпуском.
+
 Предыдущие Core 7.2.0 и exporter 7.1.0 опубликованы. Core 7.2.0 собирает факты API-предпроверки
 и политики дополнительных Java-исходников, которые переносит этот exporter.
 Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
@@ -51,7 +44,7 @@ quarto add Afonenko-Course-Tools/quarto-course@v8.3.0 --no-prompt
 quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.3.0 --no-prompt
 ```
 
-Текущий exporter-кандидат — 8.4.0: Body v2 и public results v2 сохранены, delivery v4 остаётся unreleased. Парная Core CI и installed compatibility проверяются отдельно.
+Текущий exporter-кандидат — 9.0.0: Body v2 и public results v2 сохранены, delivery v4 остаётся unreleased. Парная Core CI и installed compatibility проверяются отдельно.
 Platform/Gateway требуют отдельной проверки exact source/digest/interface; прежние
 service releases не объявляются совместимыми. Наличие тегов проверяется у владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
@@ -180,13 +173,13 @@ workspace или VSCode не требуется. `aceMode` необязател�
 правил и student/full; default full в демонстрациях намеренно публичен.
 
 ```sh
-quarto run tools/sync-contract.ts --check
+quarto run tools/check-contracts.ts
 quarto run tests/check.ts ../quarto-course
 deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts
 ```
 
 Интеграционные проверки устанавливают актуальные payload целиком; CI закрепляет
-совместимый Core. Исходный `contract.json` задаёт словарь, CUE — ограничения.
+совместимый Core. `contract.json.name` задаёт installed ownership; ограничения исполняют TS owner contracts.
 Фильтры не выполняют команды заданий. Нативная поставка следует документации
 [question info](https://docs.prairielearn.com/schemas/infoQuestion/),
 [external grading](https://docs.prairielearn.com/externalGrading/) и
@@ -198,11 +191,10 @@ deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/e
 Quarto `--profile`, сохраняются при экспорте.
 
 Собственные сообщения содержат ID, русский смысл и доступные source, ID работы
-или вопроса, поле и подсказку. Исходные ошибки Core, CUE и Pandoc сохраняются.
+или вопроса, поле и подсказку. Исходные ошибки Core и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует exporter-кандидат `8.4.0`, Quarto 1.11.5
-и CUE 0.17.1. Body использует отдельную
+Контракт этого ref использует exporter-кандидат `9.0.0`, Quarto 1.11.5. Body использует отдельную
 `statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
 поставке, закрытые ключи и решения запрещены. Код и документация выпуска читаются
@@ -216,7 +208,9 @@ Quarto `--profile`, сохраняются при экспорте.
 Полный exporter 7.0.0 требует авторский `question-points`; пример явно объявляет
 default 1, который можно заменить в course/directory/document metadata. Баллы,
 ceiling и повторные попытки описаны в [контракте](docs/authoring.md#авторские-баллы-и-повторные-попытки-exporter-500);
-`inspect-grading.ts` показывает effective policy до создания native delivery.
+`inspect-grading.ts` читает уже завершённую genuine Core operation и показывает
+effective policy без нового inspect/render. Он требует полного текущего capture;
+plain DTO или старая correlation candidate не дают publication authority.
 Текущий контракт 7.1.0 сохраняет Body v2; установка нового тега требует
 фактической публикации и явного обновления metadata курса.
 
@@ -254,7 +248,7 @@ Counters обходов не являются числом посещённых 
 Сохранены `attributes.extension_id: "course-prairielearn"` и явный необязательный
 `document_id`; пакетная операция не выбирает произвольный документ.
 
-В ordinary Pandoc (`application/export.ts`) и grading inspect активный агент
+В ordinary Pandoc (`application/export.ts`) активный агент
 получает полный снимок через `childEnv` и `clearEnv: true`; identity/off,
 отсутствующий агент и недоступный режим не требуют полного чтения env.
 Native CLI вместо прежних Docker/inspect-команд вызывает публичный Core capture
@@ -305,9 +299,13 @@ registry/image и реальные build/archive/install/course proofs прин�
 отдельно; unit fixture digest не является опубликованным OCI pin. Старые
 Core/Exporter 8.0.0 и immutable assets не меняются.
 
-Точная source dependency текущего Core-кандидата: `0613a4c6409d6cf766f926b8e096fd35d2a88422`.
-Обе задачи CI закрепляют этот commit; hosted exact-head CI ещё должен выполниться
-после отдельного разрешённого push. Локальная установка не подтверждает published tag.
+Временный pin обеих задач CI — ранее принятый Core
+`0613a4c6409d6cf766f926b8e096fd35d2a88422`. Для кандидата C 9.0.0 окончательный
+Core 9 pin и paired hosted CI ещё OPEN. Адресные локальные проверки выполняются
+на отдельном exact author checkpoint Core 9; это не принятие или публикация Core.
+Локальная установка не подтверждает published tag.
+
+[Изменения кандидата 9.0.0](docs/release-9.0.0.md) описывают текущий TS-контракт и открытые release gates.
 
 ## Контекст меню и строгая дедупликация в кандидате8.2.1
 
@@ -323,9 +321,17 @@ source mapping, grading/submission, ресурсов, starter и всего nati
 Существующий опубликованный8.1 и открытый PR22 не меняются. Тег8.2, hostedCI,
 полный экспорт курсов, серверная поставка и Student proof здесь не заявлены.
 
-## Незавершённый переход без CUE
+## Native TS producer и повторное использование
 
-Целевой контракт требует удаления CUE из runtime, разработки, справочных
-схем, тестов и CI. В этом preserving merge сохранены прежние CUE/Lua пути
-до отдельной эквивалентной TS-миграции. Наличие TS native decoder само по себе
-не закрывает этот долг; кандидат 8.4.0 пока не готов к выпуску.
+Core передаёт immutable preprojection input с четырьмя metadata planes.
+Полный native adapter сверяет generation/source/witness/profiles с private
+prepared correlation и исполняет один TS business decoder. Повторного C AST
+обхода, per-document child и business sidecars нет. Частичная publication
+валидация не выдумывает обязательные delivery topic/submission.
+
+`inspectPublication(Core, operation, request)` читает уже аутентичные callback
+facts через публичный Core API. Его data result не является lease/plan или
+разрешением assignment delivery. Прямая проверка DTO не наполняет native
+business cache. Для той же живой operation и exact request полная проверка
+повторно использует private proof с currentness fence перед artifact boundary.
+Другой generation/request и failure не наследуют cache.

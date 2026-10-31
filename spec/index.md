@@ -2,7 +2,7 @@
 type: specification-index
 component: course-prairielearn
 status: current
-version: 8.4.0
+version: 9.0.0
 updated: 2026-10-26
 ---
 
@@ -15,10 +15,10 @@ updated: 2026-10-26
 
 | Документ | type | component | status | Нормативный владелец и область |
 | --- | --- | --- | --- | --- |
-| [PrairieLearn: действующий контракт](../docs/authoring.md) | specification | course-prairielearn | current | native/CUE binding и selected participant delivery; client/tests/reference |
+| [PrairieLearn: действующий контракт](../docs/authoring.md) | specification | course-prairielearn | current | native TS binding и selected participant delivery; client/tests/reference |
 | [Диагностика](../docs/diagnostics.md) | reference | course-prairielearn | current | Собственные ID и внешние причины этого адаптера |
-| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0613a4c6409d6cf766f926b8e096fd35d2a88422/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
-| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0613a4c6409d6cf766f926b8e096fd35d2a88422/spec/index.md) | specification/index | course-core | current | Банк, условия, решения и назначения |
+| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0613a4c6409d6cf766f926b8e096fd35d2a88422/docs/body-export.md) | specification | course-core | historical exact pin | Общий producer transport и selected source input |
+| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0613a4c6409d6cf766f926b8e096fd35d2a88422/spec/index.md) | specification/index | course-core | historical exact pin | Банк, условия, решения и назначения |
 
 Банк и назначения принадлежат текущему Core; этот адаптер проверяет свой вход
 на собственной границе. Неизменяемые выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases).
@@ -33,33 +33,15 @@ Pinned official PrairieLearn JSON schemas and bundled offline Ajv validators are
 recorded in `spec/upstream/provenance.json`. The runner descriptor is Platform-owned,
 not a second author configuration or a private GradingJob.
 
-## Текущая совместимость кандидата 8.4.0
+## Текущая совместимость кандидата 9.0.0
 
-Кандидат Exporter 8.4.0 адресно проверен с exact Core `198927766da83882b9c13bc13516c74fab35711d` и строгими delivery v3/v4; v4 остаётся unreleased и требует независимой квалификации. Body v2 и public results v2
-не переименовываются. Manual/mixed/choice требуют согласованного native reader;
-Platform/Gateway проверяются отдельно по exact source/digest, без заявления
-совместимости прежних service releases. Download — необязательный consumer
-готового Core inventory, не зависимость этого экспортёра.
-
-Новая линия объединяет принятый 8.2.5 с ABI 1 фасадом из main 8.2.2.
-Оба полных hosted CI jobs закрепляют Core-кандидат 8.4.0
-`0613a4c6409d6cf766f926b8e096fd35d2a88422`. Exporter 8.4.0 ещё не опубликован;
-Успешный paired CI на новом точном составе ещё не подтверждён.
-Installed integration и готовность курса проверяются отдельно.
-
-Active pointer-v3 может содержать необязательный `commonPathDocuments`:
-плотный список закрытых refs `source/format/file/sha1/sha256` с уникальными
-source+format и file, ограниченным путём `selected-common-paths/<64hex>.json`.
-Число и порядок refs совпадают с уже SHA1-связанными `witness.documents`.
-Адаптер не читает selected records повторно: их bytes/SHA256/closure/currentness
-и полный END остаются обязанностью Core. Прежние проверки active/current,
-owned profile, source-context, forced writer и отказ restored/completed сохранены.
-Отсутствие поля сохраняет прежнее поведение; публичные schemas не меняются.
-
-## Историческая совместимость 7.1.1
-
-Экспортёр 7.1.1 использует Core 7.3.0 и прежний Body v2. Изменён descriptor,
-исполняемые файлы сохранены. Версии Core 7.2.0 / exporter 7.1.0 опубликованы.
+Кандидат использует native TS Core 9. Body v2, public results v2 и строгие
+delivery v3/v4 сохраняют собственные версии. `contract.json.name` устанавливает
+владельца; исполняемые business contracts находятся в TypeScript.
+Точная source dependency задаётся CI; номера descriptor не дают runtime authority.
+Полная поставка требует genuine Core operation, independent prior P и проверенного
+Platform image digest. Частичный publication vet — data inspection без assignment
+прав. Новый кандидат не объявляется выпущенным до OTHER review и paired CI.
 
 ## Reference-only единицы и повторные вопросы
 
@@ -78,9 +60,10 @@ witness; SHA256, filesystem identity и currentness проверяет Core до
 адаптера. Restored/completed run не разрешает новую запись. Ordinary/v2
 поведение сохраняется; публичных author flags и новых delivery schemas нет.
 
-Installed regression закрепляет Core-кандидат 8.4.0
-`0613a4c6409d6cf766f926b8e096fd35d2a88422`. Локальные проверки и этот
-ref не подтверждают публикацию выпуска.
+Текущий временный CI pin `0613a4c6409d6cf766f926b8e096fd35d2a88422` относится
+к ранее принятой линии Core. Окончательный pin Core 9 и paired CI ещё OPEN;
+локальные проверки нового exact author checkpoint не заменяют независимое
+принятие или публикацию выпуска.
 
 ## Сохранение ABI 1 при объединении main
 
@@ -89,4 +72,4 @@ child snapshot/clearEnv и identity scoped permissions. Новый native entry
 использует только публичный Core capture seam, а C auxiliary children —
 принятый frozen env с pre/post currentness. Подробности и граница проверок
 приведены в [спецификации](../docs/authoring.md#контекст-наблюдения-после-объединения-main).
-Информационное `core-version: 8.4.0` не заменяет точный CI SHA или runtime qualification.
+Информационное `core-version: 9.0.0` не заменяет точный CI SHA или runtime qualification.

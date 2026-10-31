@@ -1,18 +1,3 @@
 {
-  "name": "prairielearn",
-  "rules": "spec/prairielearn.cue",
-  "extension": ".",
-  "export_implemented": true,
-  "vocabulary": {
-    "grading": [
-      "external"
-    ],
-    "assignment_modes": [
-      "assessment-id"
-    ],
-    "assignment_label_prefix": "pl-",
-    "assignment_label_pattern": "^[a-z][a-z0-9-]*$"
-  },
-  "version": "8.1.0",
-  "core_version": "8.1.0"
+  "name": "prairielearn"
 }

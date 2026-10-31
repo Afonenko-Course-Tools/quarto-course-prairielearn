@@ -7,7 +7,7 @@ updated: 2026-10-31
 
 # Спецификация заданий и контрольных работ
 
-Кандидат Exporter 8.4.0 продолжает принятую линию 8.2.5. Optional-primary
+Кандидат Exporter 9.0.0 продолжает принятую линию 8.2.5. Optional-primary
 требует отдельно проверенного exact Core/Platform состава и image digest.
 Адресные проверки выполнены с Core `198927766da83882b9c13bc13516c74fab35711d`;
 новая paired Core CI и release compatibility остаются OPEN.
@@ -17,7 +17,7 @@ updated: 2026-10-31
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
-переключения версий схемы. Контракты этого ref: адаптер-кандидат8.4.0, delivery v3/v4, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
+переключения версий схемы. Контракты этого ref: адаптер-кандидат9.0.0, delivery v3/v4, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
 Канонические `#exr-*` имеют уникальные ID внутри явной области
 `exercise-bank: true`, собственные обязательные `difficulty` и положительное
 целое `time`. Эффективная `statement-visibility` берётся из атрибута задачи либо
@@ -28,25 +28,20 @@ updated: 2026-10-31
 
 ## Версия API и проверяемый Core
 
-Контракт API Core 8.1, Body v2 и delivery v3 сохраняется. Metadata descriptor
-адаптера указывает companion bundle `core-version: 8.4.0`, а словарный `contract.json`
-сохраняет API-декларацию `core_version: "8.1.0"`. Текущие native consumers
-не используют эти поля для проверки равенства bundle или минимальной версии:
-entrypoints загружают установленные публичные модули Core, а транспорт адаптера
-передаёт `name`, `rules` и `directory`. Из этих полей нельзя вывести проверенный
-диапазон поддерживаемых bundle.
-
-Для этого кандидата CI отдельно закрепляет Core 8.4.0:
-`0613a4c6409d6cf766f926b8e096fd35d2a88422`. Это проверяемый companion, а не
-автоматическое повышение API или объявление опубликованной совместимости.
-Нативная интеграция и поставка Java требуют собственных итоговых результатов.
+Native TS Core 9 и C 9 используют публичные capture/current-operation/validator
+границы. `contract.json` содержит только `name: "prairielearn"`; старые поля
+версий API и пути внешних схем отсутствуют. Предметную форму, defaults и
+валидацию задают TS owner contracts; типы используют те же исполняемые правила.
+Точный source pin Core задаёт CI, а `core-version: 9.0.0` в descriptor —
+информация о companion, не runtime authority. Полная совместимость installed
+состава, независимый prior P и итоговый paired CI проверяются отдельно.
 
 ## Область ответственности
 
 Ядро курса применяет правила видимости и собирает общую модель: задания,
 условия, критерии проверки, состав занятий и устойчивые идентификаторы.
 Адаптер добавляет параметры внешней проверки и правила контрольных работ.
-CUE проверяет полученную модель и отклоняет неизвестные поля.
+Исполняемый TS-контракт проверяет callback data и отклоняет неизвестные поля.
 
 Стартовый проект, авторское решение и тесты хранятся в обычном каталоге,
 на который указывает `project`. Автору не требуется создавать `question.html`,
@@ -151,7 +146,7 @@ Legacy `entrypoints/export.ts` создаёт только нативные во
 ## Ошибки и повторный экспорт
 
 [Справочник диагностики](diagnostics.md) объясняет ID адаптера, контекст работы
-и вопроса, а также исходные отказы Core, CUE и Pandoc. После ошибки результат
+и вопроса, а также исходные отказы Core и Pandoc. После ошибки результат
 не создаётся; для повторного экспорта нужен новый каталог поставки.
 
 ## Общие назначения и participant Body
@@ -618,10 +613,10 @@ HEAD/index/worktree не изменяются. Существующая рабо
 общей схемой этого фрагмента и README writer; mode/options остаются у PL.
 
 Это ограниченная локальная партия. Native schema закреплена provenance commit
-`92584fe426ececb84bc2d09de9975c7056c0c5f6`. Полный перенос прежнего CUE/Lua reader
+`92584fe426ececb84bc2d09de9975c7056c0c5f6`. Проверка полного native TS reader
 на TS, подключение actual Core inventory/summary в установленной композиции,
 новый опубликованный image digest и квалификация действующего Workspace host
-остаются отдельными открытыми проверками. Старый CUE не расширяется вторым
+остаются отдельными открытыми проверками. Старый reader не расширяется вторым
 постоянным описанием Workspace. Наличие local info.json не означает готовность
 курса или возможность публикации на портале.
 
@@ -634,7 +629,7 @@ patterns `explanation.m[d]` и `.pl-seed/identity.jso[n]`. Они выбираю
 ## Контекст наблюдения после объединения main
 
 Фасад ABI 1 сохраняет `attributes.extension_id` и явный необязательный
-`document_id`. Ordinary Pandoc и grading inspect используют полный снимок
+`document_id`. Ordinary Pandoc использует полный снимок
 `childEnv` с `clearEnv: true` только при активном агенте. Identity/off,
 недоступное чтение режима и отсутствие агента сохраняют scoped env permissions
 и обычное наследование без полного чтения env.
@@ -646,3 +641,21 @@ patterns `explanation.m[d]` и `.pl-seed/identity.jso[n]`. Они выбираю
 собственный frozen env и pre/post currentness без добавления ambient span.
 Тесты Performance используют локальную fixture; они не доказывают prior P,
 полный экспорт курса или hosted CI.
+
+## Проверка публикации и полная поставка
+
+`inspectPublication(Core, operation, {expectedSources})` вызывают внутри живого
+публичного `withCurrentNativeOperation`. Этот частичный vet проверяет metadata,
+нормализацию, assignment, порог и принадлежность всех members платформе; он
+не требует отсутствующий topic/submission до полной delivery и не создаёт
+assignment authority. Core остаётся единственным владельцем AST, private
+preprojection facts, source/currentness и native format/profile binding.
+
+Полный `createNativeAdapter` получает все четыре авторитетных metadata planes
+через typed Core validator; повторный Lua collector/child/sidecar не нужен.
+Prepared correlation сверяется до capture и полной composition. Direct DTO
+validation даёт только data result, без business/cache/proof/publish прав.
+Один private proof повторно используется только для той же operation identity
+и exact request, с currentness fence перед выдачей следующего artifact.
+Failure очищает cache; getter не читает дерево/metadata и не запускает inspect.
+`inspect-grading.ts` потребляет уже завершённый capture, не строит legacy модель.
