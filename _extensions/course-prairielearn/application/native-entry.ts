@@ -234,23 +234,12 @@ export async function nativeEntry(options: NativeEntryOptions) {
       await lease.captureInputs(
         descriptor,
         selected.expectedSources,
-        async (token: string) => {
-          // Единственный render whole owner; token выдаёт только настоящая live lease.
-          const result = await new Deno.Command("quarto", {
-            cwd: owner,
-            args: ["render", "--output-dir", relative(owner, outputDirectory)],
-            env: {
-              COURSE_CORE_CAPTURE_TOKEN: token,
-              QUARTO_RUN_NO_NETWORK: "true",
-              QUARTO_PROFILE: descriptor.identity.profiles.join(","),
-            },
-            stdout: "inherit",
-            stderr: "inherit",
-            signal: AbortSignal.timeout(20 * 60 * 1000),
-          }).output();
-          if (!result.success) {
-            throw Error("PL.NATIVE_RENDER_FAILED: exit " + result.code);
-          }
+        {
+          // Executable/cwd/env/token принадлежат qualified Core lease.
+          args: ["render", "--output-dir", relative(owner, outputDirectory)],
+          stdout: "inherit",
+          stderr: "inherit",
+          timeoutMs: 20 * 60 * 1000,
         },
       );
       await lease.assert(descriptor);
