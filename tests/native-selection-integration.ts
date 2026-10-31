@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { selectNativeCompilerInputs } from "../_extensions/course-prairielearn/public.ts";
 import { hash } from "../_extensions/course-prairielearn/application/source-selection.ts";
+import { nativeVerificationInventory } from "../_extensions/course-prairielearn/application/verification-inventory.ts";
 const Core = await import(
   pathToFileURL(Deno.args[0] + "/_extensions/course-core/public.ts").href
 );
@@ -92,6 +93,15 @@ const options = {
   full,
 };
 const selected = await selectNativeCompilerInputs(options);
+const verification = await nativeVerificationInventory({
+  courseId: "fixture",
+  operation,
+  selections: { "exr-example": selected },
+});
+if (
+  verification.scenarios.length !== 2 ||
+  verification.scenarios[0].scenario !== "reference:alternate"
+) throw Error("selected reference verification lost");
 if (
   selected.references[0].files.map((x: any) => x.name).join(",") !==
     "Example.java,Study.java"

@@ -453,15 +453,20 @@ Deno.test("CLI formats known input refusal once without stack", async () => {
     "CLI input diagnostic missing, repeated or stack printed",
   );
 });
+// Только диагностический failure producer; ни scope, ни operation не создаётся.
+async function writeCliCorrelationCandidate(root:string) {
+  const owner=root+"/bank",operation="11111111-1111-4111-8111-111111111111";
+  const base=owner+"/_generated/course-spec/prairielearn-native";
+  await Deno.mkdir(base+"/"+operation,{recursive:true});
+  await Deno.writeTextFile(base+"/active.json",JSON.stringify({operation}));
+  await Deno.writeTextFile(base+"/"+operation+"/request.json",JSON.stringify({schema:"pl-native-business-request-v1",owner,identity:{operation,runtime:"quarto-1.11.5",projection:"author",profiles:["full"]},outputDirectory:owner+"/_site",inputs:[{source:"work.qmd",captureWitness:"22222222-2222-4222-8222-222222222222"}]}));
+}
 Deno.test("CLI preserves foreign Core diagnostic and unknown stack", async () => {
   const root = await Deno.makeTempDir();
   try {
-    const core = root + "/bank/_extensions/course-core/body-export";
+    const core = root + "/bank/_extensions/course-core";
     await Deno.mkdir(core, { recursive: true });
-    await Deno.writeTextFile(
-      core + "/producer.ts",
-      "export function buildBodies() {}\n",
-    );
+    await writeCliCorrelationCandidate(root);
     for (
       const [source, known] of [
         [
@@ -476,8 +481,8 @@ Deno.test("CLI preserves foreign Core diagnostic and unknown stack", async () =>
       ] as const
     ) {
       await Deno.writeTextFile(
-        core + "/collect.ts",
-        "export function collectExport() {" + source + "}\n",
+        core + "/capture.ts",
+        "export async function withNativeCaptureScope() {" + source + "}\n",
       );
       const result = await runCli([
         root,
@@ -497,7 +502,7 @@ Deno.test("CLI preserves foreign Core diagnostic and unknown stack", async () =>
         );
       } else {assert(
           result.text.includes("unexpected internal export fault") &&
-            result.text.includes("collect.ts:"),
+            result.text.includes("capture.ts:"),
           "unknown Core stack suppressed",
         );}
       await noDelivery(root);
@@ -546,15 +551,12 @@ Deno.test("ADAPTER invalid resource encoding keeps original cause and resource f
 Deno.test("CLI retains unknown cause stack when known wrapper quotes its message", async () => {
   const root = await Deno.makeTempDir();
   try {
-    const core = root + "/bank/_extensions/course-core/body-export";
+    const core = root + "/bank/_extensions/course-core";
     await Deno.mkdir(core, { recursive: true });
+    await writeCliCorrelationCandidate(root);
     await Deno.writeTextFile(
-      core + "/producer.ts",
-      "export function buildBodies() {}\n",
-    );
-    await Deno.writeTextFile(
-      core + "/collect.ts",
-      `export function collectExport() {
+      core + "/capture.ts",
+      `export async function withNativeCaptureScope() {
   const cause = new SyntaxError("QUOTED_UNKNOWN_CAUSE");
   const wrapper = new Error("CORE.SELECTED_WORK: " + cause.message, {cause});
   wrapper.name = "ExtensionDiagnostic";
@@ -575,7 +577,7 @@ Deno.test("CLI retains unknown cause stack when known wrapper quotes its message
     );
     assert(
       result.text.includes("SyntaxError: QUOTED_UNKNOWN_CAUSE") &&
-        result.text.includes("collect.ts:"),
+        result.text.includes("capture.ts:"),
       "quoted unknown cause lost its type or original stack: " + result.text,
     );
     await noDelivery(root);

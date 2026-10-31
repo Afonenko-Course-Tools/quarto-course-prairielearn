@@ -4,6 +4,7 @@ import { z } from "../vendor/zod/v4/index.js";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { nativeWorkspaceArtifact } from "./native-workspace.ts";
+import { readNativeEntryCandidate } from "./native-entry.ts";
 import {
   decodeNativeCheck,
   nativeCheckScalars,
@@ -149,27 +150,17 @@ export async function readNativeAdapterExpectation(
   core: PublicCore,
   owner: string,
 ) {
-  const root = await Deno.realPath(owner), { request } = await requestFor(root);
-  const identity = core.NativeOperationIdentitySchema.parse(request.identity);
-  if (
-    !Array.isArray(request.inputs) || !request.inputs.length ||
-    request.inputs.some((input: any) =>
-      !safePath(input.source) ||
-      !generation.safeParse(input.captureWitness).success
-    )
-  ) throw Error("PL.CAPTURE_CHANGED: CLI source bindings");
-  const expectedSources = request.inputs.map((input: any) => input.source);
-  if (new Set(expectedSources).size !== expectedSources.length) {
-    throw Error("PL.CAPTURE_CHANGED: CLI duplicate source");
-  }
+  const candidate = await readNativeEntryCandidate(owner),
+    root = candidate.root;
+  const identity = core.NativeOperationIdentitySchema.parse(candidate.identity);
   return {
     identity,
-    expectedSources,
+    expectedSources: candidate.expectedSources,
     expectation: {
       root,
       profiles: identity.profiles,
       projection: identity.projection,
-      outputDirectory: request.outputDirectory,
+      outputDirectory: candidate.outputDirectory,
     },
   };
 }
@@ -419,6 +410,70 @@ export function createNativeAdapter(
       } finally {
         composing = false;
       }
+    },
+    /** Exact public Core delivery; планы и QRC context приходят от существующей
+     * живой composition. Этот bridge не создаёт scope/plan/condition authority.
+     */
+    async assignmentDelivery(
+      operation: any,
+      request: { source: string; assessmentId: string },
+      options: { projectPlans: readonly unknown[]; references?: unknown },
+      release: { expectedSources: string[]; courseId?: string },
+    ) {
+      const proof = await adapter.validateCourse(operation, release);
+      const delivery = await operation.assignmentDelivery(request, options);
+      if (
+        delivery.schema !== "course-native-assignment-delivery-v1" ||
+        delivery.origin.operation !== operation.identity.operation ||
+        delivery.origin.projection !== operation.identity.projection ||
+        !isDeepStrictEqual(
+          delivery.origin.profiles,
+          operation.identity.profiles,
+        ) ||
+        delivery.assessment.source !== request.source ||
+        delivery.assessment.id !== request.assessmentId ||
+        delivery.publicPackage.works.length !== 1 ||
+        delivery.publicPackage.works[0].id !== request.assessmentId ||
+        delivery.publicPackage.works[0].source !== request.source
+      ) {
+        throw Error("PL.ASSIGNMENT_CHANGED: public delivery binding");
+      }
+      const nativeAnswers: Record<string, unknown> = {},
+        nativeSettings: Record<string, unknown> = {};
+      const ids = new Set<string>();
+      for (const question of delivery.publicPackage.questions) {
+        const input = effectiveInputs.get(question.source);
+        const declaration = input?.declarations.find((d: any) =>
+          d.id === question.id
+        );
+        const settings = loaded.get(question.source)?.questions[question.id];
+        if (
+          !declaration || !settings || ids.has(question.id) ||
+          !delivery.conditions[question.id]
+        ) throw Error("PL.ASSIGNMENT_CHANGED: selected question");
+        ids.add(question.id);
+        if (declaration.answer) {
+          if (question.answerType !== declaration.answer.type) {
+            throw Error("PL.ANSWER_UNQUALIFIED: public/private form mismatch");
+          }
+          nativeAnswers[question.id] = structuredClone(declaration.answer);
+        } else if (question.answerType !== "manual") {
+          throw Error("PL.ANSWER_UNQUALIFIED: missing canonical answer");
+        }
+        nativeSettings[question.id] = structuredClone(settings);
+      }
+      if (Object.keys(delivery.conditions).some((id) => !ids.has(id))) {
+        throw Error("PL.ASSIGNMENT_CHANGED: extra condition");
+      }
+      await operation.assertCurrent();
+      return {
+        proof,
+        delivery,
+        publicPackage: delivery.publicPackage,
+        conditions: delivery.conditions,
+        nativeAnswers,
+        nativeSettings,
+      };
     },
     /** Закрытое состояние PL composition; не включать в public Body/catalog/README. */
     validatedInput(source: string) {

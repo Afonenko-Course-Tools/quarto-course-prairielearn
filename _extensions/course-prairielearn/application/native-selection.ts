@@ -196,7 +196,7 @@ export async function selectNativeCompilerInputs(options: {
     );
     // Вспомогательные классы эталона принадлежат той же проверенной A1 solution group.
     validateSources(files);
-    references.push({ name: ref.name, files });
+    references.push({ name: ref.name, optional: ref.optional, files });
   }
   const descriptor = runtimeDescriptor(
     check,

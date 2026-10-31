@@ -75,11 +75,19 @@ async function inventory(root: string) {
   await walk(root);
   return files;
 }
+export interface ExportCourseContent {
+  assessments: any[];
+  exercises: any[];
+  projects?: any[];
+}
+
 export async function exportCourse(
   input: {
     courseId: string;
     projectRoot: string;
-    result: any;
+    /** Прежний collected input; native composition передаёт content напрямую. */
+    result?: any;
+    content?: ExportCourseContent;
     checks: any;
     config: any;
     registry: any;
@@ -100,6 +108,16 @@ export async function exportCourse(
     >;
   },
 ) {
+  if (input.content && input.result) {
+    throw Error("PL.INPUT_INVALID: ambiguous course content");
+  }
+  const content = input.content ?? input.result?.model;
+  if (
+    !content || !Array.isArray(content.assessments) ||
+    input.content && !Array.isArray(content.exercises)
+  ) {
+    throw Error("PL.INPUT_INVALID: course content required");
+  }
   const d = declarations(input.config, input.instance),
     out = resolve(input.output),
     privateOut = resolve(input.checksOutput);
@@ -109,7 +127,7 @@ export async function exportCourse(
   await absent(out);
   await absent(privateOut);
   const works = d.instance.works.map((id: string) => {
-    const work = input.result.model.assessments.find((w: any) => w.id === id);
+    const work = content.assessments.find((w: any) => w.id === id);
     if (!work) throw new Error("PL selected work missing: " + id);
     if (!work.extensions.prairielearn) {
       throw new Error("PL selected work requires policy");
@@ -133,7 +151,7 @@ export async function exportCourse(
           work.id,
       );
     }
-    const menus = input.result.model.assessments.filter((menu: any) =>
+    const menus = content.assessments.filter((menu: any) =>
       menu.id !== work.id &&
       menu.slots.some((member: any) =>
         member.assignment.requirement === "optional" &&
@@ -155,7 +173,7 @@ export async function exportCourse(
     }
   }
   const methods: Record<string, "external" | "manual" | "mixed"> = {};
-  for (const exercise of input.result.model.exercises) {
+  for (const exercise of content.exercises) {
     methods[exercise.id] = gradingMethod(
       exercise.extensions?.prairielearn?.grading ??
         input.config["question-defaults"].grading,
@@ -175,9 +193,7 @@ export async function exportCourse(
       courseId: input.courseId,
       projectRoot: input.projectRoot,
       source: input.publicationSource!,
-      exercises: input.result.model.exercises.filter((e: any) =>
-        selectedIds!.has(e.id)
-      ),
+      exercises: content.exercises.filter((e: any) => selectedIds!.has(e.id)),
     })
     : undefined;
   const stage = await Deno.makeTempDir({
@@ -331,7 +347,7 @@ export async function exportCourse(
       }
       const overview = { html: overviewParts.join("\n") };
       for (const q of p.questions) {
-        const e = input.result.model.exercises.find((e: any) => e.id === q.id);
+        const e = content.exercises.find((e: any) => e.id === q.id);
         if (e?.target !== "prairielearn") {
           throw new Error("PL selected member target mismatch");
         }
@@ -364,14 +380,14 @@ export async function exportCourse(
           continue;
         }
         if (input.studentArtifact) {
-          const fact = input.result.model.projects?.find((f: any) =>
+          const fact = content.projects?.find((f: any) =>
             f.exerciseId === q.id && f.bankMember
           );
           if (!fact) throw Error("PL student artifact project fact missing");
           studentArtifacts[q.id] = await input.studentArtifact(fact);
         }
         if (method === "manual") {
-          const fact = input.result.model.projects?.find((f: any) =>
+          const fact = content.projects?.find((f: any) =>
             f.exerciseId === q.id && f.bankMember
           );
           if (!fact || fact.check || !safePath(fact.projectRoot)) {

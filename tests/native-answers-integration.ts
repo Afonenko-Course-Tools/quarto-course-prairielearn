@@ -151,6 +151,36 @@ await Core.withCurrentNativeOperation({
     expectedSources: ["index.qmd", "slides.qmd"],
   });
   const input = adapter.validatedInput("index.qmd");
+  if (Deno.args.includes("--assignment-consumer-refusal")) {
+    let error = "";
+    try {
+      await adapter.assignmentDelivery(
+        op,
+        { source: "slides.qmd", assessmentId: "sec-all" },
+        { projectPlans: [] },
+        { expectedSources: ["index.qmd", "slides.qmd"] },
+      );
+    } catch (cause) {
+      error = String(cause);
+    }
+    if (!error.includes("BODY.ASSIGNMENT_REQUIRED")) {
+      throw Error(
+        "ordinary operation acquired assignment or wrong refusal: " + error,
+      );
+    }
+    console.log(
+      JSON.stringify(
+        {
+          status: "REAL_ORDINARY_OPERATION_REFUSED_NOT_ASSIGNMENT_POSITIVE",
+          error,
+          metrics: op.metrics,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
   const base = join(root, "_generated/course-spec/prairielearn-native"),
     active = JSON.parse(await Deno.readTextFile(join(base, "active.json"))),
     request = JSON.parse(

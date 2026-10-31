@@ -29,6 +29,7 @@ const fields = (v: any, required: string[], optional: string[] = []) =>
   record(v) && required.every((k) => Object.hasOwn(v, k)) &&
   Object.keys(v).every((k) => [...required, ...optional].includes(k));
 export interface ProjectContext {
+  deferPublish?: boolean;
   nativeAnswers?: Record<string, any>;
   projectRoot: string;
   projects: Record<string, string>;
@@ -462,7 +463,7 @@ export async function exportPrairieLearn(
   context: ProjectContext,
   binding: any,
   output: string,
-): Promise<void> {
+): Promise<void | { publish(): Promise<void>; discard(): Promise<void> }> {
   const work = Array.isArray(p?.works) ? p.works[0] : undefined;
   const workContext: DiagnosticContext = {
     source: work?.source,
@@ -1043,9 +1044,38 @@ export async function exportPrairieLearn(
         2,
       ) + "\n",
     );
-    await Deno.rename(stage, out);
+    let state = "prepared";
+    const discard = async () => {
+      if (state !== "prepared") return;
+      state = "discarded";
+      await Deno.remove(stage, { recursive: true });
+    };
+    const publish = async () => {
+      if (state !== "prepared") {
+        throw Error("PL export preparation already consumed");
+      }
+      try {
+        try {
+          await Deno.lstat(out);
+          throw Error("PL fresh output required: " + out);
+        } catch (error) {
+          if (!(error instanceof Deno.errors.NotFound)) throw error;
+        }
+        await Deno.rename(stage, out);
+        state = "published";
+      } catch (error) {
+        await discard();
+        throw error;
+      }
+    };
+    if (context.deferPublish) return { publish, discard };
+    await publish();
   } catch (e) {
-    await Deno.remove(stage, { recursive: true });
+    try {
+      await Deno.remove(stage, { recursive: true });
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) throw error;
+    }
     throw e;
   }
 }

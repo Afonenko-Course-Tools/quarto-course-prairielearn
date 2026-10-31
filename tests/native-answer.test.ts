@@ -72,10 +72,11 @@ for (const answer of forms) {
             }],
             resources: [],
           };
-        await exportPrairieLearn(pkg, {
+        const prepared = await exportPrairieLearn(pkg, {
           projectRoot: root,
           projects: {},
           nativeAnswers: { [id]: answer },
+          deferPublish: true,
         }, {
           questions: {
             [id]: {
@@ -86,6 +87,13 @@ for (const answer of forms) {
             },
           },
         }, root + "/out");
+        try {
+          await Deno.lstat(root + "/out");
+          throw Error("native question output escaped before final fence");
+        } catch (error) {
+          if (!(error instanceof Deno.errors.NotFound)) throw error;
+        }
+        await prepared!.publish();
         const policy = manual
           ? { "auto-points": 0, "manual-points": 20 }
           : answer.type === "multipart"
@@ -145,19 +153,18 @@ for (const answer of forms) {
         await exportCourse({
           courseId: "fixture",
           projectRoot: root,
-          result: {
-            model: {
-              assessments: [work],
-              exercises: [{
-                id,
-                target: "prairielearn",
-                extensions: {
-                  prairielearn: {
-                    grading: method === "external" ? "external" : { method },
-                  },
+          content: {
+            assessments: [work],
+            exercises: [{
+              id,
+              target: "prairielearn",
+              extensions: {
+                prairielearn: {
+                  grading: method === "external" ? "external" : { method },
                 },
-              }],
-            },
+              },
+            }],
+            projects: [],
           },
           checks: {
             schemaVersion: 1,
