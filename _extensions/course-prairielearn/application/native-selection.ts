@@ -5,6 +5,7 @@ import { runtimeDescriptor } from "./runtime-descriptor.ts";
 
 type File = {
   target: string;
+  rawSource?: string;
   bytes: Uint8Array;
   sha256: string;
   reason: string;
@@ -52,6 +53,7 @@ export async function selectNativeCompilerInputs(options: {
       sha256: value.sha256,
       target: value.target,
       reason: value.reason,
+      ...(value.rawSource === undefined ? {} : { rawSource: value.rawSource }),
     };
   };
   const under = (target: string, root: string) =>

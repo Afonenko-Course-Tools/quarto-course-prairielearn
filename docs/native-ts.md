@@ -146,3 +146,21 @@ parity controls и OTHER/ROOT решения strict v3 publish закрыт. П�
 соединение materialization/QRC/Download и существующих builders, все
 works/forms, standalone ZIP/privacy/citations и producer qualification остаются
 открыты.
+
+## Raw source и открытая selection-origin граница (Core163bc)
+
+Matching public ArtifactFile теперь передаёт optional rawSource только для
+неизменённой raw copy. C сохраняет это поле при native selection. Чистая
+`nativeRawSourceSelection` проверяет bytes/SHA/same-S row и отдельное compiler
+name, не читает rawSource и не создаёт A1 authority. Вызов такой функции на DTO
+не означает genuine operation; production integration ещё не подключена.
+
+Конкретный shared trusted API actual Java candidate лежит вне declared project,
+и legacy projectRelativePath не может выразить его без запрещённого '..'.
+Текущая функция явно отказывает; existing CLI G2 barrier сохранён. Совместный
+C/Platform [selection-origin proposal](native-selection-origin-proposal.md)
+задаёт минимальный кандидат version2 private checks/job и точные readers,
+schemas, hash bindings и controls. Это предложение, не accepted implementation.
+Platform authority — exact581cc17/platform-release-integration; старый38bc не
+переносится в новый runtime proof. До OTHER/high+ROOT bounded ruling
+Platform/contract revision не меняются. Builder work остановлена по ROOT.
