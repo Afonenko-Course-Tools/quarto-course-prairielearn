@@ -42,9 +42,9 @@ Platform/Gateway проверяются отдельно по exact source/diges
 готового Core inventory, не зависимость этого экспортёра.
 
 Новая линия основана на принятом 8.2.5 и не включает Performance 8.2.2.
-Оба полных hosted CI jobs закрепляют Core-кандидат 8.3.0
-`3ccc9e81eb2fc297cd0f283a51e040f71572ce18`. Exporter 8.4.0 ещё не опубликован;
-Необходимая новая paired Core CI ещё OPEN; прежний pin не подтверждает новый состав.
+Оба полных hosted CI jobs закрепляют Core-кандидат 8.4.0
+`0613a4c6409d6cf766f926b8e096fd35d2a88422`. Exporter 8.4.0 ещё не опубликован;
+Успешный paired CI на новом точном составе ещё не подтверждён.
 Installed integration и готовность курса проверяются отдельно.
 
 Active pointer-v3 может содержать необязательный `commonPathDocuments`:
