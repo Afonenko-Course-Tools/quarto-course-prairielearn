@@ -44,6 +44,7 @@ Deno.test("delivery4 Workspace использует настоящий seed и e
     const output = Deno.env.get("PL_DELIVERY4_FIXTURES")
       ? Deno.env.get("PL_DELIVERY4_FIXTURES") + "/workspace"
       : root + "/out";
+    await Deno.mkdir(output.slice(0, output.lastIndexOf("/")), {recursive: true});
     await exportCourse({
       courseId: "synthetic",
       projectRoot: root,
