@@ -3,6 +3,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { cpSync } from "node:fs";
 const repo = dirname(dirname(fileURLToPath(import.meta.url))),
   core = join(Deno.args[0], "_extensions/course-core");
+// Только собственная cpSync fixture: readonly Core source не изменяется.
+async function writableFixtureDirectories(path: string) {
+  const stat=await Deno.lstat(path);
+  if (!stat.isDirectory || stat.isSymlink) return;
+  await Deno.chmod(path, 0o700);
+  for await (const entry of Deno.readDir(path)) if(entry.isDirectory && !entry.isSymlink) await writableFixtureDirectories(join(path,entry.name));
+}
 const rows = [];
 for (const command of ["export-course", "export"]) {
   for (const control of ["unqualified", "missing", "foreign"]) {
@@ -114,6 +121,7 @@ for (const command of ["export-course", "export"]) {
       }
       rows.push({ command, control, ...state, exitCode: child.code });
     } finally {
+      await writableFixtureDirectories(root);
       await Deno.remove(root, { recursive: true });
     }
   }
