@@ -1,3 +1,4 @@
+import { NativeSeedTargetsSchema } from "./native-materialization.ts";
 import { submission as parseSubmission } from "./submission.ts";
 import { createMetrics as __createMetrics } from "../observability/bridge.ts";
 const __metrics = __createMetrics("course-prairielearn");
@@ -63,7 +64,13 @@ export function gradingMethod(
   return { method: value.method };
 }
 export function declarations(raw: any, key: string) {
-  closed(raw, ["delivery", "question-defaults"], ["assessment-defaults"]);
+  closed(raw, ["delivery", "question-defaults"], [
+    "assessment-defaults",
+    "seed-targets",
+  ]);
+  if (raw["seed-targets"] !== undefined) {
+    NativeSeedTargetsSchema.parse(raw["seed-targets"]);
+  }
   closed(raw.delivery, ["book", "course", "instances"]);
   const course = raw.delivery.course;
   closed(course, ["name", "title", "timezone", "topics"]);

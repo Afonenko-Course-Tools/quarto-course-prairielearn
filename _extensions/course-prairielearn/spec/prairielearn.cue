@@ -71,7 +71,9 @@ import "list"
 	}
 }
 
+#PrairieLearnSeedTarget: string & =~#"^[^/\\\x00-\x1f\x7f]+(/[^/\\\x00-\x1f\x7f]+)*$"# & !~#"^[A-Za-z]:"# & !~#"(^|/)(\.|\.\.|\.git|\.quarto|_generated|node_modules|\.pl-seed)(/|$)"# & !~#"^README\.md(/|$)"#
 #PrairieLearnDeclarations: {
+ "seed-targets"?: {[string & =~"^exr-[a-z0-9-]+$"]: #PrairieLearnSeedTarget}
  delivery: {
   book: string & !=""
   course: {name: string & !="", title: string & !="", timezone: string & !="", topics: [...{name: string & !="", color: string & !="", description: string & !=""}]}

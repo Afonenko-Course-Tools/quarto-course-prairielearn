@@ -1,4 +1,7 @@
-import { decodeNativeMaterialization } from "./native-materialization.ts";
+import {
+  decodeNativeMaterialization,
+  NativeSeedTargetsSchema,
+} from "./native-materialization.ts";
 // @deno-types="../vendor/zod/v4/index.d.ts"
 import { z } from "../vendor/zod/v4/index.js";
 import { createHash } from "node:crypto";
@@ -118,7 +121,15 @@ export function validateNativeRaw(
   if (typeof port === "string" && /^\d+$/.test(port)) {
     config["question-defaults"].submission.workspaceOptions.port = Number(port);
   }
-  closed(config, [], ["delivery", "question-defaults", "assessment-defaults"]);
+  closed(config, [], [
+    "delivery",
+    "question-defaults",
+    "assessment-defaults",
+    "seed-targets",
+  ]);
+  if (config["seed-targets"] !== undefined) {
+    NativeSeedTargetsSchema.parse(config["seed-targets"]);
+  }
   if (config.delivery !== undefined) {
     const keys = Object.keys(config.delivery?.instances ?? {});
     if (!keys.length) throw Error("PL.DECLARATION_INVALID: пустые instances");
@@ -281,5 +292,46 @@ export function decodeNativeBusiness(
       );
     }
   }
-  return { questions, assessment, raw, materialization };
+  return {
+    questions,
+    assessment,
+    raw,
+    materialization,
+    seedTargets: NativeSeedTargetsSchema.parse(config["seed-targets"] ?? {}),
+  };
+}
+
+/** Только проверка уже декодированных authentic inputs полной native операции.
+ * Inherited map может ссылаться на другой source; каждый target имеет одного owner.
+ */
+export function assertNativeSeedTargets(
+  rows: readonly ReturnType<typeof decodeNativeBusiness>[],
+) {
+  for (const row of rows) {
+    for (const [id, target] of Object.entries(row.seedTargets)) {
+      const owners = rows.filter((owner) => Object.hasOwn(owner.questions, id));
+      if (owners.length !== 1) {
+        throw Error(
+          "PL.SEED_TARGET_INVALID: неизвестный или неоднозначный project ID",
+        );
+      }
+      const owner = owners[0], settings = owner.questions[id];
+      if (
+        owner.seedTargets[id] !== target ||
+        owner.materialization?.projects[id]?.["include-git"] !== true
+      ) {
+        throw Error(
+          "PL.SEED_TARGET_INVALID: target не связан с authoritative include-git project",
+        );
+      }
+      if (
+        !["upload", "workspace"].includes(settings.submission.mode) ||
+        settings.submission.mode === "workspace" && target !== "work"
+      ) {
+        throw Error(
+          "PL.SEED_TARGET_INVALID: поддержаны upload target или прежний Workspace work",
+        );
+      }
+    }
+  }
 }

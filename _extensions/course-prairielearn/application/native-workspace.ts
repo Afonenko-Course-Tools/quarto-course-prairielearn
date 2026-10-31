@@ -2,7 +2,10 @@ import {
   captureNativeAuxiliary,
   type NativeAuxiliary,
 } from "./native-auxiliary.ts";
-import { NativeMaterializationSchema } from "./native-materialization.ts";
+import {
+  NativeMaterializationSchema,
+  NativeSeedTargetSchema,
+} from "./native-materialization.ts";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { hash, safePath } from "./source-selection.ts";
@@ -40,6 +43,7 @@ export async function nativeWorkspaceArtifact(options: {
   settings: unknown;
   materialization: unknown;
   exerciseId: string;
+  seedTarget?: unknown;
   files: File[];
   zip: (files: File[]) => Uint8Array;
   assertCurrent: () => Promise<void>;
@@ -64,6 +68,37 @@ export async function nativeWorkspaceArtifact(options: {
     materialization?.projects?.[options.exerciseId]?.["include-git"] !== true
   ) throw Error("PL.WORKSPACE_SEED: explicit include-git required");
   const declaration = materialization.projects[options.exerciseId];
+  const target = NativeSeedTargetSchema.parse(
+    options.seedTarget === undefined ? "work" : options.seedTarget,
+  );
+  if (settings.mode === "workspace" && target !== "work") {
+    throw Error("PL.WORKSPACE_SEED: Workspace сохраняет target work");
+  }
+  const below = (name: string) => name.startsWith(target + "/");
+  function paths(files: File[], generated: boolean) {
+    const names = files.map((f) => f.name), known = new Set(names);
+    if (
+      known.size !== names.length ||
+      names.some((name) =>
+        !safePath(name) || name.split("/").includes(".pl-seed") ||
+        !generated && name.split("/").includes(".git")
+      )
+    ) {
+      throw Error("PL.WORKSPACE_SEED: duplicate/service/unsafe inventory");
+    }
+    for (const name of names) {
+      const parts = name.split("/");
+      for (let i = 1; i < parts.length; i++) {
+        if (known.has(parts.slice(0, i).join("/"))) {
+          throw Error("PL.WORKSPACE_SEED: file/directory prefix collision");
+        }
+      }
+      if (!generated && (name === target || target.startsWith(name + "/"))) {
+        throw Error("PL.WORKSPACE_SEED: seed target overlaps inventory file");
+      }
+    }
+  }
+  paths(options.files, false);
   const auxiliary = options.auxiliary ??
     captureNativeAuxiliary(options.assertCurrent);
   const root = await Deno.realPath(options.root);
@@ -197,7 +232,7 @@ export async function nativeWorkspaceArtifact(options: {
     const files = options.files.map((f) => ({
       name: f.name,
       bytes: new Uint8Array(f.bytes),
-    })).filter((f) => !f.name.startsWith("work/"));
+    })).filter((f) => !below(f.name));
 
     async function walk(path: string, prefix: string) {
       for await (const entry of Deno.readDir(path)) {
@@ -211,9 +246,9 @@ export async function nativeWorkspaceArtifact(options: {
         } else throw Error("PL.WORKSPACE_SEED: special generated file");
       }
     }
-    await walk(work, "work");
+    await walk(work, target);
     for (
-      const original of options.files.filter((f) => f.name.startsWith("work/"))
+      const original of options.files.filter((f) => below(f.name))
     ) {
       const generated = files.find((f) => f.name === original.name);
       if (
@@ -229,6 +264,7 @@ export async function nativeWorkspaceArtifact(options: {
       new Set(files.map((f) => f.name)).size !== files.length ||
       files.some((f) => !safePath(f.name) || f.name.startsWith(".pl-seed/"))
     ) throw Error("PL.WORKSPACE_SEED: duplicate/service file");
+    paths(files, true);
     if (await hash(await Deno.readFile(trustedModule)) !== trustedModuleHash) {
       throw Error("PL.WORKSPACE_SEED: trusted module changed");
     }

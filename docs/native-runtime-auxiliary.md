@@ -13,3 +13,30 @@ Authored `include-git` обрабатывается также для upload: и
 Каждый реально повторно читаемый или исполняемый auxiliary input обязателен в existing K.files/directories/absent, даже если он уже входит в S. Для пересечения S∩K admission использует прежние S hash/signature; второй whole-owner walk/hash не добавлен. Recipe, соседние data, student common-files, pinned helper и настоящий Python/Git/Quarto loader closure перечисляются до qualification. Mutable helper work/template/stage — output и в immutable K не входят. Внешние preparation inventories не являются полным K или P. Финальная адресная таблица и source-bound ограничения передаются ROOT в evidence.
 
 Ограниченные проверки используют настоящие Python/Git/Pandoc, immutable SP recipes и existing builders с отдельным явно синтетическим Body/config/image harness. Они не подтверждают actual assignment, образ Workspace, OCI, full-course или release. Platform reader отдельной версией ещё должен принять настоящий restore seed (`core.autocrlf=false`, русское сообщение начального commit); изменение учебного seed ради reader запрещено. Workspace с S0/S1 — условный будущий случай, не authored github upload и не расширение этого выпуска.
+
+## Явное размещение Git seed в native artifact
+
+C-owned конфигурация `prairielearn.seed-targets` задаёт owner-relative targets
+по exercise ID, например `seed-targets: {exr-example: versioning/project}`.
+Это не поле Core `course-project` или `project-materialization` и не источник
+полномочий. Значение приходит через тот же captured configuration slot;
+изменение raw capture относительно authentic Core metadata отвергается.
+Полная native validation связывает каждую запись с единственной объявленной
+задачей, её `include-git: true` и режимом сдачи. Неизвестные, неоднозначные,
+несогласованные между sources и не связанные с include-git записи запрещены.
+
+При отсутствии записи остаётся `work`. Для upload допускается явный безопасный
+относительный target, без вывода из README или имени упражнения. Workspace
+сохраняет `work`; другой target отвергается, контракт образа и seed manifest
+не расширяется. Служебные `.git`, `.pl-seed`, `.quarto`, `_generated`,
+`node_modules`, выход за artifact и перекрытие корневого README запрещены.
+Полный file/directory prefix conflict проверяется до упаковки. Существующие
+starter bytes под выбранным target обязаны совпадать с выходом recipe;
+соседние имена с похожим строковым префиксом не заменяются.
+
+Только место упаковки меняется: recipe, A/S0/S1, commit messages, object
+closure, trusted helper, currentness и manual scoring сохраняются. Проверки
+с настоящими recipe и ZIP выполняются командой
+`quarto run tests/native-seed-target.ts <exact SP checkout> <exact Download checkout> <own output>`.
+Это bounded ordinary fixture; actual assignment, prior P и весь курс требуют
+отдельной квалификации.

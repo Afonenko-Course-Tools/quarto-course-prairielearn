@@ -1,3 +1,4 @@
+import { assertNativeSeedTargets } from "./native-business.ts";
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { validateGradingComponents } from "./grading-policy.ts";
 // @deno-types="../vendor/zod/v4/index.d.ts"
@@ -446,6 +447,7 @@ export function createNativeAdapter(
           loaded.size !== request.expectedSources.length ||
           request.expectedSources.some((source) => !loaded.has(source))
         ) throw Error("PL.ASSESSMENT_INVALID: missing authenticated source");
+        assertNativeSeedTargets([...loaded.values()]);
         const methods: Record<string, "external" | "manual" | "mixed"> = {};
         for (const business of loaded.values()) {
           for (const [id, settings] of Object.entries(business.questions)) {
@@ -596,6 +598,7 @@ export function createNativeAdapter(
         settings: business.questions[request.exerciseId].submission,
         materialization: business.materialization,
         exerciseId: request.exerciseId,
+        seedTarget: business.seedTargets[request.exerciseId],
         files: inventory.files.map((f: any) => ({
           name: f.target,
           bytes: f.bytes,

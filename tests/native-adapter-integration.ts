@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL as toFileUrl } from "node:url";
 // Запуск: quarto run tests/native-adapter-integration.ts <immutable Core snapshot>.
 const snapshot = Deno.args[0];
 const metadata = Deno.args.includes("--metadata");
+const seedTargets = Deno.args.includes("--seed-targets");
 const profiles = metadata ? ["qualified"] : [];
 if (!snapshot) throw Error("Требуется точный Core snapshot");
 const corePath = join(snapshot, "_extensions/course-core");
@@ -87,11 +88,19 @@ default-exercise-difficulty: introductory
 default-exercise-time: 7
 default-exercise-course-role: false
 prairielearn:
-  question-defaults:
+${
+    seedTargets
+      ? "  seed-targets: {exr-open: versioning/project}\n"
+      : ""
+  }  question-defaults:
     topic: Git
     grading: {method: manual}
     submission: {mode: upload}
-filters:
+${
+    seedTargets
+      ? "project-materialization: {projects: {exr-open: {include-git: true, common-files: []}}}\n"
+      : ""
+  }filters:
   - at: pre-ast
     path: ${plPath}/native-ts/raw-capture.lua
   - at: pre-ast
@@ -149,14 +158,22 @@ foreign-policy-copy: *policy
   await put(
     "_metadata.yml",
     `prairielearn:
-  question-defaults:
+${
+      seedTargets
+        ? "  seed-targets: {exr-open: versioning/project}\n"
+        : ""
+    }  question-defaults:
     single-variant: true
 `,
   );
   await put(
     "_quarto-qualified.yml",
     `prairielearn:
-  question-defaults:
+${
+      seedTargets
+        ? "  seed-targets: {exr-open: versioning/project}\n"
+        : ""
+    }  question-defaults:
     topic: Profile
 `,
   );
@@ -225,6 +242,14 @@ await Core.withCurrentNativeOperation(expectation, async (op: any) => {
     adapter.business("index.qmd").questions["exr-open"].grading.method ===
       "manual",
   );
+  if (seedTargets) {
+    await adapter.validateCourse(op, { expectedSources: ["index.qmd"] });
+    check(
+      "authentic-seed-target-config-decoded",
+      adapter.business("index.qmd").seedTargets["exr-open"] ===
+        "versioning/project",
+    );
+  }
   if (metadata) {
     const question = adapter.business("index.qmd").questions["exr-open"];
     check(
@@ -239,6 +264,13 @@ await Core.withCurrentNativeOperation(expectation, async (op: any) => {
         "config",
         (raw: any) => raw.business.config["question-defaults"].topic = "Forged",
       ],
+      ...(seedTargets
+        ? [[
+          "seed-targets",
+          (raw: any) =>
+            raw.business.config["seed-targets"]["exr-open"] = "foreign/repo",
+        ]] as const
+        : []),
       [
         "assessment",
         (raw: any) =>
@@ -251,7 +283,7 @@ await Core.withCurrentNativeOperation(expectation, async (op: any) => {
       ],
       ["materialization", (raw: any) =>
         raw.business.materialization = {
-          projects: { "exr-open": { "include-git": true, "common-files": [] } },
+          projects: { "exr-open": { "include-git": !seedTargets, "common-files": [] } },
         }],
     ] as const
   ) {

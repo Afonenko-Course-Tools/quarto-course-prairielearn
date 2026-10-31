@@ -7,6 +7,16 @@ const path = z.string().min(1).max(4096).refine(safePath).refine((p) =>
     [".git", ".quarto", "_generated", "node_modules"].includes(s)
   )
 );
+/** C-owned target; не поле общей Core project-materialization. */
+export const NativeSeedTargetSchema = path.refine((p) =>
+  !/[\u0000-\u001f\u007f]/.test(p) &&
+  !p.split("/").includes(".pl-seed") &&
+  p !== "README.md" && !p.startsWith("README.md/")
+);
+export const NativeSeedTargetsSchema = z.record(
+  z.string().regex(/^exr-[a-z0-9-]+$/),
+  NativeSeedTargetSchema,
+);
 const common = z.strictObject({
   source: z.string().min(1).max(4096).refine((p) =>
     !/[\\\0]/.test(p) && !/^\w+:/.test(p)
