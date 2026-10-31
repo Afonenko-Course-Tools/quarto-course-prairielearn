@@ -1,3 +1,4 @@
+import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { renderNativeAnswer } from "./native-answer.ts";
 import { workspaceSeed } from "./workspace-seed.ts";
 import { submission as parseSubmission } from "./submission.ts";
@@ -31,6 +32,7 @@ const fields = (v: any, required: string[], optional: string[] = []) =>
 export interface ProjectContext {
   deferPublish?: boolean;
   nativeBody?: boolean;
+  nativeAuxiliary?: NativeAuxiliary;
   nativeAnswers?: Record<string, any>;
   projectRoot: string;
   projects: Record<string, string>;
@@ -68,8 +70,11 @@ async function command(
   args: string[],
   input: string,
   context: DiagnosticContext,
+  auxiliary?: NativeAuxiliary,
 ): Promise<string> {
-  const tool = Deno.env.get("QUARTO") || "quarto";
+  const tool =
+    (auxiliary ? auxiliary.environment.QUARTO : Deno.env.get("QUARTO")) ||
+    "quarto";
   const external = (cause: unknown, result?: Deno.CommandOutput) => {
     const stdout = result ? new TextDecoder().decode(result.stdout) : "";
     const stderr = result ? new TextDecoder().decode(result.stderr) : "";
@@ -89,11 +94,15 @@ async function command(
     error.name = "ExternalToolFailure";
     return error;
   };
+  const childEnv = auxiliary
+    ? await auxiliary.before()
+    : __metrics.childEnv({});
   let child: Deno.ChildProcess;
   try {
     child = new Deno.Command(tool, {
       args,
-      env: __metrics.childEnv({}),
+      env: childEnv,
+      ...(auxiliary ? { clearEnv: true } : {}),
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",
@@ -113,6 +122,7 @@ async function command(
     writingFailure = cause;
   }
   const result = await child.output();
+  await auxiliary?.after();
   if (!result.success) throw external(result, result);
   if (writingFailure) throw external(writingFailure, result);
   return new TextDecoder().decode(result.stdout);
@@ -196,7 +206,7 @@ export async function renderPublicBody(
   questionContext: DiagnosticContext,
   resourceBase: string,
   clientFilesToken: string,
-  options: { preserveBibliography?: boolean } = {},
+  options: { preserveBibliography?: boolean; auxiliary?: NativeAuxiliary } = {},
 ): Promise<{ html: string; files: { name: string; data: Uint8Array }[] }> {
   const questionFail = (
     message: string,
@@ -447,6 +457,7 @@ export async function renderPublicBody(
     ["pandoc", "--from=json", "--to=html5", "--mathml"],
     JSON.stringify({ "pandoc-api-version": p.apiVersion, meta: {}, blocks }),
     questionContext,
+    options.auxiliary,
   );
   const html = authoredHtml.replaceAll("{{", "&#123;&#123;").replaceAll(
     "}}",
@@ -659,7 +670,10 @@ export async function exportPrairieLearn(
         questionContext,
         "questions/" + q.key + "/clientFilesQuestion",
         "{{options.client_files_question_url}}",
-        { preserveBibliography: context.nativeBody },
+        {
+          preserveBibliography: context.nativeBody,
+          auxiliary: context.nativeAuxiliary,
+        },
       );
       prepared.push(...rendered.files);
       const native = renderNativeAnswer(answer), base = "questions/" + q.key;
@@ -889,7 +903,10 @@ export async function exportPrairieLearn(
       questionContext,
       base + "/clientFilesQuestion",
       "{{options.client_files_question_url}}",
-      { preserveBibliography: context.nativeBody },
+      {
+        preserveBibliography: context.nativeBody,
+        auxiliary: context.nativeAuxiliary,
+      },
     );
     prepared.push(...rendered.files);
     const html = rendered.html;

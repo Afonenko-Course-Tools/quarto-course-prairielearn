@@ -1,3 +1,4 @@
+import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { nativeAnswerBinding } from "./native-delivery.ts";
 import { loadPublicationConditions } from "./publication-conditions.ts";
 import { createMetrics as __createMetrics } from "../observability/bridge.ts";
@@ -99,6 +100,7 @@ export async function exportCourse(
     candidateImage?: string;
     deferPublish?: boolean;
     nativeBody?: boolean;
+    nativeAuxiliary?: NativeAuxiliary;
     nativeInputs?: Record<string, any>;
     nativeAnswers?: Record<string, any>;
     nativeResponseSlots?: Record<string, any[]>;
@@ -330,7 +332,10 @@ export async function exportCourse(
           },
           "clientFilesCourse",
           "{{ client_files_course }}",
-          { preserveBibliography: input.nativeBody },
+          {
+            preserveBibliography: input.nativeBody,
+            auxiliary: input.nativeAuxiliary,
+          },
         );
         overviewParts.push(rendered.html);
         for (const file of rendered.files) {
@@ -554,6 +559,7 @@ export async function exportCourse(
         {
           projectRoot: scratch,
           nativeBody: input.nativeBody,
+          nativeAuxiliary: input.nativeAuxiliary,
           projects,
           studentArtifacts,
           nativeAnswers: input.nativeAnswers,

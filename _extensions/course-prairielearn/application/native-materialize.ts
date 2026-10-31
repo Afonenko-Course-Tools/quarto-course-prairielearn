@@ -1,3 +1,4 @@
+import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { hash } from "./source-selection.ts";
@@ -129,6 +130,7 @@ export async function materializeNativeQuestion(
     pair: any;
     condition: any;
     fact: any;
+    materialization?: { includeGit?: boolean };
     settings: any;
     sourceRows: any[];
     courseId: string;
@@ -137,6 +139,7 @@ export async function materializeNativeQuestion(
     Download: any;
     adapter: any;
     expectedSources: string[];
+    auxiliary?: NativeAuxiliary;
   },
 ) {
   const { Core, pair, condition } = input;
@@ -189,9 +192,13 @@ export async function materializeNativeQuestion(
     bytes: f.bytes,
   }));
   let archive = await input.Download.packageArtifact(final);
-  if (input.settings.submission.mode === "workspace") {
+  if (
+    input.settings.submission.mode === "workspace" ||
+    input.materialization?.includeGit === true
+  ) {
     const workspace = await input.adapter.workspaceArtifact({
       operation: input.operation,
+      auxiliary: input.auxiliary,
       expectedSources: input.expectedSources,
       source: input.fact.source,
       exerciseId: input.fact.exerciseId,

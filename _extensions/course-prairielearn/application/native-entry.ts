@@ -250,19 +250,22 @@ export async function nativeEntry(options: NativeEntryOptions) {
   }
   const Core = await import(pathToFileURL(join(core, "public.ts")).href);
   const { prepareNativeCourse } = await import("./native-course.ts");
-  let prepared: any;
-  try {
-    prepared = await Core.withCurrentNativeOperation({
-      root: owner,
-      profiles: descriptor.identity.profiles,
-      projection: descriptor.identity.projection,
-      outputDirectory,
-    }, async (operation: any) => {
+  return await publishNativePrepared(
+    (use) =>
+      Core.withCurrentNativeOperation({
+        root: owner,
+        profiles: descriptor.identity.profiles,
+        projection: descriptor.identity.projection,
+        outputDirectory,
+      }, use),
+    async (operation: any) => {
       if (
         JSON.stringify(operation.identity) !==
           JSON.stringify(descriptor.identity)
-      ) throw Error("PL.CAPTURE_CHANGED: sealed generation");
-      prepared = await prepareNativeCourse({
+      ) {
+        throw Error("PL.CAPTURE_CHANGED: sealed generation");
+      }
+      return await prepareNativeCourse({
         Core,
         operation,
         descriptor,
@@ -270,9 +273,21 @@ export async function nativeEntry(options: NativeEntryOptions) {
         options,
         observedConfig,
       });
+    },
+  );
+}
+/** Тот же порядок nativeEntry: handle сохраняется ВНУТРИ parent callback.
+ * scope — настоящий Core gate в production; функция не создаёт authority. */
+export async function publishNativePrepared(
+  scope: (use: (operation: any) => Promise<any>) => Promise<any>,
+  prepare: (operation: any) => Promise<any>,
+) {
+  let prepared: any;
+  try {
+    prepared = await scope(async (operation) => {
+      prepared = await prepare(operation);
       return prepared;
     });
-    // Core final fence has completed before any prepared output can publish.
     return await prepared.publish();
   } catch (error) {
     await prepared?.discard();

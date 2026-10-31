@@ -1,3 +1,4 @@
+import { captureNativeAuxiliary } from "../_extensions/course-prairielearn/application/native-auxiliary.ts";
 import { withNativeProjectPlans } from "../_extensions/course-prairielearn/application/native-course.ts";
 import { hostDelta, observeNativeHost } from "./native-host-observer.ts";
 import { renderPublicBody } from "../_extensions/course-prairielearn/application/export.ts";
@@ -191,6 +192,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
   await Core.withCurrentNativeOperation(
     candidate.expectation,
     async (operation: any) => {
+      const auxiliary = captureNativeAuxiliary(() => operation.assertCurrent());
       const adapter = PL.createNativeAdapter({
         root,
         core: Core,
@@ -262,7 +264,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
             { source: "bank.qmd", id: "exr-p", field: "condition" },
             "clientFiles",
             "{{ client }}",
-            { preserveBibliography: true },
+            { preserveBibliography: true, auxiliary },
           );
           await Deno.writeTextFile(
             join(artifactOut, "condition.html"),

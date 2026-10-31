@@ -29,7 +29,6 @@ export async function workspaceSeed(
       "work/.git/index",
       "work/.git/config",
       "work/README.md",
-      "work/notes.txt",
     ]
   ) {
     if (!names.includes(required)) {

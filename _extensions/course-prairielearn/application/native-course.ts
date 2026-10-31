@@ -1,3 +1,4 @@
+import { captureNativeAuxiliary } from "./native-auxiliary.ts";
 import { dirname, join, resolve } from "node:path";
 import { createNativeAdapter } from "./native-adapter.ts";
 import { nativeProjectWitness } from "./native-provenance.ts";
@@ -228,6 +229,11 @@ export async function prepareNativeCourse(
   const { Core, operation, descriptor, selection, options } = input;
   if (!options.output) throw Error("PL.INPUT_INVALID: output required");
   const output = options.output;
+  await operation.assertCurrent();
+  let liveFence = async () => {
+    await operation.assertCurrent();
+  };
+  const auxiliary = captureNativeAuxiliary(() => liveFence());
   // Existing flags are explicit dependencies; never silently replace a stage or
   // publication-source receipt with a second materialization/guessed provenance.
   if (options.stagingReceipt) {
@@ -248,8 +254,7 @@ export async function prepareNativeCourse(
     operation,
   });
   const Download = await publicExtension(descriptor.root, "project-download");
-  let staged: any;
-  try {
+  return await withNativeStagedOutput(async (save) => {
     const composed = await withNativeAssignments({
       ...input,
       references: references.references,
@@ -299,11 +304,22 @@ export async function prepareNativeCourse(
         settings: any = {},
         bodies = new Map<string, any>();
       let registryInput: any;
+      let standaloneBinding: { assert: () => Promise<void> } | undefined;
+      const checkBindings = async () => {
+        await references.check();
+        await registryInput?.assert();
+        await standaloneBinding?.assert();
+      };
+      const fence = async () => {
+        await operation.assertCurrent();
+        await checkBindings();
+      };
+      liveFence = fence;
       const registry = async () => {
         registryInput ??= await checkedJSON(
           resolve(
             options.runtimeRegistry ??
-              Deno.env.get("PRAIRIELEARN_RUNTIME_REGISTRY") ??
+              auxiliary.environment.PRAIRIELEARN_RUNTIME_REGISTRY ??
               join(options.root, "prairielearn/runtime-profiles.json"),
           ),
         );
@@ -373,9 +389,11 @@ export async function prepareNativeCourse(
           const materialized = await materializeNativeQuestion({
             Core,
             operation,
+            auxiliary,
             pair: pairs[0],
             condition: delivered.conditions[q.id],
             fact,
+            materialization: facts[0].materialization,
             settings: value,
             sourceRows: rows,
             courseId,
@@ -393,11 +411,6 @@ export async function prepareNativeCourse(
           }
         }
       }
-      const fence = async () => {
-        await operation.assertCurrent();
-        await references.check();
-        await registryInput?.assert();
-      };
       await fence();
       let result: any;
       if (options.instance) {
@@ -459,8 +472,10 @@ export async function prepareNativeCourse(
           nativeResponseSlots,
           nativeVerification,
           nativeBody: true,
+          nativeAuxiliary: auxiliary,
           studentArtifact: async (fact) => artifacts[fact.exerciseId],
         });
+        save(result);
       } else {
         if (
           options.checksOutput || !options.bindingPath ||
@@ -471,6 +486,7 @@ export async function prepareNativeCourse(
           );
         }
         const binding = await checkedJSON(resolve(options.bindingPath));
+        standaloneBinding = binding;
         const scratch = await Deno.makeTempDir({
           dir: dirname(resolve(output)),
           prefix: ".pl-native-inputs-",
@@ -496,6 +512,14 @@ export async function prepareNativeCourse(
               await Deno.mkdir(join(scratch, q.id, folder), {
                 recursive: true,
               });
+            }
+            if (!selected) {
+              // Genuine materialized bytes, а не повторное чтение owner/student.
+              for (const file of artifacts[q.id].files) {
+                const path = join(scratch, q.id, "student", file.name);
+                await Deno.mkdir(dirname(path), { recursive: true });
+                await Deno.writeFile(path, file.bytes);
+              }
             }
             if (selected) {
               if (
@@ -541,45 +565,61 @@ export async function prepareNativeCourse(
               nativeAnswers,
               deferPublish: true,
               nativeBody: true,
+              nativeAuxiliary: auxiliary,
             },
             binding.value,
             output,
           );
-          const originalFence = fence;
-          await binding.assert();
-          await originalFence();
-          const publish = result.publish;
-          result.publish = async () => {
-            await binding.assert();
-            await originalFence();
-            return await publish();
-          };
+          save(result);
+          await fence();
         } finally {
           await Deno.remove(scratch, { recursive: true });
         }
       }
-      staged = result;
-      try {
-        await fence();
-      } catch (error) {
-        await result?.discard();
-        throw error;
-      }
-      return {
-        ...result,
-        publish: async () => {
-          throw Error(
-            "PL.NATIVE_RELEASE_UNQUALIFIED: independent whole Core+C review and exact R/M/E/G/prior-P qualification required before publish",
-          );
-        },
-      };
+      await fence();
+      return bindNativePublication(result, checkBindings);
     });
     return {
       ...composed.value,
       nativeProjectContextMetrics: composed.projectContextMetrics,
     };
+  });
+}
+
+/** Closing A1 failure не должен терять уже подготовленные output handles. */
+export async function withNativeStagedOutput<T>(
+  use: (
+    save: (prepared: { discard: () => Promise<void> }) => void,
+  ) => Promise<T>,
+): Promise<T> {
+  let staged: { discard: () => Promise<void> } | undefined;
+  try {
+    return await use((prepared) => {
+      staged = prepared;
+    });
   } catch (error) {
     await staged?.discard();
     throw error;
   }
+}
+
+/** После закрытия Core/A1 здесь нет live guard. Это не prior-P gate. */
+export function bindNativePublication<
+  T extends { publish: () => Promise<any>; discard: () => Promise<void> },
+>(
+  prepared: T,
+  checkBindings: () => Promise<void>,
+): T {
+  return {
+    ...prepared,
+    publish: async () => {
+      try {
+        await checkBindings();
+        return await prepared.publish();
+      } catch (error) {
+        await prepared.discard();
+        throw error;
+      }
+    },
+  };
 }

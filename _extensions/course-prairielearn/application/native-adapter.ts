@@ -1,3 +1,4 @@
+import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { validateGradingComponents } from "./grading-policy.ts";
 // @deno-types="../vendor/zod/v4/index.d.ts"
 import { z } from "../vendor/zod/v4/index.js";
@@ -556,6 +557,7 @@ export function createNativeAdapter(
     async workspaceArtifact(
       request: {
         operation: any;
+        auxiliary?: NativeAuxiliary;
         expectedSources: string[];
         source: string;
         exerciseId: string;
@@ -600,6 +602,7 @@ export function createNativeAdapter(
         })),
         zip: request.zip,
         assertCurrent: () => request.operation.assertCurrent(),
+        auxiliary: request.auxiliary,
       });
     },
     /** Значения только после настоящего executable callback; publish владеет outer Core fence. */
