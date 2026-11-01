@@ -17,7 +17,7 @@ updated: 2026-10-31
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Кандидат этого ref — **9.0.0**, рассчитанный на native TS Core 9.
+Кандидат этого ref — **9.0.1**, рассчитанный на native TS Core 9.
 `contract.json` содержит только installed owner name; исполняемая форма,
 нормализация и валидация принадлежат TypeScript этого адаптера.
 Прежний Lua-маршрут предметной модели и производные схемы не устанавливаются.
@@ -44,7 +44,7 @@ quarto add Afonenko-Course-Tools/quarto-course@v8.3.0 --no-prompt
 quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v8.3.0 --no-prompt
 ```
 
-Текущий exporter-кандидат — 9.0.0: Body v2 и public results v2 сохранены, delivery v4 остаётся unreleased. Парная Core CI и installed compatibility проверяются отдельно.
+Текущий exporter-кандидат — 9.0.1: Body v2 и public results v2 сохранены, delivery v4 остаётся unreleased. Парная Core CI и installed compatibility проверяются отдельно.
 Platform/Gateway требуют отдельной проверки exact source/digest/interface; прежние
 service releases не объявляются совместимыми. Наличие тегов проверяется у владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
@@ -194,7 +194,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует exporter-кандидат `9.0.0`, Quarto 1.11.5. Body использует отдельную
+Контракт этого ref использует exporter-кандидат `9.0.1`, Quarto 1.11.5. Body использует отдельную
 `statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
 поставке, закрытые ключи и решения запрещены. Код и документация выпуска читаются
@@ -335,3 +335,7 @@ facts через публичный Core API. Его data result не являе
 business cache. Для той же живой operation и exact request полная проверка
 повторно использует private proof с currentness fence перед artifact boundary.
 Другой generation/request и failure не наследуют cache.
+
+## Кандидат 9.0.1: обычная публикация
+
+[Адресная поправка](docs/release-9.0.1.md) связывает common sources с настоящим Core release proof. Полная delivery и её grading/prepared guards не менялись; новый тег требует OTHER и CI.

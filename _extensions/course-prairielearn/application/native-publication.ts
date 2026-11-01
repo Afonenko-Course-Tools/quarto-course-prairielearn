@@ -33,6 +33,10 @@ export async function inspectPublication(
             throw Error("PL.PROJECT_INVALID: требуется owner-relative project");
           }
           sources.push({ path, kind: "directory" as const });
+          for (
+            const common of business.materialization?.projects[declaration.id]
+              ?.["common-files"] ?? []
+          ) sources.push({ path: common.source, kind: "file" as const });
         }
         loaded.set(input.origin.source, { input, business });
         return { sources };
@@ -46,6 +50,9 @@ export async function inspectPublication(
       }
     },
   }]);
+  if (!proof.validatedAdapters.includes("prairielearn")) {
+    return { proof, course: structuredClone(proof.course), documents: [] };
+  }
   if (
     loaded.size !== request.expectedSources.length ||
     request.expectedSources.some((source) => !loaded.has(source))
@@ -81,6 +88,7 @@ export async function inspectPublication(
   }
   await operation.assertCurrent();
   return {
+    proof,
     course: structuredClone(proof.course),
     documents: request.expectedSources.map((source) => {
       const { input, business } = loaded.get(source)!;

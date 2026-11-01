@@ -659,3 +659,7 @@ validation даёт только data result, без business/cache/proof/publis
 и exact request, с currentness fence перед выдачей следующего artifact.
 Failure очищает cache; getter не читает дерево/metadata и не запускает inspect.
 `inspect-grading.ts` потребляет уже завершённый capture, не строит legacy модель.
+
+### Ordinary proof и common sources в кандидате 9.0.1
+
+`inspectPublication` возвращает также `proof` — уже полученный публичный Core release result, data без новых полномочий. Для каждого упражнения common-file paths из существующего PL decoder передаются тому же Core source guard, включая скрытые декларации до projection. Cross-document grading/pricing остаётся обязанностью полной delivery, а не обычного сайта. Если Core не выбрал PL adapter, результат содержит действительный общий proof и пустой PL documents list; установленный optional PL не меняет ordinary noPL маршрут. Полный `createNativeAdapter.validateCourse` и prepared correlation не изменены.
