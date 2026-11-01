@@ -63,19 +63,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: 615b76f75dc75e60e0bb07b690b836e8ec8094f5
+          ref: a924b15372f8a7c95c090031c4a0ac935ce705f5
           path: .ci-deps/qrc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-publish
-          ref: 0342fb7cd22e6c06aa345239c5d6e2ee6c3eb7ff
+          ref: b019ac08a5ab473a70e04589e1b125d977281373
           path: .ci-deps/site
           persist-credentials: false
       - name: Проверить закреплённые QRC и Site
         run: |
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "615b76f75dc75e60e0bb07b690b836e8ec8094f5"
-          test "$(git -C .ci-deps/site rev-parse HEAD)" = "0342fb7cd22e6c06aa345239c5d6e2ee6c3eb7ff"
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "a924b15372f8a7c95c090031c4a0ac935ce705f5"
+          test "$(git -C .ci-deps/site rev-parse HEAD)" = "b019ac08a5ab473a70e04589e1b125d977281373"
       - name: Настоящие закрытые answers, HTML/Reveal и grading composition
         run: quarto run tests/native-answers-integration.ts .ci-deps/core --author
       - name: Отказ несовместимого cross-document grading

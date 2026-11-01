@@ -272,16 +272,24 @@ Deno.test("Python -I допускает site в собственном venv, -I 
       root + "/venv",
     ]);
     const python = root + "/venv/bin/python3",
-      site = await run(python, [
+      startup = JSON.parse(await run(python, [
         "-I",
         "-B",
         "-c",
-        "import sysconfig; print(sysconfig.get_path('purelib'))",
-      ]),
+        "import sys,site,json; print(json.dumps(dict(version=sys.version, prefix=sys.prefix, paths=sys.path, sites=site.getsitepackages(), sitecustomize=getattr(sys.modules.get('sitecustomize'),'__file__',None))))",
+      ])),
+      sites = startup.sites.filter((path: string) =>
+        path.startsWith(root + "/venv/") && startup.paths.includes(path)
+      ),
       sentinel = root + "/SITE_EXECUTED";
+    // Проверяем реальный startup site-path, не install scheme из sysconfig.
+    assert(sites.length > 0, "Не найден startup venv site-path: " + JSON.stringify(startup));
+    console.log("Python site control: " + JSON.stringify(startup));
+    // sitecustomize может уже прийти из stdlib/runner и не обязан быть нашим.
+    // .pth — непосредственно исполняемый site hook; -S должен исключать и его.
     await Deno.writeTextFile(
-      site + "/sitecustomize.py",
-      "from pathlib import Path\nPath(" + JSON.stringify(sentinel) +
+      sites[0] + "/pl_native_site_probe.pth",
+      "import pathlib;pathlib.Path(" + JSON.stringify(sentinel) +
         ").write_text('site-loaded')\n",
     );
     await run(python, ["-I", "-B", "-c", "pass"]);
