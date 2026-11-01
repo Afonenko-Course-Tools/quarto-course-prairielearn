@@ -25,3 +25,16 @@ correlation mutants и reuse. `native-answers-integration.ts` сохраняет
 форм и public/private границы. `native-a1-reuse-integration.ts` проверяет реальные
 plans/inventories, shared origins и citations. Прежние model-only fixtures не
 являются целевым runtime API; их существенные гарантии перенесены в эти проверки.
+
+## Граница acquisition snapshot
+
+Generated active/request — только correlation candidate до и во время полного
+приобретения proof. После успешной composition private proof и отдельные
+loaded/effective inputs связаны с genuine operation identity и точной копией
+публичного release request. Для повторного артефакта той же операции C не
+перечитывает уже неиспользуемые candidate-файлы: их изменение не объявляется
+stale-proof отказом. Core currentness, generation, source, profiles и projection
+перед артефактом остаются обязательными. Другая operation/request или отказ
+сбрасывают cache и требуют нового полного validateCourse с fresh requestFor.
+Business/input getters возвращают отдельные data copies; их изменение не
+меняет приобретённые private snapshots и не создаёт publication authority.

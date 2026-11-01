@@ -230,6 +230,57 @@ prairielearn:
         ["request.json"],
       );
       checks.push("0 C per-document business sidecars");
+      // После acquisition generated transport больше не consumer authority.
+      // Private proof не меняется от изменения неиспользуемого candidate, новые
+      // operation/request обязаны заново приобрести и проверить transport.
+      const businessCopy = adapter.business("index.qmd");
+      businessCopy.questions["exr-example"].topic = "MUTATED_LOCAL_COPY";
+      assert.equal(
+        adapter.business("index.qmd").questions["exr-example"].topic,
+        "Git",
+      );
+      const inputCopy = adapter.validatedInput("index.qmd");
+      inputCopy.origin.operation = crypto.randomUUID();
+      assert.equal(
+        adapter.validatedInput("index.qmd").origin.operation,
+        op.identity.operation,
+      );
+      checks.push(
+        "business/input getters return detached data; private acquired snapshots unchanged",
+      );
+      const requestPath = join(folder, "request.json"),
+        originalCandidate = await Deno.readTextFile(requestPath);
+      const changedCandidate = JSON.parse(originalCandidate);
+      changedCandidate.inputs[0].captureWitness = crypto.randomUUID();
+      await Deno.writeTextFile(requestPath, JSON.stringify(changedCandidate));
+      const readCandidate = Deno.readTextFile;
+      let candidateReads = 0;
+      try {
+        Deno.readTextFile = ((path: any, ...rest: any[]) => {
+          if (String(path) === requestPath) {
+            candidateReads++;
+            throw Error("UNUSED_CANDIDATE_READ");
+          }
+          return (readCandidate as any)(path, ...rest);
+        }) as any;
+        assert.equal(await adapter.validateCourse(observed, request), proof);
+        assert.equal(candidateReads, 0);
+      } finally {
+        Deno.readTextFile = readCandidate;
+      }
+      await assert.rejects(
+        () =>
+          adapter.validateCourse(observed, {
+            ...request,
+            courseId: "scope-fixture",
+          }),
+        /PL.CAPTURE_CHANGED/,
+      );
+      assert.throws(() => adapter.business("index.qmd"));
+      await Deno.writeTextFile(requestPath, originalCandidate);
+      checks.push(
+        "post-acquisition candidate drift: same-op exact request reuses proof with0 candidate reads; new request rereads/refuses and clears cache",
+      );
       const data = await PL.inspectPublication(Core, op, request);
       assert.equal(data.documents.length, 2);
       checks.push("genuine installed public partial consumer");

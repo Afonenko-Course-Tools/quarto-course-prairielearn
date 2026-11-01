@@ -23,15 +23,18 @@ updated: 2026-10-26
 Банк и назначения принадлежат текущему Core; этот адаптер проверяет свой вход
 на собственной границе. Неизменяемые выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases).
 
-## Full native export
+## Полный native export
 
-`application/declarations.ts` and `#PrairieLearnDeclarations` close the delivery
-configuration. `source-selection.ts` verifies Core SourceSelection SHA256 and
-preserves submission paths. `export-course.ts` produces a complete atomic native
-course and independent private checks inventory; IDs derive from stable Core keys.
-Pinned official PrairieLearn JSON schemas and bundled offline Ajv validators are
-recorded in `spec/upstream/provenance.json`. The runner descriptor is Platform-owned,
-not a second author configuration or a private GradingJob.
+Исполняемый TS-контракт `application/declarations.ts` замыкает конфигурацию
+поставки. Существующий `native-checks.ts` нормализует PL policy из raw plane
+того же Core capture. `native-check-inventory.ts` связывает выбранные настоящие
+A1 raw origins и сохраняет точные прежние hash области; transport witness и
+selection scope имеют отдельные имена. `native-course.ts` организует genuine
+operation, а `export-course.ts` атомарно публикует полный native course и
+приватный checks inventory после закрывающего Core fence.
+Закреплённые официальные PrairieLearn JSON schemas и offline Ajv validators
+описаны в `spec/upstream/provenance.json`. Descriptor runner принадлежит
+Platform и не становится второй авторской конфигурацией или private GradingJob.
 
 ## Текущая совместимость кандидата 9.0.0
 
