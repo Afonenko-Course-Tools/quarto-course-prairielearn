@@ -39,15 +39,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          # Временный ранее принятый Core pin. Core 9 pin и paired CI ещё OPEN;
-          # локальная проверка C9 использует отдельный exact author checkpoint.
-          ref: 0613a4c6409d6cf766f926b8e096fd35d2a88422
+          # Core 9: независимо проверенный исходный код; полный hosted CI и выпуск отдельно.
+          ref: 946ad619830aa1affcbdaf4b5b447324e3d41002
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "0613a4c6409d6cf766f926b8e096fd35d2a88422"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "946ad619830aa1affcbdaf4b5b447324e3d41002"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -107,13 +106,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: 0613a4c6409d6cf766f926b8e096fd35d2a88422
+          ref: 946ad619830aa1affcbdaf4b5b447324e3d41002
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "0613a4c6409d6cf766f926b8e096fd35d2a88422"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "946ad619830aa1affcbdaf4b5b447324e3d41002"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5

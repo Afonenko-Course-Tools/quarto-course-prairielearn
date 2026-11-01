@@ -299,10 +299,10 @@ registry/image и реальные build/archive/install/course proofs прин�
 отдельно; unit fixture digest не является опубликованным OCI pin. Старые
 Core/Exporter 8.0.0 и immutable assets не меняются.
 
-Временный pin обеих задач CI — ранее принятый Core
-`0613a4c6409d6cf766f926b8e096fd35d2a88422`. Для кандидата C 9.0.0 окончательный
-Core 9 pin и paired hosted CI ещё OPEN. Адресные локальные проверки выполняются
-на отдельном exact author checkpoint Core 9; это не принятие или публикация Core.
+Обе задачи [CI](.github/workflows/ci.yml) закрепляют точный исходный код Core 9
+после независимой технической рецензии. Локальные producer/consumer проверки
+выполнены на его побайтно эквивалентном runtime. Полный paired hosted CI и
+публикация тегов проверяются отдельно.
 Локальная установка не подтверждает published tag.
 
 [Изменения кандидата 9.0.0](docs/release-9.0.0.md) описывают текущий TS-контракт и открытые release gates.

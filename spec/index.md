@@ -17,8 +17,8 @@ updated: 2026-10-26
 | --- | --- | --- | --- | --- |
 | [PrairieLearn: действующий контракт](../docs/authoring.md) | specification | course-prairielearn | current | native TS binding и selected participant delivery; client/tests/reference |
 | [Диагностика](../docs/diagnostics.md) | reference | course-prairielearn | current | Собственные ID и внешние причины этого адаптера |
-| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0613a4c6409d6cf766f926b8e096fd35d2a88422/docs/body-export.md) | specification | course-core | historical exact pin | Общий producer transport и selected source input |
-| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0613a4c6409d6cf766f926b8e096fd35d2a88422/spec/index.md) | specification/index | course-core | historical exact pin | Банк, условия, решения и назначения |
+| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/946ad619830aa1affcbdaf4b5b447324e3d41002/docs/body-export.md) | specification | course-core | current exact source pin | Общий producer transport и selected source input |
+| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/946ad619830aa1affcbdaf4b5b447324e3d41002/spec/index.md) | specification/index | course-core | current exact source pin | Банк, условия, решения и назначения |
 
 Банк и назначения принадлежат текущему Core; этот адаптер проверяет свой вход
 на собственной границе. Неизменяемые выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases).
@@ -63,10 +63,9 @@ witness; SHA256, filesystem identity и currentness проверяет Core до
 адаптера. Restored/completed run не разрешает новую запись. Ordinary/v2
 поведение сохраняется; публичных author flags и новых delivery schemas нет.
 
-Текущий временный CI pin `0613a4c6409d6cf766f926b8e096fd35d2a88422` относится
-к ранее принятой линии Core. Окончательный pin Core 9 и paired CI ещё OPEN;
-локальные проверки нового exact author checkpoint не заменяют независимое
-принятие или публикацию выпуска.
+Точный CI pin Core 9 указан в workflow данного Git ref после независимой
+технической рецензии исходников. Настоящий paired CI и публикация выпуска
+проверяются отдельно; локальные проверки не заменяют эти этапы.
 
 ## Сохранение ABI 1 при объединении main
 
