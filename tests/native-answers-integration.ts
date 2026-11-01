@@ -1,10 +1,10 @@
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 const wrongGrading = Deno.args.includes("--wrong-grading");
 const author = Deno.args.includes("--author"),
   projection = author ? "author" : "student",
   profile = author ? "full" : "student";
-const corePath = join(Deno.args[0], "_extensions/course-core"),
+const corePath = resolve(Deno.args[0], "_extensions/course-core"),
   plPath = join(
     dirname(dirname(fileURLToPath(import.meta.url))),
     "_extensions/course-prairielearn",
