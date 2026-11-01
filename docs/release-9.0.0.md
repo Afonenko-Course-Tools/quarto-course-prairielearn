@@ -35,7 +35,8 @@ snapshot и clearEnv на действительных ordinary child sites. Ine
 сохранены. Точные обязательные producer→consumer controls и границы ordinary
 прогонов фиксируются отдельно в авторском evidence packet.
 
-Окончательный принятый Core 9 pin, paired hosted CI, DIFFERENT OTHER review,
-реальные qualified profiles/prior P, полный Java/SP scope и публикация ещё OPEN.
-Временный старый CI pin не объявляется Core 9. Никакой ранее опубликованный
-тег не изменён; локальная ordinary fixture не доказывает assignment/release.
+CI закрепляет Core 9 из независимо проверенного исходного дерева; точный commit
+задаётся в workflow того же Git ref. Совместный hosted CI, независимая рецензия
+PrairieLearn, реальные qualified profiles/prior P, полный Java/SP и публикация
+проверяются отдельно. Прежние опубликованные теги сохранены; локальная
+ordinary fixture не доказывает assignment/release.
