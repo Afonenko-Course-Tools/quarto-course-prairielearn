@@ -355,11 +355,18 @@ Deno.test("full native export is deterministic, closed and atomic across output 
     const mixedAssessment=JSON.parse(await Deno.readTextFile(root+'/mixed/courseInstances/pilot/assessments/sec-lab/infoAssessment.json'));
     const mixedInfo=JSON.parse(await Deno.readTextFile(root+'/mixed/questions/demo/exr-a/info.json'));
     assert(mixedInfo.gradingMethod==='External'&&mixedInfo.externalGradingOptions&&mixedAssessment.zones[0].questions[0].autoPoints===1&&mixedAssessment.zones[0].questions[0].manualPoints===2,'Mixed lost actual External runtime or explicit teacher component');
-    const a = await exportCourse({
+    const prepared = await exportCourse({
       ...input,
       output: root + "/one",
       checksOutput: root + "/checks1.json",
+      deferPublish: true,
     });
+    assert(
+      !await Deno.stat(root + "/one").then(() => true, () => false) &&
+        !await Deno.stat(root + "/checks1.json").then(() => true, () => false),
+      "course/private checks published before outer final fence",
+    );
+    const a = await prepared.publish();
     assert(a.schemaVersion===3&&a.gradingPayloads['demo/exr-a'].grading?.method==='external'&&a.gradingPayloads['demo/exr-a'].submission?.mode==='editor','Delivery v3 requires explicit normalized grading/submission bindings');
     const b = await exportCourse({
       ...input,
@@ -413,9 +420,80 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       assert(!html.includes("PRIVATE_REFERENCE")&&!html.includes(apiText),"private sources leaked into UI");
       assert(delivery.files["questions/demo/exr-a/question.html"]===await hash(html),"optional controls absent from delivery hash");
     }
+    const optionalFact={...extrasFact,check:{...extrasFact.check,"additional-java-sources":{...extrasPolicy,"primary-required":false}}};
+    const optionalConfig:any=structuredClone(config);optionalConfig["question-defaults"].submission={mode:"upload"};
+    const optionalOut=root+"/optional-primary";
+    const optionalDelivery=await exportCourse({...apiInput,config:optionalConfig,checks:{...input.checks,projects:[optionalFact]},output:optionalOut,checksOutput:optionalOut+"-checks.json"});
+    const optionalDescriptor=JSON.parse(await Deno.readTextFile(optionalOut+"/questions/demo/exr-a/tests/grading-job.json"));
+    const optionalHtml=await Deno.readTextFile(optionalOut+"/questions/demo/exr-a/question.html");
+    assert(optionalDescriptor.additionalJavaSources.primaryRequired===false,"optional primary missing from descriptor");
+    assert(optionalHtml.includes('optional-file-names="'+[...optionalDescriptor.sourceFiles.filter((name:string)=>!name.includes('/')),extrasPolicy.archive].join(',')+'"')&&!optionalHtml.includes(' file-names="')&&!optionalHtml.includes('<pl-file-editor '),"optional upload still requires primary");
+    assert(canonical(optionalDescriptor.sourceFiles)===canonical(apiDescriptor.sourceFiles)&&optionalDescriptor.sourceFiles.includes("pkg/A.java"),"nested primary inventory was flattened or dropped");
+    assert(optionalHtml.includes("исходники с пакетами и остальные .java поместите в ZIP"),"nested ZIP transport guidance absent");
+    assert(optionalDelivery.files["questions/demo/exr-a/question.html"]===await hash(optionalHtml),"optional UI hash missing");
+    optionalConfig["question-defaults"].submission={mode:"editor"};
+    let optionalDenied=false;try{await exportCourse({...apiInput,config:optionalConfig,checks:{...input.checks,projects:[optionalFact]},output:root+"/optional-editor-denied",checksOutput:root+"/optional-editor-denied.json"});}catch{optionalDenied=true;}
+    assert(optionalDenied,"optional primary accepted placeholder editor");
     const nativeFact={...extrasFact,check:{...extrasFact.check,runtime:"java25-gradle-junit-v1","java-build":{kind:"gradle-jar-v1","main-class":"grade.Main",artifact:"gradeapp.jar"}}};
     const nativeInput={...apiInput,checks:{...input.checks,projects:[nativeFact]},registry:{schemaVersion:1,profiles:{"java25-gradle-junit-v1":{mode:"implementation",javaRelease:25,image:"registry/native-java@sha256:"+"e".repeat(64)}}},output:root+"/native-gradle",checksOutput:root+"/native-gradle-checks.json"};
     await exportCourse(nativeInput);
+    const canonicalFact = {
+      ...nativeFact,
+      check: {
+        ...nativeFact.check,
+        sourceProfile: {
+          ...nativeFact.check.sourceProfile,
+          root: "src/main/java",
+        },
+      },
+      trustedTests: [],
+    };
+    const nativeSelected = {
+      sources: [{
+        name: "pkg/A.java",
+        bytes: new TextEncoder().encode(source),
+        sha256: await hash(source),
+      }],
+      tests: [{
+        name: "ATest.java",
+        bytes: new TextEncoder().encode("class ATest {}"),
+      }, {
+        name: "ApiContract.java",
+        bytes: new TextEncoder().encode(apiText),
+      }],
+      descriptor: runtimeDescriptor(
+        canonicalFact.check,
+        nativeInput.registry.profiles["java25-gradle-junit-v1"],
+        ["pkg/A.java"],
+        ["ATest.java", "ApiContract.java"],
+        { files: ["ApiContract.java"], entry: "ApiContract" },
+      ),
+    };
+    await exportCourse({
+      ...nativeInput,
+      checks: { ...input.checks, projects: [canonicalFact] },
+      nativeInputs: { "exr-a": nativeSelected },
+      output: root + "/canonical-targets",
+      checksOutput: root + "/canonical-targets-checks.json",
+    });
+    assert(
+      await Deno.readTextFile(
+        root +
+          "/canonical-targets/questions/demo/exr-a/serverFilesQuestion/starter/pkg/A.java",
+      ) === source,
+      "actual A1 target bytes lost to old student partition selector",
+    );
+    assert(
+      canonical(
+        JSON.parse(
+          await Deno.readTextFile(
+            root +
+              "/canonical-targets/questions/demo/exr-a/tests/grading-job.json",
+          ),
+        ),
+      ) === canonical(nativeSelected.descriptor),
+      "native compiler descriptor changed at exporter connection",
+    );
     const nativeDescriptor=JSON.parse(await Deno.readTextFile(root+"/native-gradle/questions/demo/exr-a/tests/grading-job.json"));
     assert(canonical(nativeDescriptor.javaBuild)===canonical({kind:"gradle-jar-v1",mainClass:"grade.Main",artifact:"gradeapp.jar"}),"native full export dropped javaBuild");
     assert(nativeDescriptor.runtime==='java25-gradle-junit-v1'&&canonical(nativeDescriptor.sourceFiles)===canonical(apiDescriptor.sourceFiles)&&canonical(nativeDescriptor.apiPrecheck)===canonical(apiDescriptor.apiPrecheck),"native export changed selected source/API boundary");
@@ -1004,4 +1082,30 @@ Deno.test("additional Java policy rejects present null/false and closed-field de
   let denied=false;try{runtimeDescriptor({runtime:"java25-junit-v1",sourceProfile:{mode:"implementation"},"additional-java-sources":value},{javaRelease:25},["Main.java"],["ExampleTest.java"]);}catch{denied=true;}
   assert(denied,"invalid present Java policy silently disabled: "+JSON.stringify(value));
  }
+});
+
+Deno.test("Дублированная защита отвергается раньше переданной неверной публикационной зависимости", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const config = {
+      delivery: {
+        book: "tasks",
+        course: { name: "JAVA", title: "Java", timezone: "Europe/Minsk", topics: [{ name: "Java", color: "blue2", description: "Java" }] },
+        instances: { pilot: { title: "Pilot", "self-enrollment": false, publishing: { "start-date": "1970-01-01T00:00:00Z", "end-date": "9999-12-31T00:00:00Z" }, works: ["sec-one", "sec-two"] } },
+      },
+      "question-defaults": { topic: "Java", submission: { mode: "editor" } },
+    };
+    const works = ["sec-one", "sec-two"].map((id) => ({ id, relatedExercise: "exr-essay", extensions: { prairielearn: {} } }));
+    let called = false, message = "";
+    try {
+      await exportCourse({
+        courseId: "demo", projectRoot: root, result: { model: { assessments: works } },
+        checks: {}, config, registry: {}, instance: "pilot", output: root + "/native", checksOutput: root + "/checks.json",
+        publicationConditions: root + "/nonexistent-conditions.json",
+        publicationSource: { repository: "invalid", commit: "invalid", book: "tasks" },
+        body: async () => { called = true; throw new Error("unexpected body"); },
+      });
+    } catch (e) { message = String(e); }
+    assert(message === "Error: PL duplicate active defense" && !called, "Опциональная зависимость скрыла duplicate defense до body");
+  } finally { await Deno.remove(root, { recursive: true }); }
 });

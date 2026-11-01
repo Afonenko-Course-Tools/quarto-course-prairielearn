@@ -1,5 +1,7 @@
-import {createMetrics as __createMetrics} from "../observability/bridge.ts";
-const __metrics=__createMetrics("course-prairielearn");
+import { NativeSeedTargetsSchema } from "./native-materialization.ts";
+import { submission as parseSubmission } from "./submission.ts";
+import { createMetrics as __createMetrics } from "../observability/bridge.ts";
+const __metrics = __createMetrics("course-prairielearn");
 export const object = (v: any) =>
   v !== null && typeof v === "object" && !Array.isArray(v);
 export function closed(v: any, required: string[], optional: string[] = []) {
@@ -17,44 +19,87 @@ export function closed(v: any, required: string[], optional: string[] = []) {
     );
   }
 }
-export function question(v: any) {
-  closed(v, ["topic", "submission"], ["single-variant","grading"]);
+function readQuestion(v: any, complete: boolean) {
+  closed(
+    v,
+    complete ? ["topic", "submission"] : [],
+    complete
+      ? ["single-variant", "grading"]
+      : ["topic", "submission", "single-variant", "grading"],
+  );
   if (
     Object.hasOwn(v, "single-variant") &&
     typeof v["single-variant"] !== "boolean"
-  ) throw Error("PL single-variant requires boolean");
-  if (typeof v.topic !== "string" || !v.topic.trim()) {
-    throw new Error("PL topic required");
+  ) {
+    throw Error("PL single-variant requires boolean");
   }
-  closed(v.submission, ["mode"], ["ace-mode"]);
   if (
-    !["editor", "upload"].includes(v.submission.mode) ||
-    v.submission["ace-mode"] !== undefined &&
-      (v.submission.mode !== "editor" ||
-        !/^ace\/mode\/[a-z][a-z0-9_]*$/.test(v.submission["ace-mode"]))
-  ) throw new Error("PL submission invalid");
+    Object.hasOwn(v, "topic") &&
+    (typeof v.topic !== "string" || !v.topic.trim())
+  ) {
+    throw Error("PL topic required");
+  }
+  const submission = Object.hasOwn(v, "submission")
+    ? parseSubmission(v.submission, true)
+    : undefined;
+  const grading = gradingMethod(v.grading);
+  if (
+    submission?.mode === "workspace" &&
+    (grading.method !== "manual" || v["single-variant"] === false)
+  ) {
+    throw Error(
+      "PL.WORKSPACE_INVALID: Workspace требует Manual и single-variant: true",
+    );
+  }
+  return { submission, grading };
+}
+/** Частичная native publication policy: отсутствие поля не становится default delivery. */
+export function publicationQuestion(v: any) {
+  const { submission, grading } = readQuestion(v, false);
   return {
-    topic: v.topic,
-    ...(v.grading!==undefined&&v.grading!=='external'?{grading:gradingMethod(v.grading)}:{}),
+    ...(Object.hasOwn(v, "topic") ? { topic: v.topic } : {}),
+    ...(submission ? { submission } : {}),
+    grading,
     ...(Object.hasOwn(v, "single-variant")
       ? { singleVariant: v["single-variant"] }
       : {}),
-    submission: {
-      mode: v.submission.mode,
-      ...(v.submission["ace-mode"]
-        ? { aceMode: v.submission["ace-mode"] }
-        : {}),
-    },
+    ...(submission?.mode === "workspace" ? { singleVariant: true } : {}),
   };
 }
-export function gradingMethod(value:any):{method:'external'|'manual'|'mixed'}{
-  if(value===undefined||value==='external')return {method:'external'};
-  closed(value,['method']);
-  if(!['manual','mixed'].includes(value.method))throw Error('PL.GRADING_INVALID: grading.method должен быть manual или mixed');
-  return {method:value.method};
+export function question(v: any) {
+  const { submission, grading } = readQuestion(v, true);
+  return {
+    topic: v.topic,
+    ...(v.grading !== undefined && v.grading !== "external" ? { grading } : {}),
+    ...(Object.hasOwn(v, "single-variant")
+      ? { singleVariant: v["single-variant"] }
+      : {}),
+    ...(submission!.mode === "workspace" ? { singleVariant: true } : {}),
+    submission: submission!,
+  };
+}
+export function gradingMethod(
+  value: any,
+): { method: "external" | "manual" | "mixed" } {
+  if (value === undefined || value === "external") {
+    return { method: "external" };
+  }
+  closed(value, ["method"]);
+  if (!["manual", "mixed"].includes(value.method)) {
+    throw Error(
+      "PL.GRADING_INVALID: grading.method должен быть manual или mixed",
+    );
+  }
+  return { method: value.method };
 }
 export function declarations(raw: any, key: string) {
-  closed(raw, ["delivery", "question-defaults"], ["assessment-defaults"]);
+  closed(raw, ["delivery", "question-defaults"], [
+    "assessment-defaults",
+    "seed-targets",
+  ]);
+  if (raw["seed-targets"] !== undefined) {
+    NativeSeedTargetsSchema.parse(raw["seed-targets"]);
+  }
   closed(raw.delivery, ["book", "course", "instances"]);
   const course = raw.delivery.course;
   closed(course, ["name", "title", "timezone", "topics"]);
@@ -125,8 +170,17 @@ export function declarations(raw: any, key: string) {
 }
 
 // @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-closed=__metrics.wrapSync({id:"course-prairielearn.application.declarations.closed",kind:"phase"},closed);
+closed = __metrics.wrapSync({
+  id: "course-prairielearn.application.declarations.closed",
+  kind: "phase",
+}, closed);
 // @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-question=__metrics.wrapSync({id:"course-prairielearn.application.declarations.question",kind:"phase"},question);
+question = __metrics.wrapSync({
+  id: "course-prairielearn.application.declarations.question",
+  kind: "phase",
+}, question);
 // @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-declarations=__metrics.wrapSync({id:"course-prairielearn.application.declarations.declarations",kind:"phase"},declarations);
+declarations = __metrics.wrapSync({
+  id: "course-prairielearn.application.declarations.declarations",
+  kind: "phase",
+}, declarations);

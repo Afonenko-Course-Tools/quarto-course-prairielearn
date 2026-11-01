@@ -2,8 +2,8 @@
 type: specification-index
 component: course-prairielearn
 status: current
-version: 8.2.2
-updated: 2026-10-24
+version: 9.0.0
+updated: 2026-10-26
 ---
 
 # Индекс спецификаций PrairieLearn
@@ -15,47 +15,44 @@ updated: 2026-10-24
 
 | Документ | type | component | status | Нормативный владелец и область |
 | --- | --- | --- | --- | --- |
-| [PrairieLearn: действующий контракт](../docs/authoring.md) | specification | course-prairielearn | current | native/CUE binding и selected participant delivery; client/tests/reference |
+| [PrairieLearn: действующий контракт](../docs/authoring.md) | specification | course-prairielearn | current | native TS binding и selected participant delivery; client/tests/reference |
 | [Диагностика](../docs/diagnostics.md) | reference | course-prairielearn | current | Собственные ID и внешние причины этого адаптера |
-| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/9acab6d11afbdcbeefdabb15130068488e2f6dc0/docs/body-export.md) | specification | course-core | current | Общий producer transport и selected source input |
-| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/9acab6d11afbdcbeefdabb15130068488e2f6dc0/spec/index.md) | specification/index | course-core | current | Банк, условия, решения и назначения |
+| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/946ad619830aa1affcbdaf4b5b447324e3d41002/docs/body-export.md) | specification | course-core | current exact source pin | Общий producer transport и selected source input |
+| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/946ad619830aa1affcbdaf4b5b447324e3d41002/spec/index.md) | specification/index | course-core | current exact source pin | Банк, условия, решения и назначения |
 
 Банк и назначения принадлежат текущему Core; этот адаптер проверяет свой вход
 на собственной границе. Неизменяемые выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases).
 
-## Full native export
+## Полный native export
 
-`application/declarations.ts` and `#PrairieLearnDeclarations` close the delivery
-configuration. `source-selection.ts` verifies Core SourceSelection SHA256 and
-preserves submission paths. `export-course.ts` produces a complete atomic native
-course and independent private checks inventory; IDs derive from stable Core keys.
-Pinned official PrairieLearn JSON schemas and bundled offline Ajv validators are
-recorded in `spec/upstream/provenance.json`. The runner descriptor is Platform-owned,
-not a second author configuration or a private GradingJob.
+Исполняемый TS-контракт `application/declarations.ts` замыкает конфигурацию
+поставки. Существующий `native-checks.ts` нормализует PL policy из raw plane
+того же Core capture. `native-check-inventory.ts` связывает выбранные настоящие
+A1 raw origins и сохраняет точные прежние hash области; transport witness и
+selection scope имеют отдельные имена. `native-course.ts` организует genuine
+operation, а `export-course.ts` атомарно публикует полный native course и
+приватный checks inventory после закрывающего Core fence.
+Закреплённые официальные PrairieLearn JSON schemas и offline Ajv validators
+описаны в `spec/upstream/provenance.json`. Descriptor runner принадлежит
+Platform и не становится второй авторской конфигурацией или private GradingJob.
 
-## Текущая совместимость кандидата 8.2.2
+## Текущая совместимость кандидата 9.0.0
 
-Кандидат Exporter 8.2.2 использует проверяемый Core-кандидат 8.2.3 с API Core 8.1
-и delivery v3. Информационное `core-version: 8.2.3` в metadata descriptor не
-используется как проверка равенства bundle или нижней границы версии; оно
-не заменяет точный companion SHA. Body v2 и public results v2
-не переименовываются. Manual/mixed/choice требуют согласованного native reader;
-Platform/Gateway проверяются отдельно по exact source/digest, без заявления
-совместимости прежних service releases. Download — необязательный consumer
-готового Core inventory, не зависимость этого экспортёра.
+Кандидат использует native TS Core 9. Body v2, public results v2 и строгие
+delivery v3/v4 сохраняют собственные версии. `contract.json.name` устанавливает
+владельца; исполняемые business contracts находятся в TypeScript.
+Точная source dependency задаётся CI; номера descriptor не дают runtime authority.
+Полная поставка требует genuine Core operation, independent prior P и проверенного
+Platform image digest. Частичный publication vet — data inspection без assignment
+прав. Новый кандидат не объявляется выпущенным до OTHER review и paired CI.
 
-## Историческая совместимость 7.1.1
+## Reference-only единицы и повторные вопросы
 
-Экспортёр 7.1.1 использует Core 7.3.0 и прежний Body v2. Изменён descriptor,
-исполняемые файлы сохранены. Версии Core 7.2.0 / exporter 7.1.0 опубликованы.
-
-## Reference-only единицы и повторные вопросы из 8.2.1
-
-Кандидат 8.2.1 добавил публичный контекст исходных optional меню для
+Кандидат8.2.1 добавляет публичный контекст исходных optional меню для
 однопозиционных `sec-unit-*` работ и отказывает при различии повторного
 question payload, source mapping, grading/submission или ресурсов.
 Используется прежний public Body/renderer; новых полей схемы и registry нет.
-Эта история не подтверждает новый тег или готовность курса.
+Тег8.2.1 и course readiness этой веткой не подтверждаются.
 
 ## Owned overlay в 8.2.1
 
@@ -66,23 +63,15 @@ witness; SHA256, filesystem identity и currentness проверяет Core до
 адаптера. Restored/completed run не разрешает новую запись. Ordinary/v2
 поведение сохраняется; публичных author flags и новых delivery schemas нет.
 
-Текущая installed regression закрепляет Core-кандидат 8.2.3
-`9acab6d11afbdcbeefdabb15130068488e2f6dc0`. Локальные проверки и этот
-ref не подтверждают публикацию выпуска.
+Точный CI pin Core 9 указан в workflow данного Git ref после независимой
+технической рецензии исходников. Настоящий paired CI и публикация выпуска
+проверяются отдельно; локальные проверки не заменяют эти этапы.
 
-## Контекст наблюдения 8.2.2
+## Сохранение ABI 1 при объединении main
 
-Канонические фасады сохраняют ABI 1 и добавляют `attributes.extension_id`.
-Необязательный `document_id` требует явного контекста одного документа;
-экспорт книги и пакетные команды не выбирают произвольный документ.
-Четыре границы дочерних процессов в export-course, inspect-grading и
-application/export используют полный снимок окружения через `childEnv` и
-`clearEnv: true` только при активном контексте агента. Identity/off/недоступный
-режим/отсутствующий агент сохраняют прежние scoped permissions и native
-inheritance без полного чтения env и `clearEnv`. Авторские схемы, Body v2 и delivery v3 сохраняются.
-Общий runtime и полное семантическое покрытие функций не вводятся.
-
-CI проверяет Core 8.2.3 с точным SHA выше, QRC 3.1.1 и Site 5.1.4 по закреплённым
-commits. `tests/performance-context.ts` самодостаточен и не импортирует продукт
-Performance. Полные native/Java проверки, CI итогового HEAD и новая установленная
-матрица принимаются отдельно; прежнее evidence не подтверждает их прохождение.
+Сохранены `attributes.extension_id` и явный `document_id`, ordinary active
+child snapshot/clearEnv и identity scoped permissions. Новый native entry
+использует только публичный Core capture seam, а C auxiliary children —
+принятый frozen env с pre/post currentness. Подробности и граница проверок
+приведены в [спецификации](../docs/authoring.md#контекст-наблюдения-после-объединения-main).
+Информационное `core-version: 9.0.0` не заменяет точный CI SHA или runtime qualification.

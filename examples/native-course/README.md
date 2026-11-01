@@ -1,7 +1,7 @@
 # Полная поставка курса PrairieLearn
 
-Текущие кандидаты — Exporter 8.2.2 и bundle Core 8.2.3 (**unreleased**).
-API Core 8.1, Body v2 и delivery v3 имеют собственные версии и не повышаются
+Текущие кандидаты — Exporter 9.0.0 и bundle Core 9.0.0 (**unreleased**).
+Публичные native TS API Core 9, Body v2 и delivery v3 имеют собственные версии и не повышаются
 вместе с номером bundle. Для разработки используйте целые локальные checkout
 или архивы закреплённых commits; новые теги устанавливаются после публикации.
 Совместимость контрактов не подтверждает наличие тегов или опубликованного OCI digest.
@@ -24,3 +24,6 @@ quarto run tasks/_extensions/course-prairielearn/entrypoints/export-course.ts . 
 объявить собственные `publishing.start-date` и `end-date` со смещениями времени.
 Отсутствующие или некорректные даты отклоняют экспорт; доступ Student определяется
 одновременно доступностью экземпляра и назначенными assessment labels.
+
+Native export требует отдельно квалифицированного source/runtime состава и prior P.
+Обычная HTML-сборка и локальный Gradle test не заменяют эту проверку.

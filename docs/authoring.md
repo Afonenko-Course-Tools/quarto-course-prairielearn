@@ -2,16 +2,22 @@
 type: specification
 component: course-prairielearn
 status: current
-updated: 2026-10-24
+updated: 2026-10-31
 ---
 
 # Спецификация заданий и контрольных работ
 
-Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/9acab6d11afbdcbeefdabb15130068488e2f6dc0/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
+Кандидат Exporter 9.0.0 продолжает принятую линию 8.2.5. Optional-primary
+требует отдельно проверенного exact Core/Platform состава и image digest.
+Адресные проверки выполнены с Core `198927766da83882b9c13bc13516c74fab35711d`;
+новая paired Core CI и release compatibility остаются OPEN.
+Теги и OCI digests не подтверждаются version metadata; Body v2/native v3 сохранены.
+
+Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0613a4c6409d6cf766f926b8e096fd35d2a88422/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
-переключения версий схемы. Контракты этого ref: адаптер-кандидат 8.2.2 и Core-кандидат 8.2.3, delivery v3, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
+переключения версий схемы. Контракты этого ref: адаптер-кандидат9.0.0, delivery v3/v4, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
 Канонические `#exr-*` имеют уникальные ID внутри явной области
 `exercise-bank: true`, собственные обязательные `difficulty` и положительное
 целое `time`. Эффективная `statement-visibility` берётся из атрибута задачи либо
@@ -22,25 +28,20 @@ updated: 2026-10-24
 
 ## Версия API и проверяемый Core
 
-Контракт API Core 8.1, Body v2 и delivery v3 сохраняется. Metadata descriptor
-адаптера указывает companion bundle `core-version: 8.2.3`, а словарный `contract.json`
-сохраняет API-декларацию `core_version: "8.1.0"`. Текущие native consumers
-не используют эти поля для проверки равенства bundle или минимальной версии:
-entrypoints загружают установленные публичные модули Core, а транспорт адаптера
-передаёт `name`, `rules` и `directory`. Из этих полей нельзя вывести проверенный
-диапазон поддерживаемых bundle.
-
-Для этого кандидата CI отдельно закрепляет Core 8.2.3:
-`9acab6d11afbdcbeefdabb15130068488e2f6dc0`. Это проверяемый companion, а не
-автоматическое повышение API или объявление опубликованной совместимости.
-Нативная интеграция и поставка Java требуют собственных итоговых результатов.
+Native TS Core 9 и C 9 используют публичные capture/current-operation/validator
+границы. `contract.json` содержит только `name: "prairielearn"`; старые поля
+версий API и пути внешних схем отсутствуют. Предметную форму, defaults и
+валидацию задают TS owner contracts; типы используют те же исполняемые правила.
+Точный source pin Core задаёт CI, а `core-version: 9.0.0` в descriptor —
+информация о companion, не runtime authority. Полная совместимость installed
+состава, независимый prior P и итоговый paired CI проверяются отдельно.
 
 ## Область ответственности
 
 Ядро курса применяет правила видимости и собирает общую модель: задания,
 условия, критерии проверки, состав занятий и устойчивые идентификаторы.
 Адаптер добавляет параметры внешней проверки и правила контрольных работ.
-CUE проверяет полученную модель и отклоняет неизвестные поля.
+Исполняемый TS-контракт проверяет callback data и отклоняет неизвестные поля.
 
 Стартовый проект, авторское решение и тесты хранятся в обычном каталоге,
 на который указывает `project`. Автору не требуется создавать `question.html`,
@@ -145,7 +146,7 @@ Legacy `entrypoints/export.ts` создаёт только нативные во
 ## Ошибки и повторный экспорт
 
 [Справочник диагностики](diagnostics.md) объясняет ID адаптера, контекст работы
-и вопроса, а также исходные отказы Core, CUE и Pandoc. После ошибки результат
+и вопроса, а также исходные отказы Core и Pandoc. После ошибки результат
 не создаётся; для повторного экспорта нужен новый каталог поставки.
 
 ## Общие назначения и participant Body
@@ -464,7 +465,7 @@ Selected Body v2 передаёт вопросу читаемый `title`, не�
 
 ## Закрытый native Gradle build record
 
-В Core 8.2.3 `java-build` содержит ровно `kind: gradle-jar-v1`, `main-class`
+В Core 8.2.2 `java-build` содержит ровно `kind: gradle-jar-v1`, `main-class`
 и `artifact`. Имя класса соответствует
 `^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$`, имя JAR —
 `^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.jar$` (до105 ASCII bytes).
@@ -479,7 +480,7 @@ selected byte hashes и API/extras boundary сохраняются. Student Grad
 Descriptor остаётся schemaVersion1. Рецепт и реальная сборка принадлежат
 Platform; source candidate не доказывает archive/image/runtime/course readiness.
 
-## Reference-only work и публичный контекст меню из 8.2.1
+## Reference-only work и публичный контекст меню (кандидат8.2.1)
 
 Обычная работа `sec-unit-<суффикс exr>` содержит ровно один fixed slot с
 `id: exr-<суффикс>`, одним таким же candidate и required local assignment.
@@ -506,35 +507,155 @@ Platform; source candidate не доказывает archive/image/runtime/cours
 компоненты; manual не получает фиктивных tests/runtime.
 
 Bodyv2, deliveryv3 и public resultsv2 сохранены. Exact Core-кандидат закреплён в CI.
-Возможность появилась в кандидате 8.2.1 и сохраняется в 8.2.2. Новый полный
-захват/экспорт курса, доступ Student, учёт Moodle и публикация текущего
-кандидата — отдельные последующие проверки.
+Новый whole-course capture/export, доступ Student, Moodle учёт и публикация
+кандидата8.2.1 — отдельные последующие проверки.
 
-## Контекст наблюдения и окружение процессов (8.2.2)
+## Явные conditions ZIP принятой публикации
 
-Фасад ABI 1 передаёт `attributes.extension_id: "course-prairielearn"` и сохраняет
-явный необязательный `document_id`. Контекст документа не выводится из имени
-операции или книги. Экспорт книги и пакетные команды сохраняют общий контекст
-без выбора одного произвольного документа. Это дополнение не вводит новый
-общий runtime и не заявляет полного семантического покрытия адаптера.
+Опциональный CLI-параметр `--publication-conditions /absolute/manifest.json`
+подключает целые архивы уже принятой публикации. Это отдельные внешние зависимости,
+не Core student materialization и не содержимое `starter.zip`. Без параметра
+сохраняется прежний экспорт. Core по-прежнему удаляет contextual Download links
+из публичного Body; адаптер добавляет только явно разрешённые conditions archives.
 
-Только при активном контексте агента полный снимок окружения проходит через
-`childEnv`, затем `Deno.Command` использует `clearEnv: true` на четырёх границах: Docker image inspect и Quarto
-inspect в `entrypoints/export-course.ts`, Quarto inspect в
-`entrypoints/inspect-grading.ts`, Pandoc в `application/export.ts`. Рабочие
-переменные сохраняются, удалённый устаревший `COURSE_PERF_PARENT_SPAN_ID`
-не восстанавливается повторным наследованием Deno. Контекст родителя берётся
-из текущего активного span; без такого контекста новая связь не придумывается.
-Существующая command-операция публичного Body renderer сохраняется.
-При identity-ответе фасада (`off`, отсутствующий агент или недоступное чтение
-режима) сохраняются прежние scoped permissions и native inheritance без полного
-чтения env и `clearEnv`. Фасад возвращает исходные функции, Promise и окружение.
-Самостоятельная `tests/performance-permissions.ts` проверяет четыре границы
-с прежними узкими env-разрешениями.
+Неизменённый host builder Platform 2.3.0 передаёт окружение настоящему
+установленному entrypoint. Для этого маршрута вместо CLI используется один
+явный `PRAIRIELEARN_PUBLICATION_CONDITIONS=/absolute/manifest.json`.
+CLI и ENV одновременно запрещены, даже с одинаковым значением; пустой или
+относительный путь отвергается. Если оба отсутствуют, прежний экспорт сохраняется.
+Один эффективный путь определяет ту же source authority (`stagingReceipt.publicBase`
+в private stage), проверки и JSON dependency receipt в stdout. Исполнитель должен
+закрепить exact ENV, manifest, публикационный receipt и whole ZIP в собственных
+sealed inputs; неявное ambient значение не является разрешением. Другая версия
+builder/runtime assembly или новые образы для этого transport не требуются.
 
-Самодостаточная проверка `tests/performance-context.ts` использует локальную
-тестовую fixture и реальные дочерние процессы, без зависимости от Performance.
-Она не подтверждает полную native/Java интеграцию или опубликованный runtime.
-Матрица Exporter 8.2.2 / Core 8.2.3 с companion QRC 3.1.1 / Site 5.1.4 требует
-собственных проверок точных refs, установленного состава и итогового CI.
-Body v2, delivery v3 и public results v2 сохраняются; новых авторских полей нет.
+Manifest имеет схему `pl-publication-conditions-v1` и точные поля:
+
+- `courseId` — текущий курс;
+- `source: {repository, commit, book}` — текущий public Git source; в private stage
+  это `publicBase` принятого staging receipt;
+- `publication: {repository, commit, receipt: {path, bytes, sha256}}` — источник
+  исторической публикации и внешнее принятое свидетельство;
+- `archives` — записи `{questionId, source, sourceSha256, file: {path, bytes, sha256}}`.
+  `source` задаёт owner-relative QMD текущего вопроса, `file` — полный исходный ZIP.
+
+Набор записей должен точно совпадать с conditions requests выбранных упражнений
+в исходном native AST, до публичной Core partition. Foreign/duplicate/missing
+IDs, несоответствие source/hash, symlink/hardlink/alias, небезопасный путь,
+collision client target и изменение входов до публикации означают отказ.
+Внешние зависимости читаются на границах операции, не в цикле вопросов.
+Адаптер не создаёт HTML или ZIP и не объявляет исторические архивы новым capture.
+
+Точные bytes копируются в `clientFilesQuestion/<ID>-conditions.zip`; вопрос
+получает ссылку «Скачать условие для локального просмотра» через обычный PL
+client-files URL. Файлы и HTML входят в стандартные inventory/delivery hash.
+Схемы delivery и provenance не меняются: manifest и исходная публикация связаны
+sealed caller inputs, pre/post checks и JSON dependency receipt в CLI stdout,
+сохраняемом внешним исполнителем. Само наличие manifest не доказывает допустимость
+старого Site: публикацию и её ZIP заранее принимает внешний владелец evidence.
+
+## Git-история в стартовом комплекте
+
+`starter.zip` сохраняет точные байты Core student artifact, включая учебную
+Git-историю. При прямом копировании в `clientFilesQuestion/starter` экспортёр
+проверяет все members, но исключает файлы с точным компонентом пути `.git`.
+Остальные raw файлы, README и ссылки сохраняются. Это позволяет перенести
+весь native курс обычным Git clone без вложенных gitlinks; историю учащийся
+получает после распаковки неизменённого ZIP.
+
+### Загрузка без обязательного starter primary
+
+`additional-java-sources.primary-required: false` переносится в runtime descriptor
+как `additionalJavaSources.primaryRequired: false`. Это opt-in только для Java
+implementation с полной bounded ZIP policy. Используйте `submission.mode: upload`:
+в единственном `pl-file-upload` все известные основные имена и архив перечислены
+в `optional-file-names`; editor явно отклоняется. Runtime проверяет непустую union
+реально загруженных Java sources и сохраняет API/tests/scoring. Подстановка
+starter/reference и автоматическое переключение в ручную проверку не выполняются.
+Отсутствие поля сохраняет прежний descriptor и UI; `true` сохраняет обязательные
+основные файлы. Starter inventory остаётся непустым.
+
+В opt-in upload отдельно перечисляются только primary без каталогов и архив.
+Nested primary передаются внутри ZIP с исходными относительными путями; полный
+`sourceFiles` и canonical binding сохраняются. Flattening, кодирование имён и
+wildcard загрузка не применяются.
+
+## Ранний Git Workspace: локальный кандидат
+
+Единственный runtime-канон изменённого submission-контракта находится в
+`application/submission.ts`; публичный вход — `_extensions/course-prairielearn/public.ts`.
+Он декодирует прежние editor/upload и новый Manual Git Workspace. Workspace
+требует `singleVariant: true`, точный image digest, home/port и явный возврат
+`work/**`, `work/.git/**`, `work/.*`, `explanation.m[d]`, `.pl-seed/identity.jso[n]`.
+Один wildcard не устанавливает перенос скрытой `.git`. В этой ранней партии
+проверены плоский учебный worktree, скрытый untracked файл, обычные Git objects,
+refs, HEAD и index; произвольная вложенная структура дополнительных скрытых
+каталогов этим набором шаблонов ещё не квалифицирована.
+
+`exportPrairieLearn` принимает полный student artifact от Core/Download,
+сохраняет его ZIP без изменения в `workspace/.pl-seed/starter.zip` и связывает
+manifest с SHA-256 архива и каждым member исходного inventory. При отсутствии
+Git seed либо неполном договоре возврата публикация отвергается. Служебные
+байты `.pl-seed` принадлежат транспорту. Студент не создаёт ZIP в Workspace.
+Native вопрос содержит `pl-workspace`, `pl-file-preview` и необязательную
+загрузку для полноценного локального пути. Автоматический grader не добавляется.
+
+Назначенный image `sp-git-workspace` проверяет seed до первого использования,
+создаёт только исходный A/main и записывает identity. При restart существующие
+HEAD/index/worktree не изменяются. Существующая работа без identity, пропавшая
+работа с identity или изменённый seed дают явный отказ без автоматического сброса.
+Ручной разбор различает конечные свойства и свидетельства двух restore.
+
+`describeSubmission(contract, files)` возвращает нейтральный фрагмент README:
+`{files:[{name,starterPath?}],instructions}`. `name` — логическое имя сдачи,
+`starterPath` — отдельный проверенный путь в starter; basename не выводится.
+Для Workspace `files: []`: фиктивное имя загрузки не создаётся. Core владеет
+общей схемой этого фрагмента и README writer; mode/options остаются у PL.
+
+Это ограниченная локальная партия. Native schema закреплена provenance commit
+`92584fe426ececb84bc2d09de9975c7056c0c5f6`. Проверка полного native TS reader
+на TS, подключение actual Core inventory/summary в установленной композиции,
+новый опубликованный image digest и квалификация действующего Workspace host
+остаются отдельными открытыми проверками. Старый reader не расширяется вторым
+постоянным описанием Workspace. Наличие local info.json не означает готовность
+курса или возможность публикации на портале.
+
+Для `explanation.md` и `.pl-seed/identity.json` используются точные bracket
+patterns `explanation.m[d]` и `.pl-seed/identity.jso[n]`. Они выбирают те же
+реальные имена, но native question-variant не превращает их в обязательные
+поля самостоятельной локальной загрузки. Локальная сдача архива разрешена
+без запуска Workspace; её полнота по условию остаётся предметом Manual.
+
+## Контекст наблюдения после объединения main
+
+Фасад ABI 1 сохраняет `attributes.extension_id` и явный необязательный
+`document_id`. Ordinary Pandoc использует полный снимок
+`childEnv` с `clearEnv: true` только при активном агенте. Identity/off,
+недоступное чтение режима и отсутствие агента сохраняют scoped env permissions
+и обычное наследование без полного чтения env.
+
+Прежние Docker/inspect children `entrypoints/export-course.ts` заменены
+`application/native-entry.ts` → публичным Core capture lease. Возвращать
+старый collector или частные Core imports для наблюдения нельзя. Native render
+исполняет Core по qualified policy; C auxiliary Pandoc/Python/Git сохраняют
+собственный frozen env и pre/post currentness без добавления ambient span.
+Тесты Performance используют локальную fixture; они не доказывают prior P,
+полный экспорт курса или hosted CI.
+
+## Проверка публикации и полная поставка
+
+`inspectPublication(Core, operation, {expectedSources})` вызывают внутри живого
+публичного `withCurrentNativeOperation`. Этот частичный vet проверяет metadata,
+нормализацию, assignment, порог и принадлежность всех members платформе; он
+не требует отсутствующий topic/submission до полной delivery и не создаёт
+assignment authority. Core остаётся единственным владельцем AST, private
+preprojection facts, source/currentness и native format/profile binding.
+
+Полный `createNativeAdapter` получает все четыре авторитетных metadata planes
+через typed Core validator; повторный Lua collector/child/sidecar не нужен.
+Prepared correlation сверяется до capture и полной composition. Direct DTO
+validation даёт только data result, без business/cache/proof/publish прав.
+Один private proof повторно используется только для той же operation identity
+и exact request, с currentness fence перед выдачей следующего artifact.
+Failure очищает cache; getter не читает дерево/metadata и не запускает inspect.
+`inspect-grading.ts` потребляет уже завершённый capture, не строит legacy модель.

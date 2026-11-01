@@ -1,8 +1,8 @@
 # Пример авторства PrairieLearn
 
-Текущие кандидаты — Exporter 8.2.2 и bundle Core 8.2.3 (**unreleased**).
-API Core 8.1, Body v2 и delivery v3 сохраняют отдельные версии.
-Проверяемый toolchain — Quarto 1.11.5 и CUE 0.17.1; новые теги устанавливаются
+Текущие кандидаты — Exporter 9.0.0 и bundle Core 9.0.0 (**unreleased**).
+Публичные native TS API Core 9, Body v2 и delivery v3 сохраняют отдельные версии.
+Проверяемый toolchain — Quarto 1.11.5; новые теги устанавливаются
 только после публикации. Для разработки используйте целые локальные checkout.
 [План владельца](../../docs/plans/2026-10-08-implementation.md) фиксирует runtime
 проверки; [текущий контракт](../../docs/authoring.md) описывает банк и платформенную привязку.
@@ -34,3 +34,6 @@ quarto run render.ts full
 создаёт native delivery и выполняет настоящие локальные проверки программы;
 server import/image/assignment проверяются отдельно в PrairieLearn.
 [Диагностика](../../docs/diagnostics.md).
+
+Native export требует отдельно квалифицированного source/runtime состава и prior P.
+Обычная HTML-сборка и локальный Gradle test не заменяют эту проверку.

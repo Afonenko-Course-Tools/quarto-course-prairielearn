@@ -1,4 +1,4 @@
-name: Проверка Quarto и CUE
+name: Проверка TS-контрактов и native Quarto
 
 on:
   pull_request:
@@ -39,59 +39,52 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          # Точный Core-кандидат 8.2.3; тот же commit используется обеими задачами CI.
-          # Commit не означает существование release tag.
-          ref: 9acab6d11afbdcbeefdabb15130068488e2f6dc0
+          # Core 9: независимо проверенный исходный код; полный hosted CI и выпуск отдельно.
+          ref: 946ad619830aa1affcbdaf4b5b447324e3d41002
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "9acab6d11afbdcbeefdabb15130068488e2f6dc0"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "946ad619830aa1affcbdaf4b5b447324e3d41002"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
-      - uses: cue-lang/setup-cue@b0e30e540a2dae47304ebf16586a5b2db023b61c # v2.0.0
-        with:
-          version: v0.17.1
-      - name: Проверка единого словаря контракта
-        run: quarto run tools/sync-contract.ts --check
       - name: Самодостаточная проверка контекста ABI 1
         run: quarto run tests/performance-context.ts
       - name: Прежние разрешения окружения без активного агента
         run: quarto run tests/performance-permissions.ts
+      - name: Проверить состав исполняемых TS-контрактов
+        run: quarto run tools/check-contracts.ts
+      - name: ABI и frozen native auxiliary env
+        run: quarto run tests/performance-native-auxiliary.ts
+      - name: Граница native capture без legacy child
+        run: quarto run tests/performance-native-boundary.ts
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: b20d8934168e808cdb333e58179fbcd25e47bea8 # QRC 3.1.1: точный кандидат
+          ref: a924b15372f8a7c95c090031c4a0ac935ce705f5
           path: .ci-deps/qrc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-publish
-          ref: b12a568511fa22cef27bfed1b261566e5d8bc42e # Site 5.1.4: точный кандидат
+          ref: b019ac08a5ab473a70e04589e1b125d977281373
           path: .ci-deps/site
           persist-credentials: false
       - name: Проверить закреплённые QRC и Site
         run: |
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "b20d8934168e808cdb333e58179fbcd25e47bea8"
-          test "$(git -C .ci-deps/site rev-parse HEAD)" = "b12a568511fa22cef27bfed1b261566e5d8bc42e"
-      - name: Закрытый writer enrollment
-        run: EXPORTER_EXTENSION="$PWD/_extensions/course-prairielearn" quarto pandoc /dev/null --from markdown --to json --lua-filter tests/native-overlay.lua
-      - name: Installed owned overlay и grading export
-        run: timeout --signal=TERM --kill-after=15s 1200s quarto run tests/native-overlay.ts .ci-deps/core .ci-deps/qrc .ci-deps/site
-      - run: quarto run tests/native-model.ts .ci-deps/core
-      - run: quarto run tests/native-pointer.ts .ci-deps/core
-      - run: quarto run tests/native-manual.ts .ci-deps/core
-      - run: quarto run tests/native-ordinary.ts .ci-deps/core
-      - run: quarto run tests/native-references.ts .ci-deps/core
-      - run: quarto run tests/native-declarations.ts .ci-deps/core
-      - run: quarto run tests/native-directory-grading.ts .ci-deps/core
-      - run: quarto run tests/identity.ts .ci-deps/core
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "a924b15372f8a7c95c090031c4a0ac935ce705f5"
+          test "$(git -C .ci-deps/site rev-parse HEAD)" = "b019ac08a5ab473a70e04589e1b125d977281373"
+      - name: Настоящие закрытые answers, HTML/Reveal и grading composition
+        run: quarto run tests/native-answers-integration.ts .ci-deps/core --author
+      - name: Отказ несовместимого cross-document grading
+        run: quarto run tests/native-answers-integration.ts .ci-deps/core --wrong-grading
+      - name: Подлинные source origin и три различные hash-области
+        run: quarto run tests/native-raw-origin-values.ts .ci-deps/core
       - name: Версии инструментов
         run: |
           quarto --version
-          cue version
       - name: Проверка правил PrairieLearn и сборка примера student/full
         run: quarto run tests/check.ts .ci-deps/core
 
@@ -113,19 +106,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: 9acab6d11afbdcbeefdabb15130068488e2f6dc0
+          ref: 946ad619830aa1affcbdaf4b5b447324e3d41002
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "9acab6d11afbdcbeefdabb15130068488e2f6dc0"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "946ad619830aa1affcbdaf4b5b447324e3d41002"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5
-      - uses: cue-lang/setup-cue@b0e30e540a2dae47304ebf16586a5b2db023b61c
-        with:
-          version: v0.17.1
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
         with:
           deno-version: v2.7.14
@@ -136,7 +126,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
         with:
           gradle-version: '9.1.0'
-      - run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts tests/manual-mixed.test.ts tests/materialized-student.test.ts tests/public-cases.test.ts tests/body-projection.test.ts tests/java-build.test.ts tests/whole-bank.test.ts
+      - name: Настоящий Gradle эталон и отказ незавершённого starter
+        run: |
+          export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
+          bash tools/check-java.sh
+      - run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts tests/manual-mixed.test.ts tests/materialized-student.test.ts tests/native-seed-policy.test.ts tests/git-transport.test.ts tests/publication-conditions.test.ts tests/publication-conditions-entry.test.ts tests/public-cases.test.ts tests/body-projection.test.ts tests/java-build.test.ts tests/whole-bank.test.ts
       - name: Атомарный экспорт между файловыми системами
         run: PL_EXDEV_TEST_DIR=/dev/shm deno test --no-config -A --filter "across output filesystems" tests/export-course.test.ts
-      - run: CORE="$PWD/.ci-deps/core" bash tools/check-java.sh
+      - name: Профили исходников Java, starter/API/Gradle и native delivery
+        run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/java-build.test.ts tests/native-selection.test.ts tests/native-origin-scope.test.ts tests/native-verification-inventory.test.ts tests/native-seed-policy.test.ts tests/native-auxiliary.test.ts

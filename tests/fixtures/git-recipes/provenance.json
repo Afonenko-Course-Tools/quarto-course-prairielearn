@@ -1,0 +1,37 @@
+{
+  "sourceCommit": "e0a928f5b11dde12b0c2563b3928c610ae7ea677",
+  "sourceTree": "cde30f525e15049fe5c2e2a7469807032d4823d0",
+  "root": "tasks/projects/version-control",
+  "files": [
+    {
+      "path": "github-ssh/seed_recipe.py",
+      "sha256": "4a4f75d9d29bc884cd7db6599145ff914a1d85e5d4a1a9ccdaf96c39f815adbf",
+      "size": 639
+    },
+    {
+      "path": "github-ssh/seed.json",
+      "sha256": "6598b43f977cacef9c0bd13f60e510583dd201b7153123e76a79694af9352c8e",
+      "size": 284
+    },
+    {
+      "path": "github-ssh/student/README.md",
+      "sha256": "9db6ec5a57275365408b6a83261080a3dab4a8a3ca1d521f325ef7cefb9ee645",
+      "size": 2222
+    },
+    {
+      "path": "restore-selected-state/seed_recipe.py",
+      "sha256": "aca018790dffe29427ea94417aed2d4d5ac4450a58f9203f9194451ed12e7191",
+      "size": 615
+    },
+    {
+      "path": "restore-selected-state/student/work/README.md",
+      "sha256": "f7ea405aa4916242449ca6b20606d3f6456ca6fdcb42eb8134d85c886233325f",
+      "size": 47
+    },
+    {
+      "path": "restore-selected-state/student/work/notes.txt",
+      "sha256": "2f1f3a7683ae54fd03f98417aab1eb452306c0fe4c623db09cbf44a7e50723cc",
+      "size": 59
+    }
+  ]
+}
