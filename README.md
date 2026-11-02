@@ -17,7 +17,7 @@ updated: 2026-10-31
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Кандидат этого ref — **9.0.1**, рассчитанный на native TS Core 9.
+Кандидат этого ref — **9.0.2**, рассчитанный на native TS Core 9.
 `contract.json` содержит только installed owner name; исполняемая форма,
 нормализация и валидация принадлежат TypeScript этого адаптера.
 Прежний Lua-маршрут предметной модели и производные схемы не устанавливаются.
@@ -339,3 +339,7 @@ business cache. Для той же живой operation и exact request пол�
 ## Кандидат 9.0.1: обычная публикация
 
 [Адресная поправка](docs/release-9.0.1.md) связывает common sources с настоящим Core release proof. Полная delivery и её grading/prepared guards не менялись; новый тег требует OTHER и CI.
+
+## Native project contracts 9.0.2
+
+Экспортёр предпочитает публичный `withProjectContracts` Core 9.3.0 для планов student/full. Если этот метод отсутствует, сохраняется `withProjectContexts`; ошибка нового метода не запускает повтор через старый. Правила grading, release proof и currentness не меняются. Source ref требует собственной проверки установленной композиции.
