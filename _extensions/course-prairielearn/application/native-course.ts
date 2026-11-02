@@ -331,6 +331,10 @@ export async function prepareNativeCourse(
         }
         return registryInput.value;
       };
+      const materializationTotal = new Set(deliveries.flatMap((d: any) =>
+        d.publicPackage.questions.filter((q: any) => !d.nativeAnswers[q.id]).map((q: any) => q.id)
+      )).size;
+      let materializationIndex = 0;
       for (const delivered of deliveries) {
         bodies.set(
           delivered.publicPackage.works[0].id,
@@ -389,6 +393,8 @@ export async function prepareNativeCourse(
           if (fact.check && !runtime) {
             throw Error("PL.RUNTIME_INVALID: selected profile");
           }
+          const progressIndex = ++materializationIndex, started = performance.now();
+          console.error(`PrairieLearn: подготовка задания ${progressIndex}/${materializationTotal} ${q.key} — начало`);
           const materialized = await materializeNativeQuestion({
             Core,
             operation,
@@ -407,6 +413,7 @@ export async function prepareNativeCourse(
             adapter,
             expectedSources: selection.expectedSources,
           });
+          console.error(`PrairieLearn: подготовка задания ${progressIndex}/${materializationTotal} ${q.key} — готово (${((performance.now() - started) / 1000).toFixed(1)} с)`);
           artifacts[q.id] = materialized;
           if (materialized.project) {
             projects.push(materialized.project);

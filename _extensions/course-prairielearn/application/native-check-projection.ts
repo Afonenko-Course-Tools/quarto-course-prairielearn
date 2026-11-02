@@ -64,6 +64,9 @@ export async function projectNativeChecks(
     const names = new Set(ref.files.map((f) => f.name));
     if (
       ref.available &&
+      // Явная Java reference-группа без student ZIP policy — полное решение,
+      // а не копия списка starter-файлов. Выбор role/hash/limits уже проверен.
+      !(!extras && ["java25-junit-v1", "java25-gradle-junit-v1"].includes(check.runtime)) &&
       ((!extras && [...names].some((n) => !primary.has(n))) ||
         extras?.["primary-required"] !== false &&
           [...primary].some((n) => !names.has(n)))
