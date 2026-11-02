@@ -2,7 +2,7 @@
 type: specification-index
 component: course-prairielearn
 status: current
-version: 9.0.2
+version: 9.0.3
 updated: 2026-10-26
 ---
 
@@ -36,7 +36,7 @@ operation, а `export-course.ts` атомарно публикует полны�
 описаны в `spec/upstream/provenance.json`. Descriptor runner принадлежит
 Platform и не становится второй авторской конфигурацией или private GradingJob.
 
-## Текущая совместимость кандидата 9.0.2
+## Текущая совместимость кандидата 9.0.3
 
 Кандидат использует native TS Core 9. Body v2, public results v2 и строгие
 delivery v3/v4 сохраняют собственные версии. `contract.json.name` устанавливает
@@ -75,3 +75,11 @@ child snapshot/clearEnv и identity scoped permissions. Новый native entry
 принятый frozen env с pre/post currentness. Подробности и граница проверок
 приведены в [спецификации](../docs/authoring.md#контекст-наблюдения-после-объединения-main).
 Информационное `core-version: 9.0.0` не заменяет точный CI SHA или runtime qualification.
+
+## Контекст при повторной native-проверке
+
+Полный экспорт повторно проверяет конфигурацию выбранной первой работы с тем
+же точным `source`, с которым уже был декодирован raw business input. Благодаря
+этому common-files с owner-relative `/common/...` нормализуются так же, как
+при начальной проверке. Ограничения путей, аудиторий и выбранных A1 файлов не
+меняются; raw metadata не модифицируется.

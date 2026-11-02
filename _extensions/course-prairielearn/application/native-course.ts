@@ -447,6 +447,7 @@ export async function prepareNativeCourse(
         });
         const config = validateNativeRaw(
           adapter.business(selection.assessments[0].source).raw,
+          { source: selection.assessments[0].source },
         )
           .config;
         result = await exportCourse({
