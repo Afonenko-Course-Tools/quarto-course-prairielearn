@@ -111,3 +111,25 @@ Deno.test("C seed-targets проверяет полный authenticated business
     }, b])
   );
 });
+
+Deno.test("Повторная raw-проверка сохраняет source для owner-relative common-files", () => {
+  const value: any = raw();
+  value.materialization.projects["exr-repo"]["common-files"] = [{
+    source: "/common/work-environment/count.fish",
+    target: "student/survey/tools/count.fish",
+    audience: "student",
+  }];
+  const before = JSON.stringify(value);
+  bad(() => validateNativeRaw(value));
+  for (const source of ["index.qmd", "labs/work-environment.qmd"]) {
+    const actual = validateNativeRaw(value, { source });
+    assert(actual.materialization?.projects["exr-repo"]["common-files"][0].source ===
+      "common/work-environment/count.fish", "Потерян owner-relative путь");
+    assert(JSON.stringify(value) === before, "Изменён raw source");
+  }
+  value.materialization.projects["exr-repo"]["common-files"][0].source = "../common/tool.fish";
+  assert(validateNativeRaw(value, { source: "labs/work.qmd" }).materialization?.projects["exr-repo"]["common-files"][0].source ===
+    "common/tool.fish", "Потерян document-relative путь");
+  value.materialization.projects["exr-repo"]["common-files"][0].source = "../../escape";
+  bad(() => validateNativeRaw(value, { source: "labs/work.qmd" }));
+});
