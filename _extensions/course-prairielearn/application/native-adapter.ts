@@ -305,6 +305,7 @@ export function createNativeAdapter(
     async validateCourse(
       operation: any,
       request: { expectedSources: string[]; courseId?: string },
+      checkpoint?: () => Promise<void>,
     ) {
       if (composing) throw Error("PL.ASSESSMENT_INVALID: recursive validation");
       if (
@@ -313,7 +314,7 @@ export function createNativeAdapter(
         isDeepStrictEqual(validatedCourse.request, request)
       ) {
         try {
-          await operation.assertCurrent();
+          await (checkpoint ? checkpoint() : operation.assertCurrent());
           return validatedCourse.proof;
         } catch (error) {
           validatedCourse = undefined;
@@ -402,8 +403,13 @@ export function createNativeAdapter(
       request: { source: string; assessmentId: string },
       options: { projectPlans: readonly unknown[]; references?: unknown },
       release: { expectedSources: string[]; courseId?: string },
+      checkpoint?: () => Promise<void>,
     ) {
-      const proof = await adapter.validateCourse(operation, release);
+      const proof = await adapter.validateCourse(
+        operation,
+        release,
+        checkpoint,
+      );
       const delivery = await operation.assignmentDelivery(request, options);
       if (
         delivery.schema !== "course-native-assignment-delivery-v1" ||
@@ -448,7 +454,7 @@ export function createNativeAdapter(
       if (Object.keys(delivery.conditions).some((id) => !ids.has(id))) {
         throw Error("PL.ASSIGNMENT_CHANGED: extra condition");
       }
-      await operation.assertCurrent();
+      await (checkpoint ? checkpoint() : operation.assertCurrent());
       return {
         proof,
         delivery,
@@ -470,6 +476,7 @@ export function createNativeAdapter(
       request: {
         operation: any;
         auxiliary?: NativeAuxiliary;
+        checkpoint?: () => Promise<void>;
         expectedSources: string[];
         source: string;
         exerciseId: string;
@@ -479,7 +486,7 @@ export function createNativeAdapter(
     ) {
       await adapter.validateCourse(request.operation, {
         expectedSources: request.expectedSources,
-      });
+      }, request.checkpoint);
       const business = loaded.get(request.source),
         input = effectiveInputs.get(request.source);
       const declaration = input?.declarations.find((d: any) =>
@@ -514,7 +521,8 @@ export function createNativeAdapter(
           bytes: f.bytes,
         })),
         zip: request.zip,
-        assertCurrent: () => request.operation.assertCurrent(),
+        assertCurrent: request.checkpoint ??
+          (() => request.operation.assertCurrent()),
         auxiliary: request.auxiliary,
       });
     },

@@ -663,3 +663,28 @@ Failure очищает cache; getter не читает дерево/metadata и 
 ### Ordinary proof и common sources в кандидате 9.0.1
 
 `inspectPublication` возвращает также `proof` — уже полученный публичный Core release result, data без новых полномочий. Для каждого упражнения common-file paths из существующего PL decoder передаются тому же Core source guard, включая скрытые декларации до projection. Cross-document grading/pricing остаётся обязанностью полной delivery, а не обычного сайта. Если Core не выбрал PL adapter, результат содержит действительный общий proof и пустой PL documents list; установленный optional PL не меняет ordinary noPL маршрут. Полный `createNativeAdapter.validateCourse` и prepared correlation не изменены.
+
+## Полный набор файлов авторского Java reference
+
+Явно объявленная A1 solution-группа Java без `additional-java-sources` задаёт
+полное авторское решение, включая вспомогательные классы и допустимые имена
+реализации, отличающиеся от starter. В private checks сохраняются только
+фактически выбранные Source-файлы этой группы с прежними role/hash/limits.
+Это не разрешает дополнительные student uploads и не меняет public grading
+descriptor. Проверяющий Platform формирует отдельный private reference job с
+точным списком этих авторских файлов после проверки student delivery binding.
+Ветвь явно заданной student ZIP policy и другие runtimes остаются прежними.
+
+
+### Callback-local checkpoint Core (кандидат 9.0.5)
+
+Native composition передаёт exact `batch.checkpoint` в повторные проверки уже
+полученного private proof, delivery, materialization, workspace и auxiliary pre/post.
+Начальная валидация остаётся полной. Если метод отсутствует в полученной партии
+старого Core, используется прежний `operation.assertCurrent()`. Существующий метод
+никогда не заменяется fallback после expiry или при следующей batch. Operation
+identity, proof cache keys, QRC/registry/standalone bindings, selection и bytes
+проверяются по прежним правилам. До успешного Core closing staged output не публикуется.
+
+Изменение пока Source-only: unit counts не подтверждают скорость whole-course
+export, Native qualification, prior P или готовность выпуска.
