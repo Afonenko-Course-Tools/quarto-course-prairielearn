@@ -2,7 +2,7 @@
 type: specification-index
 component: course-prairielearn
 status: current
-version: 9.0.1
+version: 9.0.2
 updated: 2026-10-26
 ---
 
@@ -36,7 +36,7 @@ operation, а `export-course.ts` атомарно публикует полны�
 описаны в `spec/upstream/provenance.json`. Descriptor runner принадлежит
 Platform и не становится второй авторской конфигурацией или private GradingJob.
 
-## Текущая совместимость кандидата 9.0.1
+## Текущая совместимость кандидата 9.0.2
 
 Кандидат использует native TS Core 9. Body v2, public results v2 и строгие
 delivery v3/v4 сохраняют собственные версии. `contract.json.name` устанавливает

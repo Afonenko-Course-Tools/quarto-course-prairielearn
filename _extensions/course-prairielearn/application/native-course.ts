@@ -33,7 +33,10 @@ export async function withNativeProjectPlans<T>(
   use: (plans: any[]) => Promise<T>,
   operation: any,
 ): Promise<NativeProjectPlansResult<T>> {
-  if (typeof operation?.withProjectContexts !== "function") {
+  const withProjects = typeof operation?.withProjectContracts === "function"
+    ? operation.withProjectContracts
+    : operation?.withProjectContexts;
+  if (typeof withProjects !== "function") {
     throw Error(
       "PL.NATIVE_PROJECT_CONTEXT_REUSE_REQUIRED: public current-operation A1 batch unavailable; no standalone fallback",
     );
@@ -67,7 +70,7 @@ export async function withNativeProjectPlans<T>(
     }
     return snapshot as Readonly<Record<string, number>>;
   };
-  const value = await operation.withProjectContexts(
+  const value = await withProjects.call(operation,
     requests,
     async (batch: any) => {
       retained = batch;
