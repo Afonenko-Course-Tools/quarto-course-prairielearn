@@ -674,3 +674,17 @@ Failure очищает cache; getter не читает дерево/metadata и 
 descriptor. Проверяющий Platform формирует отдельный private reference job с
 точным списком этих авторских файлов после проверки student delivery binding.
 Ветвь явно заданной student ZIP policy и другие runtimes остаются прежними.
+
+
+### Callback-local checkpoint Core (кандидат 9.0.5)
+
+Native composition передаёт exact `batch.checkpoint` в повторные проверки уже
+полученного private proof, delivery, materialization, workspace и auxiliary pre/post.
+Начальная валидация остаётся полной. Если метод отсутствует в полученной партии
+старого Core, используется прежний `operation.assertCurrent()`. Существующий метод
+никогда не заменяется fallback после expiry или при следующей batch. Operation
+identity, proof cache keys, QRC/registry/standalone bindings, selection и bytes
+проверяются по прежним правилам. До успешного Core closing staged output не публикуется.
+
+Изменение пока Source-only: unit counts не подтверждают скорость whole-course
+export, Native qualification, prior P или готовность выпуска.
