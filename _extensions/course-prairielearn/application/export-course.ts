@@ -18,6 +18,9 @@ import {
   uuid,
 } from "./export.ts";
 import { declarations, gradingMethod, question } from "./declarations.ts";
+import type { materializeNativeQuestion } from "./native-materialize.ts";
+import type { StudentArtifact } from "./export.ts";
+import type { NativeProjectFact } from "course-core/public.ts";
 import {
   canonical,
   hash,
@@ -117,6 +120,17 @@ export interface ExportCourseContent {
   exercises: any[];
   projects?: any[];
 }
+type NativeSelection = NonNullable<
+  Awaited<ReturnType<typeof materializeNativeQuestion>>["selection"]
+>;
+/** Writer читает только имена/bytes и уже подготовленный runtime descriptor. */
+export type NativeCompilerInput = Pick<NativeSelection, "descriptor"> & {
+  sources: readonly Pick<
+    NativeSelection["sources"][number],
+    "name" | "bytes"
+  >[];
+  tests: readonly Pick<NativeSelection["tests"][number], "name" | "bytes">[];
+};
 
 export async function exportCourse(
   input: {
@@ -136,17 +150,15 @@ export async function exportCourse(
     deferPublish?: boolean;
     nativeBody?: boolean;
     nativeAuxiliary?: NativeAuxiliary;
-    nativeInputs?: Record<string, any>;
+    nativeInputs?: Record<string, NativeCompilerInput>;
     nativeAnswers?: Record<string, any>;
     nativeResponseSlots?: Record<string, any[]>;
     nativeVerification?: { scenarios: any[]; scenariosHash: string };
     publicationConditions?: string;
     publicationSource?: { repository: string; commit: string; book: string };
     studentArtifact?: (
-      fact: any,
-    ) => Promise<
-      { files: { name: string; bytes: Uint8Array }[]; archive: Uint8Array }
-    >;
+      fact: Pick<NativeProjectFact, "exerciseId">,
+    ) => Promise<StudentArtifact>;
   },
 ) {
   if (input.content && input.result) {
@@ -299,10 +311,7 @@ export async function exportCourse(
         p = await input.body(work.id),
         binding: any = { questions: {} },
         projects: Record<string, string> = {},
-        studentArtifacts: Record<
-          string,
-          { files: { name: string; bytes: Uint8Array }[]; archive: Uint8Array }
-        > = {};
+        studentArtifacts: Record<string, StudentArtifact> = {};
       const contexts = [{ work, body: p, menu: false }];
       for (const menu of unitMenus.get(work.id) ?? []) {
         if (!menuBodies.has(menu.id)) {
@@ -477,7 +486,7 @@ export async function exportCourse(
         const profile = input.registry.profiles?.[fact.check.runtime];
         const nativeSelection = input.nativeInputs?.[q.id];
         const sources = nativeSelection
-          ? nativeSelection.sources.map((s: any) => ({
+          ? nativeSelection.sources.map((s) => ({
             name: s.name,
             data: s.bytes,
           }))
@@ -517,7 +526,7 @@ export async function exportCourse(
         const testNames = new Set();
         for (
           const test of nativeSelection
-            ? nativeSelection.tests.map((t: any) => ({
+            ? nativeSelection.tests.map((t) => ({
               submissionRelativePath: t.name,
               bytes: t.bytes,
             }))
@@ -621,7 +630,7 @@ export async function exportCourse(
         if (f?.check) {
           for (
             const s of input.nativeInputs?.[q.id]
-              ? input.nativeInputs[q.id].sources.map((s: any) => ({
+              ? input.nativeInputs[q.id].sources.map((s) => ({
                 name: s.name,
                 data: s.bytes,
               }))

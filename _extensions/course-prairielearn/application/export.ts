@@ -29,6 +29,10 @@ const safe = (v: unknown): v is string =>
 const fields = (v: any, required: string[], optional: string[] = []) =>
   record(v) && required.every((k) => Object.hasOwn(v, k)) &&
   Object.keys(v).every((k) => [...required, ...optional].includes(k));
+export interface StudentArtifact {
+  files: { name: string; bytes: Uint8Array }[];
+  archive: Uint8Array;
+}
 export interface ProjectContext {
   deferPublish?: boolean;
   nativeBody?: boolean;
@@ -37,10 +41,7 @@ export interface ProjectContext {
   projectRoot: string;
   projects: Record<string, string>;
   publicationConditions?: Record<string, PublicationCondition>;
-  studentArtifacts?: Record<
-    string,
-    { files: { name: string; bytes: Uint8Array }[]; archive: Uint8Array }
-  >;
+  studentArtifacts?: Record<string, StudentArtifact>;
 }
 export async function publicProjectFiles(root: string) {
   const result = await files(root, { field: "project.student" }, true);

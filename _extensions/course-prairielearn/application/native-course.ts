@@ -319,11 +319,13 @@ export async function prepareNativeCourse(
           });
         }
       }
-      const projects: any[] = [],
-        nativeInputs: any = {},
+      type Materialized = Awaited<ReturnType<typeof materializeNativeQuestion>>;
+      const projects: NonNullable<Materialized["project"]>[] = [],
+        nativeInputs: Record<string, NonNullable<Materialized["selection"]>> =
+          {},
         nativeAnswers: any = {},
         nativeResponseSlots: any = {},
-        artifacts: any = {},
+        artifacts: Record<string, Materialized> = {},
         settings: any = {},
         bodies = new Map<string, any>();
       // Введение каждого реально используемого меню готово до дорогих A1 ZIP.
@@ -486,7 +488,7 @@ export async function prepareNativeCourse(
           artifacts[q.id] = materialized;
           if (materialized.project) {
             projects.push(materialized.project);
-            nativeInputs[q.id] = materialized.selection;
+            nativeInputs[q.id] = materialized.selection!;
           }
         }
       }
@@ -604,7 +606,7 @@ export async function prepareNativeCourse(
             if (selected) {
               if (
                 canonical(provided.files) !==
-                  canonical(selected.sources.map((f: any) => f.name))
+                  canonical(selected.sources.map((f) => f.name))
               ) throw Error("PL.BINDING_CHANGED: primary files");
               for (
                 const [folder, files] of [["student", selected.sources], [
@@ -623,7 +625,7 @@ export async function prepareNativeCourse(
                 JSON.stringify(selected.descriptor),
               );
               const profile = registryInput.value.profiles[
-                projects.find((p) => p.exerciseId === q.id).check.runtime
+                projects.find((p) => p.exerciseId === q.id)!.check!.runtime
               ];
               if (
                 !profile.image ||

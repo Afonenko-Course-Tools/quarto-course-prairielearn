@@ -1,10 +1,12 @@
 // Адресный checker: Source repo Core либо owner/extension установленной composition.
 // Запуск: quarto run tests/native-core-typecheck.ts CORE_ROOT
+// --course-export ограничивает запуск новым affected graph и его одним negative.
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeNativeCoreImportMap } from "../tools/native-core-import-map.ts";
 const repo = dirname(dirname(fileURLToPath(import.meta.url)));
 if (!Deno.args[0]) throw Error("Требуется путь Source/installed Core");
+const courseExport = Deno.args.includes("--course-export");
 const temporary = await Deno.makeTempDir({ prefix: "pl-core-typecheck-" });
 try {
   const map = resolve(temporary, "imports.json");
@@ -13,20 +15,41 @@ try {
   const positive = await new Deno.Command(Deno.execPath(), {
     args: [
       ...args,
-      resolve(
-        repo,
-        "_extensions/course-prairielearn/application/native-entry.ts",
-      ),
-      resolve(repo, "tests/native-core-boundary-types.ts"),
-      resolve(repo, "tests/native-materialization-types.ts"),
+      ...(courseExport
+        ? [
+          resolve(
+            repo,
+            "_extensions/course-prairielearn/application/native-course.ts",
+          ),
+        ]
+        : [
+          resolve(
+            repo,
+            "_extensions/course-prairielearn/application/native-entry.ts",
+          ),
+          resolve(repo, "tests/native-core-boundary-types.ts"),
+          resolve(repo, "tests/native-materialization-types.ts"),
+        ]),
+      resolve(repo, "tests/native-course-export-types.ts"),
       resolve(repo, "tests/native-core-typecheck.ts"),
     ],
     stdout: "inherit",
     stderr: "inherit",
   }).output();
   if (!positive.success) Deno.exit(positive.code);
+  const nativeWriterSource = [
+    "native-writer-source-bytes",
+    `
+      import {exportCourse} from "pl-native/export-course.ts";
+      import type {NativeCompilerInput} from "pl-native/export-course.ts";
+      declare const input: Parameters<typeof exportCourse>[0], selection: NativeCompilerInput;
+      exportCourse({...input,nativeInputs:{example:{...selection,sources:[{name:"Main.java",data:new Uint8Array()}]}}});
+    `,
+    "TS2353",
+  ];
   for (
-    const [name, code, diagnostic] of [
+    const [name, code, diagnostic] of courseExport ? [nativeWriterSource] : [
+      nativeWriterSource,
       [
         "authored-feedback",
         `
