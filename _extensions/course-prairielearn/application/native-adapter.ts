@@ -505,7 +505,10 @@ export function createNativeAdapter(
         inventory.audience !== "student"
       ) throw Error("PL.WORKSPACE_SEED: inventory identity");
       for (const file of inventory.files) {
-        if (await hash(file.bytes) !== file.sha256) {
+        if (
+          file.bytes.byteLength !== file.size ||
+          await hash(file.bytes) !== file.sha256
+        ) {
           throw Error("PL.WORKSPACE_SEED: inventory bytes changed");
         }
       }

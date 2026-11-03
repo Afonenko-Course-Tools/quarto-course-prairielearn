@@ -188,11 +188,6 @@ export async function materializeNativeQuestion(
       ) throw Error("PL.SELECTION_CHANGED: final starter");
     }
   }
-  const files = final.files.map((f: any) => ({
-    name: f.target,
-    bytes: f.bytes,
-  }));
-  let archive = await input.Download.packageArtifact(final);
   if (
     input.settings.submission.mode === "workspace" ||
     input.materialization?.includeGit === true
@@ -214,6 +209,11 @@ export async function materializeNativeQuestion(
       archive: workspace.archive,
     };
   }
+  const files = final.files.map((f: any) => ({
+    name: f.target,
+    bytes: f.bytes,
+  }));
+  const archive = await input.Download.packageArtifact(final);
   await (input.checkpoint
     ? input.checkpoint()
     : input.operation.assertCurrent());
