@@ -8,7 +8,7 @@ import { decodeNativeCheck } from "./native-checks.ts";
 import { validateNativeRaw } from "./native-business.ts";
 import { nativeChecksManifest } from "./native-check-inventory.ts";
 import { nativeVerificationInventory } from "./verification-inventory.ts";
-import { exportCourse } from "./export-course.ts";
+import { exportCourse, nativeUnitMenus } from "./export-course.ts";
 import { exportPrairieLearn } from "./export.ts";
 import {
   checkedJSON,
@@ -326,6 +326,41 @@ export async function prepareNativeCourse(
         artifacts: any = {},
         settings: any = {},
         bodies = new Map<string, any>();
+      // Введение каждого реально используемого меню готово до дорогих A1 ZIP.
+      // Assignment membership проверяет Core по раннему observed context intent.
+      if (options.instance) {
+        const selectedWorks = selection.assessments.map((a) => {
+          const work = content.assessments.find((w: any) =>
+            w.id === a.id && w.source === a.source
+          );
+          if (!work) {
+            throw Error(
+              "PL.NATIVE_INTENT_INCOMPLETE: selected work absent: " + a.id,
+            );
+          }
+          return work;
+        });
+        const menus = nativeUnitMenus(selectedWorks, content.assessments);
+        const needed = new Map<string, any>();
+        for (const group of menus.values()) {
+          for (const menu of group) needed.set(menu.id, menu);
+        }
+        for (const menu of needed.values()) {
+          const delivered = await adapter.assignmentDelivery(
+            operation,
+            {
+              source: menu.source,
+              assessmentId: menu.id,
+            },
+            { projectPlans, references: references.references },
+            {
+              expectedSources: selection.expectedSources,
+            },
+            checkpoint,
+          );
+          bodies.set(menu.id, delivered.publicPackage);
+        }
+      }
       let registryInput: any;
       let standaloneBinding: { assert: () => Promise<void> } | undefined;
       const checkBindings = async () => {

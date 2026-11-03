@@ -131,7 +131,29 @@ export async function selectNativeOwnerAssignments(
     }
     return { source: matches[0], id: id as string };
   });
-  return { expectedSources, assessments };
+  const contextAssessments: { source: string; id: string }[] = [];
+  if (options.instance) {
+    // Состав optional меню известен только после native capture. До child
+    // резервируем observed IDs, не выдавая их за выбранные работы поставки.
+    for (const source of expectedSources) {
+      const id = observed.fileInformation?.[source]?.metadata?.assessment?.id;
+      if (id === undefined) continue;
+      if (
+        typeof id !== "string" || !id ||
+        [...assessments, ...contextAssessments].some((a) =>
+          a.id === id && a.source !== source
+        )
+      ) {
+        throw Error(
+          "PL.NATIVE_SELECTION_UNQUALIFIED: ambiguous context assessment.id",
+        );
+      }
+      if (!assessments.some((a) => a.id === id)) {
+        contextAssessments.push({ source, id });
+      }
+    }
+  }
+  return { expectedSources, assessments, contextAssessments };
 }
 export type NativeEntryOptions = {
   root: string;
@@ -199,7 +221,13 @@ export async function nativeEntry(options: NativeEntryOptions) {
           ...options,
           root: owner,
         });
-        return selected;
+        return {
+          expectedSources: selected.expectedSources,
+          assessments: [
+            ...selected.assessments,
+            ...selected.contextAssessments,
+          ],
+        };
       },
     },
   }, async (scope: any) => {
@@ -213,7 +241,10 @@ export async function nativeEntry(options: NativeEntryOptions) {
         JSON.stringify(descriptor.inputs.map((i: any) => i.source)) !==
           JSON.stringify(selected.expectedSources) ||
         JSON.stringify(descriptor.assessments) !==
-          JSON.stringify(selected.assessments)
+          JSON.stringify([
+            ...selected.assessments,
+            ...selected.contextAssessments,
+          ])
       ) throw Error("PL.CAPTURE_CHANGED: prepared selection");
       if (
         options.profiles?.length &&

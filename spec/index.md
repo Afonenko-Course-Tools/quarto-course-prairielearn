@@ -2,7 +2,7 @@
 type: specification-index
 component: course-prairielearn
 status: current
-version: 9.0.5
+version: 9.0.7
 updated: 2026-10-26
 ---
 
@@ -83,3 +83,7 @@ child snapshot/clearEnv и identity scoped permissions. Новый native entry
 этому common-files с owner-relative `/common/...` нормализуются так же, как
 при начальной проверке. Ограничения путей, аудиторий и выбранных A1 файлов не
 меняются; raw metadata не модифицируется.
+
+## Контексты меню в 9.0.7
+
+Полная поставка заранее резервирует source/ID контексты assessment из наблюдённых owner metadata. После native capture существующий matcher выбирает только optional меню, используемые работами поставки. Их genuine public Body готовится до подготовки артефактов заданий; вопросы меню повторно не материализуются. Standalone intent остаётся ограничен выбранной работой. Core membership, source/currentness и публичная проекция сохраняются.

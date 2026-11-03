@@ -58,3 +58,44 @@ Deno.test("consume existing отказывает до новой scope или ч
     throw Error("existing mode entered fresh path: " + error);
   }
 });
+
+Deno.test("course intent включает observed context меню, standalone остаётся exact work", async () => {
+  const observed: any = owner();
+  observed.config.prairielearn = {
+    "question-defaults": {
+      topic: "Fixture",
+      grading: { method: "manual" },
+      submission: { mode: "upload" },
+      "single-variant": true,
+    },
+    delivery: {
+      book: "tasks",
+      course: {
+        name: "FIXTURE",
+        title: "Проверка",
+        timezone: "Europe/Minsk",
+        topics: [{ name: "Fixture", color: "blue2", description: "Проверка" }],
+      },
+      instances: {
+        pilot: {
+          title: "Проверка",
+          "self-enrollment": false,
+          publishing: {
+            "start-date": "1970-01-01T00:00:00Z",
+            "end-date": "9999-12-31T00:00:00Z",
+          },
+          works: ["sec-lab"],
+        },
+      },
+    },
+  };
+  const selected: any = await Entry.selectNativeOwnerAssignments(observed, {
+    root: "/owner",
+    book: "tasks",
+    instance: "pilot",
+  });
+  if (
+    JSON.stringify(selected.contextAssessments) !==
+      JSON.stringify([{ source: "slides.qmd", id: "sec-slides" }])
+  ) throw Error("native menu context omitted before child");
+});
