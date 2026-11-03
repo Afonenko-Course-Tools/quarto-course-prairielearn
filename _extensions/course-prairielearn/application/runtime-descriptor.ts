@@ -42,7 +42,7 @@ export function runtimeDescriptor<C extends LegacyDescriptorCheck>(c: C, profile
     mode, runtime:c.runtime,
     ...(javaRuntime ? {java:{release:25,encoding:'UTF-8','compiler-options':['-proc:none','-Xmaxerrs','5'],...c.java}} : {}),
     limits:{'outer-seconds':30,'compile-seconds':15,'run-seconds':10,networking:false,'max-output-bytes':65536,...c.limits},
-    scoring:scoring ?? {mode:'weighted'}, discovery:normalizeDiscovery(c.discovery),
+    scoring:scoring ?? ({mode:'weighted'} satisfies {mode:'weighted'}), discovery:normalizeDiscovery(c.discovery),
     ...(c.feedback?{feedback:{requirement:c.feedback.requirement,whatCheck:c.feedback['what-check']}}:{}),
     ...(c['public-cases']!==undefined?{publicCases:publicCases(c['public-cases'])}:{}),
     ...(c.variants ? {variants:c.variants} : {}),

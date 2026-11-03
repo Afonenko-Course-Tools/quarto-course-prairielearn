@@ -47,6 +47,9 @@ type _NativeMode = Require<
     NativeProjectCheck["sourceProfile"]["mode"]
   >
 >;
+type _NativeScoring = Require<
+  Exact<typeof nativeDescriptor["scoring"], NativeProjectCheck["scoring"]>
+>;
 type Project = Awaited<ReturnType<typeof projectNativeChecks>>["project"];
 type Manifest = Awaited<ReturnType<typeof nativeChecksManifest<Project>>>;
 type _Project = Require<Exact<Manifest["projects"][number], Project>>;
