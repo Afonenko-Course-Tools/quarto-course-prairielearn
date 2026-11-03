@@ -11,7 +11,11 @@ import {
   publicationQuestion,
   question,
 } from "./declarations.ts";
-import { gradingPolicy, validateGradingComponents } from "./grading-policy.ts";
+import {
+  assessmentUuidPattern,
+  gradingPolicy,
+  validateGradingComponents,
+} from "./grading-policy.ts";
 import {
   nativeCheckScalars,
   NativeProjectChecksSchema,
@@ -42,6 +46,10 @@ export const ScoringPolicySchema = z.strictObject({
   "allow-multiple-instances": z.boolean().optional(),
 });
 export const AssessmentPolicySchema = ScoringPolicySchema.extend({
+  uuid: z.string().regex(
+    assessmentUuidPattern,
+    "Ожидается native UUID контрольной работы",
+  ).optional(),
   pass: z.strictObject({ "at-least": z.number().int().positive() }),
   attempts: z.number().int().positive(),
   assignment: AssignmentPolicySchema.optional(),

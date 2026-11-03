@@ -194,6 +194,21 @@ export async function exportCourse(
     ).method;
   }
   for (const work of works) validateGradingComponents(work, methods);
+  const courseUuid = await identity("course/" + input.courseId);
+  const assessmentUuids = new Map<string, string>();
+  const uuidOwners = new Map<string, string>();
+  for (const work of works) {
+    const uuid = work.extensions.prairielearn.uuid ??
+      await identity("assessment/" + work.id, courseUuid);
+    const previous = uuidOwners.get(uuid.toLowerCase());
+    if (previous !== undefined) {
+      throw Error(
+        `PL.ASSESSMENT_INVALID: повторный UUID ${uuid}: ${previous} и ${work.id}`,
+      );
+    }
+    uuidOwners.set(uuid.toLowerCase(), work.id);
+    assessmentUuids.set(work.id, uuid);
+  }
   const selectedIds = input.publicationConditions
     ? new Set(
       works.flatMap((w: any) => [
@@ -236,7 +251,6 @@ export async function exportCourse(
     );
   };
   try {
-    const courseUuid = await identity("course/" + input.courseId);
     await write("infoCourse.json", {
       uuid: courseUuid,
       name: d.course.name,
@@ -676,7 +690,7 @@ export async function exportCourse(
         "courseInstances/" + input.instance + "/assessments/" + work.id +
           "/infoAssessment.json",
         {
-          uuid: await identity("assessment/" + work.id, courseUuid),
+          uuid: assessmentUuids.get(work.id),
           type: assessmentType,
           title: work.title,
           set: assessmentType,

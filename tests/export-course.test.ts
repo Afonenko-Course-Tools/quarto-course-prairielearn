@@ -1109,3 +1109,96 @@ Deno.test("Дублированная защита отвергается ран
     assert(message === "Error: PL duplicate active defense" && !called, "Опциональная зависимость скрыла duplicate defense до body");
   } finally { await Deno.remove(root, { recursive: true }); }
 });
+
+Deno.test("UUID assessment сохраняется при переименовании, fallback стабилен, ошибки атомарны", async () => {
+  const root = await Deno.makeTempDir({ prefix: "pl-assessment-uuid-" });
+  try {
+    await Deno.mkdir(root + "/project/student", { recursive: true });
+    await Deno.writeTextFile(root + "/project/student/README.md", "Условие");
+    const assignment = { requirement: "required", workMode: "individual" };
+    const work: any = {
+      id: "sec-lab", source: "lab.qmd", kind: "lab", title: "Работа",
+      slots: [{ id: "exr-a", selection: "fixed", candidates: ["exr-a"], assignment }],
+      extensions: { prairielearn: { attempts: 1, pass: { "at-least": 1 }, "auto-points": 0, "manual-points": 2 } },
+    };
+    const config = {
+      delivery: { book: "tasks",
+        course: { name: "DEMO", title: "Курс", timezone: "Europe/Minsk", topics: [{ name: "Курс", color: "blue2", description: "Курс" }] },
+        instances: { pilot: { title: "Поток", "self-enrollment": false,
+          publishing: { "start-date": "1970-01-01T00:00:00Z", "end-date": "9999-12-31T00:00:00Z" }, works: ["sec-lab"] } },
+      },
+      "question-defaults": { topic: "Курс", grading: { method: "manual" }, submission: { mode: "upload" } },
+    };
+    const body = {
+      schema: "course-body-package-v2", owner: "demo", release: "native", apiVersion: [1, 23, 1],
+      questions: [{ owner: "demo", id: "exr-a", key: "demo/exr-a", title: "Задача", source: "a.qmd",
+        visibility: "public", statementVisibility: "open", hasPublicSolution: false, answerType: "manual",
+        condition: [{ t: "Para", c: [{ t: "Str", c: "Условие" }] }], publicAnswer: [] }],
+      works: [{ owner: "demo", id: work.id, key: "demo/" + work.id, source: "lab.qmd", kind: "lab", title: "Работа",
+        slots: [{ id: "demo/sec-lab/exr-a", selection: "fixed", candidates: ["demo/exr-a"], assignment }] }],
+      resources: [],
+    };
+    const input: any = { courseId: "demo", projectRoot: root, instance: "pilot", config, registry: { schemaVersion: 1, profiles: {} },
+      result: { model: { assessments: [work], exercises: [{ id: "exr-a", target: "prairielearn" }],
+        projects: [{ exerciseId: "exr-a", bankMember: true, projectRoot: "project" }] } },
+      checks: { schemaVersion: 1, courseId: "demo", bookRoot: "tasks", sourceSnapshotHash: "a".repeat(64), inventoryHash: "b".repeat(64), projects: [] },
+      body: async () => body,
+    };
+    // Явная identity переживает смену author ID и пути native assessment.
+    const preservedUuid = "6cbeb308-b0c5-51fc-bc0e-0f6bcbe75a45";
+    for (const id of ["sec-lab", "sec-renamed"]) {
+      const renamed = structuredClone(work) as any;
+      renamed.id = id;
+      renamed.extensions.prairielearn.uuid = preservedUuid;
+      const renamedConfig = structuredClone(config);
+      renamedConfig.delivery.instances.pilot.works = [id];
+      const renamedBody = structuredClone(body);
+      renamedBody.works[0].id = id;
+      renamedBody.works[0].key = "demo/" + id;
+      renamedBody.works[0].slots[0].id = "demo/" + id + "/exr-a";
+      const output = root + "/uuid-" + id;
+      await exportCourse({ ...input, config: renamedConfig,
+        result: { model: { ...input.result.model, assessments: [renamed] } },
+        body: async () => renamedBody, output, checksOutput: output + "-checks.json" });
+      const native = JSON.parse(await Deno.readTextFile(output + "/courseInstances/pilot/assessments/" + id + "/infoAssessment.json"));
+      assert(native.uuid === preservedUuid, "Переименование assessment изменило явный native UUID");
+    }
+    const uuidOther = structuredClone(work) as any;
+    uuidOther.id = "sec-other";
+    const invalidUuidCases = [
+      ...[null, false, 42, "", "not-a-uuid"].map((uuid) => ({
+        assessments: [{ ...work, extensions: { prairielearn: { ...work.extensions.prairielearn, uuid } } }],
+        config: structuredClone(config),
+      })),
+      ...[false, true].map((fallback) => {
+        const first = structuredClone(work) as any, second = structuredClone(uuidOther);
+        if (!fallback) first.extensions.prairielearn.uuid = preservedUuid;
+        second.extensions.prairielearn.uuid = preservedUuid.toUpperCase();
+        const twoConfig = structuredClone(config);
+        twoConfig.delivery.instances.pilot.works.push(second.id);
+        return { assessments: [first, second], config: twoConfig };
+      }),
+      { assessments: [work], config: { ...config, "assessment-defaults": { uuid: preservedUuid } } },
+    ];
+    for (const [index, invalid] of invalidUuidCases.entries()) {
+      const output = root + "/invalid-uuid-" + index;
+      let message = "", bodyCalled = false;
+      try {
+        await exportCourse({ ...input, config: invalid.config,
+          result: { model: { ...input.result.model, assessments: invalid.assessments } },
+          body: async () => { bodyCalled = true; return body; },
+          output, checksOutput: output + "-checks.json" });
+      } catch (error) { message = String(error); }
+      assert(message.toLowerCase().includes("uuid") && !bodyCalled,
+        "UUID ошибка не остановила экспорт до подготовки Body: " + index);
+      for (const path of [output, output + "-checks.json"]) {
+        assert(!await Deno.stat(path).then(() => true, () => false), "Неверный UUID создал поставку");
+      }
+    }
+    await exportCourse({ ...input, output: root + "/fallback", checksOutput: root + "/fallback-checks.json" });
+    const fallbackAssessment = JSON.parse(await Deno.readTextFile(root + "/fallback/courseInstances/pilot/assessments/sec-lab/infoAssessment.json"));
+    assert(fallbackAssessment.uuid === "6cbeb308-b0c5-51fc-bc0e-0f6bcbe75a45", "Отсутствующее поле UUID изменило прежний deterministic fallback");
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});

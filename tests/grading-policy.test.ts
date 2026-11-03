@@ -186,3 +186,49 @@ Deno.test("required zero-point questions fail closed; optional zero never suppli
     "optional zero with no ceiling rejected",
   );
 });
+
+
+import {
+  decodeNativeBusiness,
+  validateNativeRaw,
+} from "../_extensions/course-prairielearn/application/native-business.ts";
+
+Deno.test("Локальный native UUID проходит business contract при переименовании assessment", () => {
+  const uuid = "6cbeb308-b0c5-51fc-bc0e-0f6bcbe75a45";
+  for (const id of ["sec-lab", "sec-renamed"]) {
+    const assessment = work();
+    assessment.id = id;
+    const raw = {
+      config: { "assessment-defaults": { attempts: 3, pass: { "at-least": 1 }, "question-points": 2 } },
+      assessment: { uuid, assignment: { mode: "assessment-id" } },
+      declarations: [],
+    };
+    const decoded = decodeNativeBusiness(raw, {
+      course: { id: "demo" }, assessment, declarations: [],
+    }, { deferComposition: true });
+    assert(decoded.assessment.uuid === uuid, "Native business потерял явную identity");
+    gradingPolicy({ ...assessment, extensions: { prairielearn: decoded.assessment } });
+  }
+});
+
+Deno.test("Native UUID запрещён в defaults и неверный локальный UUID отвергается", () => {
+  const assessment = work();
+  for (const uuid of [null, false, 42, "", "not-a-uuid", "6cbeb308b0c551fcbc0e0f6bcbe75a45", "6cbeb308-b0c5-51fc-bc0e-0f6bcbe75a45\n"]) {
+    let message = "";
+    try {
+      decodeNativeBusiness({
+        assessment: { ...assessment.extensions.prairielearn, uuid, assignment: { mode: "assessment-id" } },
+        declarations: [],
+      }, { course: { id: "demo" }, assessment, declarations: [] }, { deferComposition: true });
+    } catch (error) { message = String(error); }
+    assert(message.includes("uuid"), "Неверный UUID прошёл native business contract");
+  }
+  let message = "";
+  try {
+    validateNativeRaw({
+      config: { "assessment-defaults": { uuid: "6cbeb308-b0c5-51fc-bc0e-0f6bcbe75a45" } },
+      declarations: [],
+    });
+  } catch (error) { message = String(error); }
+  assert(message.includes("uuid"), "Один UUID допускается для всех работ через defaults");
+});

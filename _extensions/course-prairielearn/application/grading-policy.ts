@@ -1,6 +1,9 @@
 import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
 import { closed } from "./declarations.ts";
+// Форма UUID совпадает с закреплённой native infoAssessment schema.
+export const assessmentUuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const scalar = (v: any) =>
   typeof v === "number" && Number.isFinite(v) && v >= 0;
 const attempts = (v: any) => Number.isSafeInteger(v) && v >= 1;
@@ -22,6 +25,7 @@ export function gradingPolicy(work: any) {
   };
   closed(policy, ["attempts", "pass"], [
     "assignment",
+    "uuid",
     "question-points",
     "question-max-points",
     "slot-overrides",
@@ -32,6 +36,14 @@ export function gradingPolicy(work: any) {
     "auto-points",
     "manual-points",
   ]);
+  if (
+    Object.hasOwn(policy, "uuid") &&
+    (typeof policy.uuid !== "string" || !assessmentUuidPattern.test(policy.uuid))
+  ) {
+    throw Error(
+      `PL.ASSESSMENT_INVALID: ${source} uuid: ожидается native UUID контрольной работы`,
+    );
+  }
   if (!attempts(policy.attempts)) {
     fail("attempts", "expected positive integer (native triesPerVariant)");
   }

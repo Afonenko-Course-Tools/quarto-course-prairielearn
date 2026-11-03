@@ -97,6 +97,14 @@ export function declarations(raw: any, key: string) {
     "assessment-defaults",
     "seed-targets",
   ]);
+  if (
+    object(raw["assessment-defaults"]) &&
+    Object.hasOwn(raw["assessment-defaults"], "uuid")
+  ) {
+    throw Error(
+      "PL.ASSESSMENT_INVALID: uuid разрешён только в локальной assessment.prairielearn, не в assessment-defaults",
+    );
+  }
   if (raw["seed-targets"] !== undefined) {
     NativeSeedTargetsSchema.parse(raw["seed-targets"]);
   }
