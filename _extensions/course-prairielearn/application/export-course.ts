@@ -25,6 +25,41 @@ import {
   safePath,
   selectedSources,
 } from "./source-selection.ts";
+/** Один matcher для раннего native context и окончательной сборки. */
+export function nativeUnitMenus(
+  works: any[],
+  assessments: any[],
+): Map<string, any[]> {
+  const unitMenus = new Map<string, any[]>();
+  for (const work of works) {
+    if (!work.id.startsWith("sec-unit-")) continue;
+    const expected = "exr-" + work.id.slice("sec-unit-".length);
+    const slot = work.slots?.[0];
+    if (
+      work.slots?.length !== 1 || slot?.selection !== "fixed" ||
+      slot.id !== expected || slot.candidates?.length !== 1 ||
+      slot.candidates[0] !== expected ||
+      slot.assignment?.requirement !== "required"
+    ) {
+      throw Error(
+        "PL reference-only unit не соответствует единственной задаче: " +
+          work.id,
+      );
+    }
+    const menus = assessments.filter((menu: any) =>
+      menu.id !== work.id &&
+      menu.slots.some((member: any) =>
+        member.assignment.requirement === "optional" &&
+        member.candidates.includes(expected)
+      )
+    );
+    if (new Set(menus.map((menu: any) => menu.id)).size !== menus.length) {
+      throw Error("PL неоднозначный источник контекста меню: " + work.id);
+    }
+    unitMenus.set(work.id, menus);
+  }
+  return unitMenus;
+}
 export async function identity(
   name: string,
   namespace = "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
@@ -141,34 +176,7 @@ export async function exportCourse(
     return work;
   });
   const menuBodies = new Map<string, any>();
-  const unitMenus = new Map<string, any[]>();
-  for (const work of works) {
-    if (!work.id.startsWith("sec-unit-")) continue;
-    const expected = "exr-" + work.id.slice("sec-unit-".length);
-    const slot = work.slots?.[0];
-    if (
-      work.slots?.length !== 1 || slot?.selection !== "fixed" ||
-      slot.id !== expected || slot.candidates?.length !== 1 ||
-      slot.candidates[0] !== expected ||
-      slot.assignment?.requirement !== "required"
-    ) {
-      throw Error(
-        "PL reference-only unit не соответствует единственной задаче: " +
-          work.id,
-      );
-    }
-    const menus = content.assessments.filter((menu: any) =>
-      menu.id !== work.id &&
-      menu.slots.some((member: any) =>
-        member.assignment.requirement === "optional" &&
-        member.candidates.includes(expected)
-      )
-    );
-    if (new Set(menus.map((menu: any) => menu.id)).size !== menus.length) {
-      throw Error("PL неоднозначный источник контекста меню: " + work.id);
-    }
-    unitMenus.set(work.id, menus);
-  }
+  const unitMenus = nativeUnitMenus(works, content.assessments);
   const active = new Set();
   for (const w of works) {
     if (w.relatedExercise) {
