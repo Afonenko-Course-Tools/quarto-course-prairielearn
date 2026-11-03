@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import {
   nativeChecksManifest,
   nativeRawSourceSelection,
+  prepareNativeRawSourceSelection,
 } from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
 import { hash } from "../_extensions/course-prairielearn/application/source-selection.ts";
 const Core = await import(
@@ -33,11 +34,14 @@ Deno.readFile = ((..._args: any[]) => {
   throw Error("unexpected origin read");
 }) as any;
 Deno.readTextFile = Deno.readFile as any;
+const preparedSelection = (value: typeof input & { version?: 1 | 2 }) =>
+  prepareNativeRawSourceSelection(value)(value);
 let selected;
 let refusals = 0;
 try {
   selected = await nativeRawSourceSelection(input);
   if (
+    !("projectRelativePath" in selected) ||
     selected.projectRelativePath !== "starter/src/main/java/Main.java" ||
     selected.submissionRelativePath !== "Main.java" ||
     selected.projectRelativePath === file.target
@@ -51,35 +55,61 @@ try {
       (v: any) => v.file.bytes[0] ^= 1,
       (v: any) => v.file.size++,
       (v: any) => v.sourceRows.push(v.sourceRows[0]),
+      (v: any) => v.sourceRows.push({ source: "../unused", sha256: digest }),
       (v: any) => v.submissionRelativePath = "../escape",
     ]
   ) {
     const bad = structuredClone({ ...input, Core: undefined });
     bad.Core = Core;
     mutate(bad);
-    let error = "";
-    try {
-      await nativeRawSourceSelection(bad);
-    } catch (e) {
-      error = String(e);
+    for (const select of [nativeRawSourceSelection, preparedSelection]) {
+      let error = "";
+      try {
+        await select(bad);
+      } catch (e) {
+        error = String(e);
+      }
+      if (!error) throw Error("origin mutation accepted");
+      refusals++;
     }
-    if (!error) throw Error("origin mutation accepted");
-    refusals++;
   }
   const shared = structuredClone({ ...input, Core: undefined });
   shared.Core = Core;
   shared.file.rawSource =
     "projects/common/java/api-support/src/api/java/org/prairielearn/api/PlatformApiPrecheck.java";
   shared.sourceRows = [{ source: shared.file.rawSource, sha256: digest }];
-  let error = "";
-  try {
-    await nativeRawSourceSelection(shared);
-  } catch (e) {
-    error = String(e);
+  for (const select of [nativeRawSourceSelection, preparedSelection]) {
+    let error = "";
+    try {
+      await select(shared);
+    } catch (e) {
+      error = String(e);
+    }
+    if (!error.includes("PL.NATIVE_ORIGIN_OUTSIDE_PROJECT")) {
+      throw Error("shared legacy origin not refused: " + error);
+    }
   }
-  if (!error.includes("PL.NATIVE_ORIGIN_OUTSIDE_PROJECT")) {
-    throw Error("shared legacy origin not refused: " + error);
+  const select = prepareNativeRawSourceSelection({
+    ...input,
+    sourceRows: [...input.sourceRows, ...shared.sourceRows],
+    version: 2,
+  });
+  for (const value of [input, shared]) {
+    const actual = await select(value);
+    const expected = await nativeRawSourceSelection({ ...value, version: 2 });
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      throw Error("prepared origin differs from standalone selection");
+    }
   }
+  const sharedV2 = await select({
+    file: shared.file,
+    submissionRelativePath: "tests/Shared.java",
+  });
+  if (
+    !("ownerRelativePath" in sharedV2) ||
+    sharedV2.ownerRelativePath !== shared.file.rawSource ||
+    sharedV2.submissionRelativePath !== "tests/Shared.java"
+  ) throw Error("prepared shared v2 origin/submission lost");
 } finally {
   Deno.readFile = read;
   Deno.readTextFile = readText;

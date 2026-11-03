@@ -21,25 +21,24 @@ export function checksCanonical(value: any): string {
  * непосредственно от guarded materializeProject в живом callback той же операции.
  * Version2 выражает shared origin явно; legacy1 его отклоняет.
  */
-export async function nativeRawSourceSelection(
-  input: {
-    Core: any;
-    file: unknown;
-    projectRoot: string;
-    submissionRelativePath: string;
-    sourceRows: readonly { source: string; sha256: string }[];
-    version?: 1 | 2;
-  },
+type RawSourceSelectionInput = {
+  Core: any;
+  file: unknown;
+  projectRoot: string;
+  submissionRelativePath: string;
+  sourceRows: readonly { source: string; sha256: string }[];
+  version?: 1 | 2;
+};
+export async function nativeRawSourceSelection(input: RawSourceSelectionInput) {
+  return await prepareNativeRawSourceSelection(input)(input);
+}
+
+/** Локальная подготовка для неизменной партии одной project projection.
+ * Map остаётся внутри closure; отдельные selections проверяют свои bytes/paths.
+ */
+export function prepareNativeRawSourceSelection(
+  input: Omit<RawSourceSelectionInput, "file" | "submissionRelativePath">,
 ) {
-  const file = input.Core.ArtifactFileSchema.parse(input.file);
-  if (
-    !safePath(input.projectRoot) || !safePath(input.submissionRelativePath) ||
-    !safePath(file.rawSource)
-  ) {
-    throw Error(
-      "PL.NATIVE_ORIGIN_UNQUALIFIED: explicit project/submission/raw source required",
-    );
-  }
   const rows = new Map<string, string>();
   for (const row of input.sourceRows) {
     if (!safePath(row.source) || rows.has(row.source)) {
@@ -47,28 +46,42 @@ export async function nativeRawSourceSelection(
     }
     rows.set(row.source, row.sha256);
   }
-  if (
-    file.size !== file.bytes.length ||
-    rows.get(file.rawSource) !== file.sha256 ||
-    await hash(file.bytes) !== file.sha256
-  ) {
-    throw Error(
-      "PL.NATIVE_ORIGIN_UNQUALIFIED: missing/foreign/changed same-S raw bytes",
-    );
-  }
-  const path = posix.relative(input.projectRoot, file.rawSource);
-  if (!safePath(path) && input.version !== 2) {
-    throw Error(
-      "PL.NATIVE_ORIGIN_OUTSIDE_PROJECT: shared raw source cannot be represented by legacy projectRelativePath: " +
-        file.rawSource,
-    );
-  }
-  return {
-    ...(safePath(path)
-      ? { projectRelativePath: path }
-      : { ownerRelativePath: file.rawSource }),
-    submissionRelativePath: input.submissionRelativePath,
-    sha256: file.sha256,
+  return async (
+    selection: Pick<RawSourceSelectionInput, "file" | "submissionRelativePath">,
+  ) => {
+    const file = input.Core.ArtifactFileSchema.parse(selection.file);
+    if (
+      !safePath(input.projectRoot) ||
+      !safePath(selection.submissionRelativePath) ||
+      !safePath(file.rawSource)
+    ) {
+      throw Error(
+        "PL.NATIVE_ORIGIN_UNQUALIFIED: explicit project/submission/raw source required",
+      );
+    }
+    if (
+      file.size !== file.bytes.length ||
+      rows.get(file.rawSource) !== file.sha256 ||
+      await hash(file.bytes) !== file.sha256
+    ) {
+      throw Error(
+        "PL.NATIVE_ORIGIN_UNQUALIFIED: missing/foreign/changed same-S raw bytes",
+      );
+    }
+    const path = posix.relative(input.projectRoot, file.rawSource);
+    if (!safePath(path) && input.version !== 2) {
+      throw Error(
+        "PL.NATIVE_ORIGIN_OUTSIDE_PROJECT: shared raw source cannot be represented by legacy projectRelativePath: " +
+          file.rawSource,
+      );
+    }
+    return {
+      ...(safePath(path)
+        ? { projectRelativePath: path }
+        : { ownerRelativePath: file.rawSource }),
+      submissionRelativePath: selection.submissionRelativePath,
+      sha256: file.sha256,
+    };
   };
 }
 /** Структура/hash-область v1; не создаёт valid CheckProject и не публикует manifest.
