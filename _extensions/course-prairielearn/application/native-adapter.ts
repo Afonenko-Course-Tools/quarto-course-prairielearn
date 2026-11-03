@@ -1,3 +1,10 @@
+import type * as CorePublic from "course-core/public.ts";
+import type {
+  NativeOperationIdentity,
+  NativePendingOperationExpectation,
+  NativePreparedLease,
+  NativePreparedOperation,
+} from "course-core/public.ts";
 import { nativeBusinessInput, nativeMetadataReadSet } from "./native-input.ts";
 import { assertNativeSeedTargets } from "./native-business.ts";
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
@@ -12,16 +19,22 @@ import { decodeNativeCheck } from "./native-checks.ts";
 import { decodeNativeBusiness } from "./native-business.ts";
 import { hash, safePath } from "./source-selection.ts";
 
-// Runtime-схемы Core поставляет composition через его публичный модуль.
-export type PublicCore = {
-  withPendingNativeOperation: (
-    expectation: any,
-    callback: (pending: any) => Promise<unknown>,
-  ) => Promise<unknown>;
-  NativeAdapterValidationInputSchema: { parse: (value: unknown) => any };
-  ArtifactInventorySchema: { parse: (value: unknown) => any };
-  NativeOperationIdentitySchema: { parse: (value: unknown) => any };
-  NativePreparedOperationSchema?: { parse: (value: unknown) => any };
+// Типы берутся из того же публичного Core, который выбирает composition.
+// При проверке course-core/ разрешается import map; runtime import отсутствует.
+export type PublicCore = Pick<
+  typeof CorePublic,
+  | "withPendingNativeOperation"
+  | "NativeAdapterValidationInputSchema"
+  | "ArtifactInventorySchema"
+  | "NativeOperationIdentitySchema"
+  | "NativePreparedOperationSchema"
+>;
+export type NativePreparedRequest = {
+  schema: "pl-native-business-request-v1";
+  owner: string;
+  identity: NativeOperationIdentity;
+  outputDirectory: string;
+  inputs: NativePreparedOperation["inputs"];
 };
 const ownBase = "_generated/course-spec/prairielearn-native";
 const generation = z.string().uuid();
@@ -56,10 +69,10 @@ async function ownFile(root: string, path: string) {
 }
 async function requestValue(
   root: string,
-  identity: any,
-  inputs: any[],
+  identity: NativeOperationIdentity,
+  inputs: NativePreparedOperation["inputs"],
   outputDirectory: string,
-) {
+): Promise<NativePreparedRequest> {
   if (
     !inputs.length || inputs.some((input) =>
       !safePath(input.source) ||
@@ -87,7 +100,7 @@ export async function nativePreparedRequest(core: PublicCore, value: unknown) {
   ) throw Error("PL.CAPTURE_CHANGED: prepared owner/output");
   return await requestValue(d.root, d.identity, d.inputs, d.outputDirectory);
 }
-async function saveRequest(root: string, request: any) {
+async function saveRequest(root: string, request: NativePreparedRequest) {
   const id = generation.parse(request.identity.operation),
     folder = await directory(root, ownBase + "/" + id);
   try {
@@ -120,8 +133,10 @@ async function saveRequest(root: string, request: any) {
 }
 export async function prepareNativeAdapter(
   core: PublicCore,
-  expectation: any,
-  lease?: { descriptor: unknown; assert(expected: unknown): Promise<void> },
+  expectation: Omit<NativePendingOperationExpectation, "profiles"> & {
+    profiles?: string[];
+  },
+  lease?: Pick<NativePreparedLease, "descriptor" | "assert">,
 ) {
   const root = await Deno.realPath(expectation.root);
   if (lease) {

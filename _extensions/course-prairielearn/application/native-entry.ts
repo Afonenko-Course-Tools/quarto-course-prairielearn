@@ -1,3 +1,9 @@
+import type * as CorePublic from "course-core/public.ts";
+import type {
+  NativeOperation,
+  NativePreparedOperation,
+} from "course-core/public.ts";
+import type { withNativeCaptureScope as CoreCaptureScope } from "course-core/capture.ts";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -201,17 +207,21 @@ export async function nativeEntry(options: NativeEntryOptions) {
     }
   }
   if (!core) throw Error("PL.INPUT_INVALID: installed public Core required");
-  const { withNativeCaptureScope } = await import(
-    pathToFileURL(join(core, "capture.ts")).href
+  const coreDirectory = core;
+  const { withNativeCaptureScope }: {
+    withNativeCaptureScope: typeof CoreCaptureScope;
+  } = await import(
+    pathToFileURL(join(coreDirectory, "capture.ts")).href
   );
   let selected:
     | Awaited<ReturnType<typeof selectNativeOwnerAssignments>>
     | undefined;
-  let descriptor: any, observedConfig: any;
+  let descriptor: NativePreparedOperation | undefined;
+  let observedConfig: unknown;
   const functionalProfiles = (options.profiles ??
     (Deno.env.get("QUARTO_PROFILE") || "").split(",")).filter((p) =>
-    p && p !== "student" && p !== "full"
-  );
+      p && p !== "student" && p !== "full"
+    );
   await withNativeCaptureScope({
     root: owner,
     projection: "author",
@@ -220,7 +230,7 @@ export async function nativeEntry(options: NativeEntryOptions) {
     assignment: {
       mode: "new",
       profiles: functionalProfiles,
-      prepare: async (observed: Readonly<Record<string, any>>) => {
+      prepare: async (observed) => {
         observedConfig = structuredClone(observed.config);
         selected = await selectNativeOwnerAssignments(observed, {
           ...options,
@@ -235,17 +245,22 @@ export async function nativeEntry(options: NativeEntryOptions) {
         };
       },
     },
-  }, async (scope: any) => {
-    await scope.withPreparedOperation(async (lease: any) => {
-      const Core = await import(pathToFileURL(join(core!, "public.ts")).href);
-      descriptor = Core.NativePreparedOperationSchema.parse(lease.descriptor);
+  }, async (scope) => {
+    await scope.withPreparedOperation(async (lease) => {
+      const Core: typeof CorePublic = await import(
+        pathToFileURL(join(coreDirectory, "public.ts")).href
+      );
+      const prepared = Core.NativePreparedOperationSchema.parse(
+        lease.descriptor,
+      );
+      descriptor = prepared;
       if (
-        !selected || descriptor.root !== owner ||
-        descriptor.outputDirectory !== outputDirectory ||
-        descriptor.identity.projection !== "author" ||
-        JSON.stringify(descriptor.inputs.map((i: any) => i.source)) !==
+        !selected || prepared.root !== owner ||
+        prepared.outputDirectory !== outputDirectory ||
+        prepared.identity.projection !== "author" ||
+        JSON.stringify(prepared.inputs.map((i) => i.source)) !==
           JSON.stringify(selected.expectedSources) ||
-        JSON.stringify(descriptor.assessments) !==
+        JSON.stringify(prepared.assessments) !==
           JSON.stringify([
             ...selected.assessments,
             ...selected.contextAssessments,
@@ -254,7 +269,7 @@ export async function nativeEntry(options: NativeEntryOptions) {
       if (
         JSON.stringify(functionalProfiles) !==
           JSON.stringify(
-            descriptor.identity.profiles.filter((p: string) =>
+            prepared.identity.profiles.filter((p) =>
               p !== "student" && p !== "full"
             ),
           )
@@ -262,12 +277,12 @@ export async function nativeEntry(options: NativeEntryOptions) {
       const { prepareNativeAdapter } = await import("./native-adapter.ts");
       await prepareNativeAdapter(Core, {
         root: owner,
-        profiles: descriptor.identity.profiles,
+        profiles: prepared.identity.profiles,
         projection: "author",
         outputDirectory,
       }, lease);
       await lease.captureInputs(
-        descriptor,
+        prepared,
         selected.expectedSources,
         {
           // Executable/cwd/env/token принадлежат qualified Core lease.
@@ -277,34 +292,41 @@ export async function nativeEntry(options: NativeEntryOptions) {
           timeoutMs: 20 * 60 * 1000,
         },
       );
-      await lease.assert(descriptor);
+      await lease.assert(prepared);
     });
   });
   if (!descriptor || !selected) {
     throw Error("PL.CAPTURE_MISSING: prepared operation");
   }
-  const Core = await import(pathToFileURL(join(core, "public.ts")).href);
+  const prepared = descriptor, selection = selected;
+  const Core: typeof CorePublic = await import(
+    pathToFileURL(join(coreDirectory, "public.ts")).href
+  );
   const { prepareNativeCourse } = await import("./native-course.ts");
   return await publishNativePrepared(
-    (use) =>
+    (
+      use: (
+        operation: NativeOperation,
+      ) => Promise<NativePreparedPublication<unknown>>,
+    ) =>
       Core.withCurrentNativeOperation({
         root: owner,
-        profiles: descriptor.identity.profiles,
-        projection: descriptor.identity.projection,
+        profiles: prepared.identity.profiles,
+        projection: prepared.identity.projection,
         outputDirectory,
       }, use),
-    async (operation: any) => {
+    async (operation) => {
       if (
         JSON.stringify(operation.identity) !==
-          JSON.stringify(descriptor.identity)
+          JSON.stringify(prepared.identity)
       ) {
         throw Error("PL.CAPTURE_CHANGED: sealed generation");
       }
       return await prepareNativeCourse({
         Core,
         operation,
-        descriptor,
-        selection: selected!,
+        descriptor: prepared,
+        selection,
         options,
         observedConfig,
       });
@@ -313,11 +335,17 @@ export async function nativeEntry(options: NativeEntryOptions) {
 }
 /** Тот же порядок nativeEntry: handle сохраняется ВНУТРИ parent callback.
  * scope — настоящий Core gate в production; функция не создаёт authority. */
-export async function publishNativePrepared(
-  scope: (use: (operation: any) => Promise<any>) => Promise<any>,
-  prepare: (operation: any) => Promise<any>,
-) {
-  let prepared: any;
+type NativePreparedPublication<T> = {
+  publish(): Promise<T>;
+  discard(): Promise<void>;
+};
+export async function publishNativePrepared<Operation, T>(
+  scope: (
+    use: (operation: Operation) => Promise<NativePreparedPublication<T>>,
+  ) => Promise<NativePreparedPublication<T>>,
+  prepare: (operation: Operation) => Promise<NativePreparedPublication<T>>,
+): Promise<T> {
+  let prepared: NativePreparedPublication<T> | undefined;
   try {
     prepared = await scope(async (operation) => {
       prepared = await prepare(operation);
