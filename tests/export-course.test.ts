@@ -1,3 +1,4 @@
+import { NativeProjectCheckSchema } from "../_extensions/course-prairielearn/application/native-checks.ts";
 import {runtimeDescriptor} from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
 import {
   declarations,
@@ -462,7 +463,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         bytes: new TextEncoder().encode(apiText),
       }],
       descriptor: runtimeDescriptor(
-        canonicalFact.check,
+        NativeProjectCheckSchema.parse({...canonicalFact.check, "source-profile":"fixture", tests:["tests/junit/*.java"]}),
         nativeInput.registry.profiles["java25-gradle-junit-v1"],
         ["pkg/A.java"],
         ["ATest.java", "ApiContract.java"],
@@ -1079,7 +1080,9 @@ Deno.test("question repeat declaration is closed and typed", () => {
 Deno.test("additional Java policy rejects present null/false and closed-field defects",()=>{
  const policy={archive:"additional-sources.zip","max-files":128,"max-file-bytes":1048576,"max-total-bytes":4194304,"max-archive-bytes":2097152};
  for(const value of [null,false,0,{...policy,commands:[]},{...policy,"max-files":129},{...policy,"max-files":true}]){
-  let denied=false;try{runtimeDescriptor({runtime:"java25-junit-v1",sourceProfile:{mode:"implementation"},"additional-java-sources":value},{javaRelease:25},["Main.java"],["ExampleTest.java"]);}catch{denied=true;}
+  const raw:unknown={profile:"fixture","source-profile":"main",tests:["tests/*.java"],scoring:{mode:"weighted"},runtime:"java25-junit-v1",sourceProfile:{mode:"implementation",root:"student",include:["**/*.java"]},"additional-java-sources":value};
+  // Намеренно неверный raw приходит через внешнюю JS-границу; результат не используется.
+  let denied=false;try{Reflect.apply(runtimeDescriptor,undefined,[raw,{javaRelease:25},["Main.java"],["ExampleTest.java"]]);}catch{denied=true;}
   assert(denied,"invalid present Java policy silently disabled: "+JSON.stringify(value));
  }
 });

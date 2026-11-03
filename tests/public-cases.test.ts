@@ -1,3 +1,4 @@
+import { NativeProjectCheckSchema } from "../_extensions/course-prairielearn/application/native-checks.ts";
 import {runtimeDescriptor} from '../_extensions/course-prairielearn/application/runtime-descriptor.ts';
 const assert=(v:unknown,m:string)=>{if(!v)throw Error(m)};
 Deno.test('only explicit closed public case declarations enter runtime descriptor',()=>{
@@ -6,5 +7,5 @@ Deno.test('only explicit closed public case declarations enter runtime descripto
  for(const cases of [[{id:'missing-name',test:'Checks#x',input:'0',expected:'0'}],[{id:'x',test:'Checks#x',expected:'1'}],[{id:'x',test:'Checks#x',input:'1',expected:'1',private:true}],[c['public-cases'][0],c['public-cases'][0]]]){
   let refused=false;try{runtimeDescriptor({...c,'public-cases':cases},{javaRelease:25},['Main.java'],['Checks.java'])}catch{refused=true}assert(refused,'invalid or ambiguous public case accepted');
  }
- const no:any=runtimeDescriptor({runtime:'java25-junit-v1',sourceProfile:{mode:'implementation'}},{javaRelease:25},['Main.java'],['Checks.java']);assert(no.publicCases===undefined,'private default promoted');
+ const no:any=runtimeDescriptor(NativeProjectCheckSchema.parse({profile:'fixture','source-profile':'main',tests:['tests/**'],scoring:{mode:'weighted'},runtime:'java25-junit-v1',sourceProfile:{mode:'implementation',root:'student',include:['**/*.java']}}),{javaRelease:25},['Main.java'],['Checks.java']);assert(no.publicCases===undefined,'private default promoted');
 });

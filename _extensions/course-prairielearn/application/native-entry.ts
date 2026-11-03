@@ -218,10 +218,7 @@ export async function nativeEntry(options: NativeEntryOptions) {
     | undefined;
   let descriptor: NativePreparedOperation | undefined;
   let observedConfig: unknown;
-  const functionalProfiles = (options.profiles ??
-    (Deno.env.get("QUARTO_PROFILE") || "").split(",")).filter((p) =>
-      p && p !== "student" && p !== "full"
-    );
+  let functionalProfiles: string[] | undefined;
   await withNativeCaptureScope({
     root: owner,
     projection: "author",
@@ -229,7 +226,12 @@ export async function nativeEntry(options: NativeEntryOptions) {
   }, {
     assignment: {
       mode: "new",
-      profiles: functionalProfiles,
+      get profiles() {
+        return functionalProfiles ??= (options.profiles ??
+          (Deno.env.get("QUARTO_PROFILE") || "").split(",")).filter((p) =>
+            p && p !== "student" && p !== "full"
+          );
+      },
       prepare: async (observed) => {
         observedConfig = structuredClone(observed.config);
         selected = await selectNativeOwnerAssignments(observed, {

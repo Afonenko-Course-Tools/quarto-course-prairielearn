@@ -1,3 +1,4 @@
+import { NativeProjectCheckSchema } from "../_extensions/course-prairielearn/application/native-checks.ts";
 import { hash, selectedSources } from '../_extensions/course-prairielearn/application/source-selection.ts';
 import { runtimeDescriptor } from '../_extensions/course-prairielearn/application/runtime-descriptor.ts';
 const assert = (value: unknown) => { if (!value) throw new Error('Assertion failed'); };
@@ -21,9 +22,9 @@ Deno.test('non-Java text source requires an explicit runtime extension allowlist
   } finally { await Deno.remove(root,{recursive:true}); }
 });
 Deno.test('fish descriptor does not impersonate Java; Java keeps compiler defaults', () => {
-  const check = {runtime:'fish-git-v1',sourceProfile:{mode:'implementation'}};
+  const check = NativeProjectCheckSchema.parse({profile:'fixture','source-profile':'main',tests:['tests/**'],scoring:{mode:'weighted'},runtime:'fish-git-v1',sourceProfile:{mode:'implementation',root:'student',include:['**/*.fish']}});
   const descriptor=runtimeDescriptor(check,{sourceExtensions:['.fish']},['commands.fish'],['headers.txt']);
   assert(!Object.hasOwn(descriptor,'java') && descriptor.sourceFiles[0]==='commands.fish');
   const java=runtimeDescriptor({...check,runtime:'java25-junit-v1'},{javaRelease:25},['S.java'],['T.java']);
-  assert(java.java.release===25 && java.java.encoding==='UTF-8');
+  assert(java.java?.release===25 && java.java.encoding==='UTF-8');
 });

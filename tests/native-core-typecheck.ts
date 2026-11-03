@@ -1,46 +1,14 @@
 // Адресный checker: Source repo Core либо owner/extension установленной composition.
 // Запуск: quarto run tests/native-core-typecheck.ts CORE_ROOT
 import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+import { writeNativeCoreImportMap } from "../tools/native-core-import-map.ts";
 const repo = dirname(dirname(fileURLToPath(import.meta.url)));
 if (!Deno.args[0]) throw Error("Требуется путь Source/installed Core");
-let core: string | undefined;
-for (
-  const path of [
-    resolve(Deno.args[0], "_extensions/course-core"),
-    resolve(Deno.args[0], "_extensions/Afonenko-Course-Tools/course-core"),
-    resolve(Deno.args[0]),
-  ]
-) {
-  try {
-    if ((await Deno.stat(resolve(path, "public.ts"))).isFile) {
-      core = await Deno.realPath(path);
-      break;
-    }
-  } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) throw error;
-  }
-}
-if (!core) throw Error("Публичный Core не найден");
 const temporary = await Deno.makeTempDir({ prefix: "pl-core-typecheck-" });
 try {
   const map = resolve(temporary, "imports.json");
-  await Deno.writeTextFile(
-    map,
-    JSON.stringify({
-      imports: {
-        "course-core/": pathToFileURL(core + "/").href,
-        "pl-native/": pathToFileURL(
-          resolve(repo, "_extensions/course-prairielearn/application") + "/",
-        ).href,
-        "stdlib/path": import.meta.resolve("stdlib/path").replace(
-          "jsr:/",
-          "jsr:",
-        ),
-        "stdlib/fs": import.meta.resolve("stdlib/fs").replace("jsr:/", "jsr:"),
-      },
-    }),
-  );
+  await writeNativeCoreImportMap(Deno.args[0], map);
   const args = ["check", "--no-config", "--no-lock", "--import-map", map];
   const positive = await new Deno.Command(Deno.execPath(), {
     args: [
