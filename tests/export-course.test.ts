@@ -986,7 +986,7 @@ Deno.test("multiple_selected_defenses_for_one_essay reject before source collect
     let called = false;
     let message = "";
     try {
-      await exportCourse({
+      const raw: unknown = {
         courseId: "demo",
         projectRoot: root,
         result: { model: { assessments: works } },
@@ -1000,7 +1000,9 @@ Deno.test("multiple_selected_defenses_for_one_essay reject before source collect
           called = true;
           throw new Error("unexpected body");
         },
-      });
+      };
+      // Нарочно неполный external JS input: прежний early refusal проверяется до checks reader.
+      await Reflect.apply(exportCourse, undefined, [raw]);
     } catch (e) {
       message = String(e);
     }
@@ -1101,13 +1103,15 @@ Deno.test("Дублированная защита отвергается ран
     const works = ["sec-one", "sec-two"].map((id) => ({ id, relatedExercise: "exr-essay", extensions: { prairielearn: {} } }));
     let called = false, message = "";
     try {
-      await exportCourse({
+      const raw: unknown = {
         courseId: "demo", projectRoot: root, result: { model: { assessments: works } },
         checks: {}, config, registry: {}, instance: "pilot", output: root + "/native", checksOutput: root + "/checks.json",
         publicationConditions: root + "/nonexistent-conditions.json",
         publicationSource: { repository: "invalid", commit: "invalid", book: "tasks" },
         body: async () => { called = true; throw new Error("unexpected body"); },
-      });
+      };
+      // Нарочно неполный external JS input: прежний early refusal проверяется до checks reader.
+      await Reflect.apply(exportCourse, undefined, [raw]);
     } catch (e) { message = String(e); }
     assert(message === "Error: PL duplicate active defense" && !called, "Опциональная зависимость скрыла duplicate defense до body");
   } finally { await Deno.remove(root, { recursive: true }); }

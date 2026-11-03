@@ -1,12 +1,14 @@
 // Адресный checker: Source repo Core либо owner/extension установленной composition.
 // Запуск: quarto run tests/native-core-typecheck.ts CORE_ROOT
 // --course-export ограничивает запуск новым affected graph и его одним negative.
+// --legacy-boundary проверяет legacy/native handoff и только два его negatives.
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeNativeCoreImportMap } from "../tools/native-core-import-map.ts";
 const repo = dirname(dirname(fileURLToPath(import.meta.url)));
 if (!Deno.args[0]) throw Error("Требуется путь Source/installed Core");
 const courseExport = Deno.args.includes("--course-export");
+const legacyBoundary = Deno.args.includes("--legacy-boundary");
 const temporary = await Deno.makeTempDir({ prefix: "pl-core-typecheck-" });
 try {
   const map = resolve(temporary, "imports.json");
@@ -15,7 +17,7 @@ try {
   const positive = await new Deno.Command(Deno.execPath(), {
     args: [
       ...args,
-      ...(courseExport
+      ...(courseExport || legacyBoundary
         ? [
           resolve(
             repo,
@@ -31,6 +33,14 @@ try {
           resolve(repo, "tests/native-materialization-types.ts"),
         ]),
       resolve(repo, "tests/native-course-export-types.ts"),
+      resolve(repo, "tests/native-legacy-boundary-types.ts"),
+      ...(legacyBoundary
+        ? [
+          resolve(repo, "tests/export-course.test.ts"),
+          resolve(repo, "tests/java-build.test.ts"),
+          resolve(repo, "tests/text-runtime.test.ts"),
+        ]
+        : []),
       resolve(repo, "tests/native-core-typecheck.ts"),
     ],
     stdout: "inherit",
@@ -47,83 +57,108 @@ try {
     `,
     "TS2353",
   ];
+  const legacyNegatives = [
+    [
+      "legacy-is-not-native-bytes",
+      `
+      import type {NativeCompilerInput} from "pl-native/export-course.ts";
+      import type {LegacyPhysicalSelection} from "pl-native/legacy-checks.ts";
+      declare const legacy: LegacyPhysicalSelection;
+      const native: NativeCompilerInput["tests"][number] = legacy;
+    `,
+      "TS2739",
+    ],
+    [
+      "owner-is-not-physical",
+      `
+      import type {LegacyPhysicalSelection} from "pl-native/legacy-checks.ts";
+      const legacy: LegacyPhysicalSelection = {ownerRelativePath:"shared/Checks.java",submissionRelativePath:"Checks.java",sha256:"hash"};
+    `,
+      "TS2353",
+    ],
+  ];
   for (
-    const [name, code, diagnostic] of courseExport ? [nativeWriterSource] : [
-      nativeWriterSource,
-      [
-        "authored-feedback",
-        `
+    const [name, code, diagnostic] of legacyBoundary
+      ? legacyNegatives
+      : courseExport
+      ? [nativeWriterSource]
+      : [
+        ...legacyNegatives,
+        nativeWriterSource,
+        [
+          "authored-feedback",
+          `
       import {runtimeDescriptor} from "pl-native/runtime-descriptor.ts";
       import type {NativeProjectCheck} from "pl-native/native-checks.ts";
       declare const check: NativeProjectCheck;
       runtimeDescriptor({...check,feedback:{requirement:"r",whatCheck:"runtime"}}, {javaRelease:25}, [], []);
     `,
-        "TS2561",
-      ],
-      [
-        "runtime-feedback",
-        `
+          "TS2561",
+        ],
+        [
+          "runtime-feedback",
+          `
       import type {runtimeDescriptor} from "pl-native/runtime-descriptor.ts";
       const feedback: NonNullable<ReturnType<typeof runtimeDescriptor>["feedback"]> = {requirement:"r","what-check":"authored"};
     `,
-        "TS2353",
-      ],
-      [
-        "materialization-plan",
-        `
+          "TS2353",
+        ],
+        [
+          "materialization-plan",
+          `
       import {materializeNativeQuestion} from "pl-native/native-materialize.ts";
       declare const input: Parameters<typeof materializeNativeQuestion>[0];
       materializeNativeQuestion({...input,pair:{...input.pair,student:{...input.pair.student,audience:"author"}}});
     `,
-        "TS2322",
-      ],
-      [
-        "materialization-condition",
-        `
+          "TS2322",
+        ],
+        [
+          "materialization-condition",
+          `
       import {materializeNativeQuestion} from "pl-native/native-materialize.ts";
       declare const input: Parameters<typeof materializeNativeQuestion>[0];
       materializeNativeQuestion({...input,condition:input.pair.student});
     `,
-        "TS2322",
-      ],
-      [
-        "adapter-method",
-        `
+          "TS2322",
+        ],
+        [
+          "adapter-method",
+          `
       import type {PublicCore} from "pl-native/native-adapter.ts";
       declare const core: PublicCore;
       core.withPendngNativeOperation({}, async () => {});
     `,
-        "TS2551",
-      ],
-      [
-        "scope-method",
-        `
+          "TS2551",
+        ],
+        [
+          "scope-method",
+          `
       import type {NativeCaptureScope} from "course-core/public.ts";
       declare const scope: NativeCaptureScope;
       scope.withPreparedOperaton(async () => {});
     `,
-        "TS2551",
-      ],
-      [
-        "preparation",
-        `
+          "TS2551",
+        ],
+        [
+          "preparation",
+          `
       import {withNativeCaptureScope} from "course-core/capture.ts";
       withNativeCaptureScope({root:"/owner",projection:"author",outputDirectory:"/owner/out"},
         {assignment:{mode:"new",prepare:async () => ({expectedSources:["work.qmd"],
           assessments:[{source:"work.qmd",assessmentId:"work"}]})}}, async () => {});
     `,
-        "TS2322",
-      ],
-      [
-        "descriptor",
-        `
+          "TS2322",
+        ],
+        [
+          "descriptor",
+          `
       import type {NativePreparedLease,NativePreparedOperation} from "course-core/public.ts";
       declare const lease: NativePreparedLease, descriptor: NativePreparedOperation;
       lease.assert({...descriptor,identity:{...descriptor.identity,projection:"full"}});
     `,
-        "TS2322",
-      ],
-    ]
+          "TS2322",
+        ],
+      ]
   ) {
     const source = resolve(temporary, name + ".ts");
     await Deno.writeTextFile(source, code);

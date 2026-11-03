@@ -21,6 +21,7 @@ import { declarations, gradingMethod, question } from "./declarations.ts";
 import type { materializeNativeQuestion } from "./native-materialize.ts";
 import type { StudentArtifact } from "./export.ts";
 import type { NativeProjectFact } from "course-core/public.ts";
+import type { CheckSourceOrigin, ExportChecks } from "./legacy-checks.ts";
 import {
   canonical,
   hash,
@@ -132,14 +133,14 @@ export type NativeCompilerInput = Pick<NativeSelection, "descriptor"> & {
   tests: readonly Pick<NativeSelection["tests"][number], "name" | "bytes">[];
 };
 
-export async function exportCourse(
+export async function exportCourse<Checks extends ExportChecks>(
   input: {
     courseId: string;
     projectRoot: string;
     /** Прежний collected input; native composition передаёт content напрямую. */
     result?: any;
     content?: ExportCourseContent;
-    checks: any;
+    checks: Checks;
     config: any;
     registry: any;
     instance: string;
@@ -467,7 +468,7 @@ export async function exportCourse(
           };
           continue;
         }
-        const fact = input.checks.projects.find((p: any) =>
+        const fact = input.checks.projects.find((p) =>
           p.exerciseId === q.id && p.bankMember
         );
         if (!fact?.check || fact.readiness?.ready === false) {
@@ -523,23 +524,39 @@ export async function exportCourse(
         ) {
           throw new Error("PL trusted tests missing");
         }
-        const testNames = new Set();
+        const testNames = new Set<string>();
+        type TrustedTest =
+          | {
+            kind: "native";
+            submissionRelativePath: string;
+            bytes: NativeCompilerInput["tests"][number]["bytes"];
+          }
+          | { kind: "legacy"; origin: CheckSourceOrigin };
+        function* legacyTests(
+          origins: readonly CheckSourceOrigin[],
+        ): Generator<TrustedTest> {
+          for (const origin of origins) yield { kind: "legacy", origin };
+        }
         for (
-          const test of nativeSelection
-            ? nativeSelection.tests.map((t) => ({
+          const selectedTest of nativeSelection
+            ? nativeSelection.tests.map((t): TrustedTest => ({
+              kind: "native",
               submissionRelativePath: t.name,
               bytes: t.bytes,
             }))
-            : fact.trustedTests
+            : legacyTests(fact.trustedTests)
         ) {
+          const test = selectedTest.kind === "native"
+            ? selectedTest
+            : selectedTest.origin;
           if (
             testNames.has(test.submissionRelativePath) ||
             test.submissionRelativePath === "grading-job.json"
           ) throw new Error("PL duplicate or reserved trusted test path");
           testNames.add(test.submissionRelativePath);
-          const bytes = nativeSelection
-            ? test.bytes
-            : await readSelected(root, test);
+          const bytes = selectedTest.kind === "native"
+            ? selectedTest.bytes
+            : await readSelected(root, selectedTest.origin);
           await Deno.mkdir(
             dirname(join(project, "tests", test.submissionRelativePath)),
             { recursive: true },
@@ -554,7 +571,7 @@ export async function exportCourse(
           c,
           profile,
           sources.map((s: any) => s.name),
-          fact.trustedTests.map((t: any) => t.submissionRelativePath),
+          fact.trustedTests.map((t) => t.submissionRelativePath),
           fact.apiPrecheck,
         );
         await Deno.writeTextFile(
@@ -603,7 +620,7 @@ export async function exportCourse(
       );
       for (const q of p.questions) {
         const base = "questions/" + q.key;
-        const c = input.checks.projects.find((f: any) => f.exerciseId === q.id)
+        const c = input.checks.projects.find((f) => f.exerciseId === q.id)
           ?.check;
         const info = JSON.parse(
           await Deno.readTextFile(join(partial, base, "info.json")),
@@ -626,7 +643,7 @@ export async function exportCourse(
           join(partial, base, "info.json"),
           JSON.stringify(info, null, 2) + "\n",
         );
-        const f = input.checks.projects.find((f: any) => f.exerciseId === q.id);
+        const f = input.checks.projects.find((f) => f.exerciseId === q.id);
         if (f?.check) {
           for (
             const s of input.nativeInputs?.[q.id]

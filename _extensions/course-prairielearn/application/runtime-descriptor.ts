@@ -4,6 +4,7 @@ import { normalizeDiscovery } from './grading-descriptor.ts';
 import { javaBuild } from './java-build.ts';
 import { safePath } from './source-selection.ts';
 import type { NativeProjectCheck } from './native-checks.ts';
+import type { LegacyDescriptorCheck } from './legacy-checks.ts';
 export type RuntimeProfile = NonNullable<Parameters<typeof javaBuild>[1]>;
 export interface AdditionalJavaSources {primaryRequired?:boolean;archive:string;maxFiles:number;maxFileBytes:number;maxTotalBytes:number;maxArchiveBytes:number}
 export function validateAdditionalJavaSources(value:any,sources:string[],tests:string[]):AdditionalJavaSources {
@@ -21,7 +22,7 @@ function publicCases(value:NonNullable<NativeProjectCheck['public-cases']>){
  });
 }
 export interface ApiPrecheck {files:string[];entry:string}
-export function runtimeDescriptor(c: NativeProjectCheck, profile: RuntimeProfile, sources: string[], tests: string[], api?:ApiPrecheck) {
+export function runtimeDescriptor<C extends LegacyDescriptorCheck>(c: C, profile: RuntimeProfile, sources: string[], tests: string[], api?:ApiPrecheck) {
   const build=javaBuild(c,profile);
   const javaRuntime = profile.javaRelease !== undefined || !profile.sourceExtensions;
   if (!javaRuntime && c.java !== undefined) throw new Error('PL non-Java runtime cannot declare Java compiler settings');
@@ -34,12 +35,14 @@ export function runtimeDescriptor(c: NativeProjectCheck, profile: RuntimeProfile
     if(!extra||typeof extra!=='object'||Array.isArray(extra)||!['java25-junit-v1','java25-gradle-junit-v1'].includes(c.runtime)||c.sourceProfile.mode!=='implementation'||Object.keys(extra).some(k=>!['archive','max-files','max-file-bytes','max-total-bytes','max-archive-bytes','primary-required'].includes(k)))throw new Error('PL additional Java sources require closed Java implementation policy');
     additionalJavaSources=validateAdditionalJavaSources({...('primary-required' in extra?{primaryRequired:extra['primary-required']}:{}),archive:extra.archive,maxFiles:extra['max-files'],maxFileBytes:extra['max-file-bytes'],maxTotalBytes:extra['max-total-bytes'],maxArchiveBytes:extra['max-archive-bytes']},sources,tests);
   }
+  const mode: C['sourceProfile']['mode'] = c.sourceProfile.mode;
+  const scoring: C['scoring'] = c.scoring;
   return {
     schemaVersion:1, sourceFiles:sources, testFiles:tests,
-    mode:c.sourceProfile.mode, runtime:c.runtime,
+    mode, runtime:c.runtime,
     ...(javaRuntime ? {java:{release:25,encoding:'UTF-8','compiler-options':['-proc:none','-Xmaxerrs','5'],...c.java}} : {}),
     limits:{'outer-seconds':30,'compile-seconds':15,'run-seconds':10,networking:false,'max-output-bytes':65536,...c.limits},
-    scoring:c.scoring ?? {mode:'weighted'}, discovery:normalizeDiscovery(c.discovery),
+    scoring:scoring ?? {mode:'weighted'}, discovery:normalizeDiscovery(c.discovery),
     ...(c.feedback?{feedback:{requirement:c.feedback.requirement,whatCheck:c.feedback['what-check']}}:{}),
     ...(c['public-cases']!==undefined?{publicCases:publicCases(c['public-cases'])}:{}),
     ...(c.variants ? {variants:c.variants} : {}),

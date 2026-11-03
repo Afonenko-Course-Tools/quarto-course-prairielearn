@@ -88,12 +88,14 @@ export function prepareNativeRawSourceSelection(
 /** Структура/hash-область v1; не создаёт valid CheckProject и не публикует manifest.
  * Projects должны поступить из отдельной reviewed native policy projection.
  */
-export async function nativeChecksManifest(
+export async function nativeChecksManifest<
+  Project extends { qualifiedId: string },
+>(
   input: {
     courseId: string;
     bookRoot: string;
     sources: { source: string; sha256: string }[];
-    projects: any[];
+    projects: readonly Project[];
     version?: 1 | 2;
     selectionScope?: any;
   },

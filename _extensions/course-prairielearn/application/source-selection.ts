@@ -1,6 +1,7 @@
 import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
 import { javaBuild } from './java-build.ts';
+import type { CheckSourceOrigin } from './legacy-checks.ts';
 import { join, relative, resolve } from "node:path";
 export const safePath = (p: unknown): p is string =>
   typeof p === "string" && !!p && !/^(?:[\/\\]|[A-Za-z]:)/.test(p) &&
@@ -41,7 +42,7 @@ function canonicalValue(v: any): string {
   }
   return JSON.stringify(v);
 }
-export async function readSelected(root: string, s: any) {
+export async function readSelected(root: string, s: CheckSourceOrigin & {projectRelativePath?:string}) {
   if (
     !safePath(s.projectRelativePath) || !safePath(s.submissionRelativePath) ||
     !/^[a-f0-9]{64}$/.test(s.sha256)

@@ -9,6 +9,7 @@ import type {
   StudentArtifact,
 } from "../_extensions/course-prairielearn/application/export.ts";
 import type { runtimeDescriptor } from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
+import type { NativeProjectCheck } from "../_extensions/course-prairielearn/application/native-checks.ts";
 
 type IsAny<T> = 0 extends (1 & T) ? true : false;
 type Exact<A, B> = IsAny<A> extends true ? false
@@ -56,5 +57,8 @@ type _NativeBytes = Require<
   >
 >;
 type _NativeDescriptor = Require<
-  Exact<NativeCompilerInput["descriptor"], ReturnType<typeof runtimeDescriptor>>
+  Exact<
+    NativeCompilerInput["descriptor"],
+    ReturnType<typeof runtimeDescriptor<NativeProjectCheck>>
+  >
 >;
