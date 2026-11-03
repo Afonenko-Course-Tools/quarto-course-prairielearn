@@ -151,6 +151,7 @@ export const NativeProjectChecksSchema = z.strictObject({
   "source-profiles": z.record(text, NativeSourceProfileSchema),
   profiles: z.record(text, z.strictObject(fields).partial()),
 });
+export type NativeProjectCheck = z.output<typeof NativeProjectCheckSchema>;
 /** Только PL policy inheritance. Native metadata inheritance уже выполнил Quarto. */
 function merge(base: any, local: any): any {
   if (!local || typeof local !== "object" || Array.isArray(local)) return local;

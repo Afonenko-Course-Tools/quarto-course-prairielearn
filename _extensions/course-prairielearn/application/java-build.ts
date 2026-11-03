@@ -1,11 +1,12 @@
 // Внутренняя закрытая граница captured Core check → Platform descriptor.
+import type { NativeProjectCheck } from "./native-checks.ts";
 export interface JavaBuild {
   kind: "gradle-jar-v1";
   mainClass?: string;
   artifact: string;
 }
 export function javaBuild(
-  check: any,
+  check: Pick<NativeProjectCheck, "runtime" | "sourceProfile" | "java-build">,
   profile?: {
     mode?: string;
     javaRelease?: number;

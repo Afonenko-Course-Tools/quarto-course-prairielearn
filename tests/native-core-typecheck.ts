@@ -50,6 +50,7 @@ try {
         "_extensions/course-prairielearn/application/native-entry.ts",
       ),
       resolve(repo, "tests/native-core-boundary-types.ts"),
+      resolve(repo, "tests/native-materialization-types.ts"),
       resolve(repo, "tests/native-core-typecheck.ts"),
     ],
     stdout: "inherit",
@@ -58,6 +59,42 @@ try {
   if (!positive.success) Deno.exit(positive.code);
   for (
     const [name, code, diagnostic] of [
+      [
+        "authored-feedback",
+        `
+      import {runtimeDescriptor} from "pl-native/runtime-descriptor.ts";
+      import type {NativeProjectCheck} from "pl-native/native-checks.ts";
+      declare const check: NativeProjectCheck;
+      runtimeDescriptor({...check,feedback:{requirement:"r",whatCheck:"runtime"}}, {javaRelease:25}, [], []);
+    `,
+        "TS2561",
+      ],
+      [
+        "runtime-feedback",
+        `
+      import type {runtimeDescriptor} from "pl-native/runtime-descriptor.ts";
+      const feedback: NonNullable<ReturnType<typeof runtimeDescriptor>["feedback"]> = {requirement:"r","what-check":"authored"};
+    `,
+        "TS2353",
+      ],
+      [
+        "materialization-plan",
+        `
+      import {materializeNativeQuestion} from "pl-native/native-materialize.ts";
+      declare const input: Parameters<typeof materializeNativeQuestion>[0];
+      materializeNativeQuestion({...input,pair:{...input.pair,student:{...input.pair.student,audience:"author"}}});
+    `,
+        "TS2322",
+      ],
+      [
+        "materialization-condition",
+        `
+      import {materializeNativeQuestion} from "pl-native/native-materialize.ts";
+      declare const input: Parameters<typeof materializeNativeQuestion>[0];
+      materializeNativeQuestion({...input,condition:input.pair.student});
+    `,
+        "TS2322",
+      ],
       [
         "adapter-method",
         `

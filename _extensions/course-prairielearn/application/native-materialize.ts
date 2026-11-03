@@ -4,6 +4,20 @@ import { pathToFileURL } from "node:url";
 import { hash } from "./source-selection.ts";
 import { describeSubmission } from "./submission.ts";
 import { projectNativeChecks } from "./native-check-projection.ts";
+import type { CheckedNativeProjectFact } from "./native-check-projection.ts";
+import type * as CorePublic from "course-core/public.ts";
+import type {
+  ArtifactInventory,
+  MaterializableCondition,
+  MaterializationBindings,
+  NativeAssignmentProjectPlans,
+  NativeOperation,
+  ProjectPlan,
+  SubmissionInstructions,
+} from "course-core/public.ts";
+import type { createNativeAdapter } from "./native-adapter.ts";
+import type { question } from "./declarations.ts";
+import type { RuntimeProfile } from "./runtime-descriptor.ts";
 export async function publicExtension(owner: string, name: string) {
   for (
     const root of [
@@ -47,7 +61,7 @@ export async function nativeReferenceBindings(
     outputDirectory: string;
     book: string;
     config: any;
-    operation: any;
+    operation: Pick<NativeOperation, "catalog">;
   },
 ) {
   const QRC = await publicExtension(input.owner, "reference-catalog"),
@@ -77,7 +91,7 @@ export async function nativeReferenceBindings(
     })
     : QRC.createBodyLinks({ catalog: file.value, baseUrl });
   const sources = Object.fromEntries(
-    input.operation.catalog.documents.map((d: any) => [d.source, d.output]),
+    input.operation.catalog.documents.map((d) => [d.source, d.output]),
   );
   return {
     QRC,
@@ -95,10 +109,18 @@ export async function nativeReferenceBindings(
         return new URL(sources[source], baseUrl).href;
       },
     },
-    async bindings(Core: any, plan: any, condition: any, submission: any) {
+    async bindings(
+      Core: Pick<typeof CorePublic, "materializationClosure">,
+      plan: ProjectPlan,
+      condition: MaterializableCondition,
+      submission: SubmissionInstructions,
+    ): Promise<MaterializationBindings> {
       const closure = await Core.materializationClosure(plan, condition),
-        linksBySource: any = {},
-        referencesBySource: any = {};
+        linksBySource: NonNullable<MaterializationBindings["linksBySource"]> =
+          {},
+        referencesBySource: NonNullable<
+          MaterializationBindings["referencesBySource"]
+        > = {};
       for (const fragment of closure.fragments) {
         linksBySource[fragment.source] = QRC.bindConditionLinks({
           context: { input: fragment.source },
@@ -125,19 +147,37 @@ export async function nativeReferenceBindings(
 /** Genuine Core calls remain inside the live A1 + native operation callback. */
 export async function materializeNativeQuestion(
   input: {
-    Core: any;
-    operation: any;
-    pair: any;
-    condition: any;
-    fact: any;
+    Core: Pick<
+      typeof CorePublic,
+      | "materializeProject"
+      | "ArtifactInventorySchema"
+      | "ProjectPlanSchema"
+      | "ArtifactFileSchema"
+    >;
+    operation: NativeOperation;
+    pair: NativeAssignmentProjectPlans;
+    condition: MaterializableCondition;
+    fact: CheckedNativeProjectFact;
     materialization?: { includeGit?: boolean };
-    settings: any;
-    sourceRows: any[];
+    settings: Pick<ReturnType<typeof question>, "submission">;
+    sourceRows: readonly { source: string; sha256: string }[];
     courseId: string;
-    runtime: any;
-    bindings: (plan: any, condition: any, submission: any) => Promise<any>;
-    Download: any;
-    adapter: any;
+    runtime: RuntimeProfile;
+    bindings: (
+      plan: ProjectPlan,
+      condition: MaterializableCondition,
+      submission: SubmissionInstructions,
+    ) => Promise<MaterializationBindings>;
+    Download: {
+      zip: Parameters<
+        Awaited<ReturnType<typeof createNativeAdapter>>["workspaceArtifact"]
+      >[0]["zip"];
+      packageArtifact: (inventory: ArtifactInventory) => Promise<Uint8Array>;
+    };
+    adapter: Pick<
+      Awaited<ReturnType<typeof createNativeAdapter>>,
+      "workspaceArtifact"
+    >;
     expectedSources: string[];
     auxiliary?: NativeAuxiliary;
     checkpoint?: () => Promise<void>;
@@ -169,7 +209,7 @@ export async function materializeNativeQuestion(
   }
   const submission = describeSubmission(
     input.settings.submission,
-    checked?.selection.sources.map((f: any) => ({
+    checked?.selection.sources.map((f) => ({
       name: f.name,
       starterPath: f.target,
     })) ?? [],
@@ -181,7 +221,7 @@ export async function materializeNativeQuestion(
   );
   if (checked) {
     for (const f of checked.selection.sources) {
-      const actual = final.files.find((file: any) => file.target === f.target);
+      const actual = final.files.find((file) => file.target === f.target);
       if (
         !actual || actual.sha256 !== f.sha256 ||
         await hash(actual.bytes) !== f.sha256
@@ -209,7 +249,7 @@ export async function materializeNativeQuestion(
       archive: workspace.archive,
     };
   }
-  const files = final.files.map((f: any) => ({
+  const files = final.files.map((f) => ({
     name: f.target,
     bytes: f.bytes,
   }));

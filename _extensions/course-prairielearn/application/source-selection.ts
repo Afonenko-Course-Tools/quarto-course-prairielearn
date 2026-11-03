@@ -2,7 +2,7 @@ import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
 import { javaBuild } from './java-build.ts';
 import { join, relative, resolve } from "node:path";
-export const safePath = (p: string) =>
+export const safePath = (p: unknown): p is string =>
   typeof p === "string" && !!p && !/^(?:[\/\\]|[A-Za-z]:)/.test(p) &&
   !p.includes("\\") && !p.includes("\0") && !p.split("/").some((p) =>
     !p || p === "." || p === ".."

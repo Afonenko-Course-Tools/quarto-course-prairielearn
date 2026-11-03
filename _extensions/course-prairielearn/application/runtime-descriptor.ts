@@ -3,6 +3,8 @@ const __metrics=__createMetrics("course-prairielearn");
 import { normalizeDiscovery } from './grading-descriptor.ts';
 import { javaBuild } from './java-build.ts';
 import { safePath } from './source-selection.ts';
+import type { NativeProjectCheck } from './native-checks.ts';
+export type RuntimeProfile = NonNullable<Parameters<typeof javaBuild>[1]>;
 export interface AdditionalJavaSources {primaryRequired?:boolean;archive:string;maxFiles:number;maxFileBytes:number;maxTotalBytes:number;maxArchiveBytes:number}
 export function validateAdditionalJavaSources(value:any,sources:string[],tests:string[]):AdditionalJavaSources {
   const caps={maxFiles:128,maxFileBytes:1048576,maxTotalBytes:4194304,maxArchiveBytes:2097152};
@@ -10,7 +12,7 @@ export function validateAdditionalJavaSources(value:any,sources:string[],tests:s
   if([...sources,...tests,'grading-job.json','tests/grading-job.json'].some(name=>name===value.archive||name.startsWith(value.archive+'/')||value.archive.startsWith(name+'/')))throw new Error('PL additional Java archive conflicts with primary/trusted path');
   return {...value};
 }
-function publicCases(value:any){
+function publicCases(value:NonNullable<NativeProjectCheck['public-cases']>){
  if(!Array.isArray(value)||value.length>32)throw Error('PL public-cases requires a bounded list');
  const ids=new Set<string>();
  return value.map(c=>{
@@ -19,12 +21,12 @@ function publicCases(value:any){
  });
 }
 export interface ApiPrecheck {files:string[];entry:string}
-export function runtimeDescriptor(c: any, profile: any, sources: string[], tests: string[], api?:ApiPrecheck) {
+export function runtimeDescriptor(c: NativeProjectCheck, profile: RuntimeProfile, sources: string[], tests: string[], api?:ApiPrecheck) {
   const build=javaBuild(c,profile);
   const javaRuntime = profile.javaRelease !== undefined || !profile.sourceExtensions;
   if (!javaRuntime && c.java !== undefined) throw new Error('PL non-Java runtime cannot declare Java compiler settings');
   if(Boolean(c['api-precheck'])!==Boolean(api))throw new Error('PL API precheck selection missing or undeclared');
-  if(api&&(!['java25-junit-v1','java25-gradle-junit-v1'].includes(c.runtime)||!javaRuntime||c.sourceProfile.mode!=='implementation'||!Array.isArray(api.files)||!api.files.length||new Set(api.files).size!==api.files.length||api.files.length>=tests.length||api.files.some(x=>!safePath(x)||!x.endsWith('.java')||!tests.includes(x))||!/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(api.entry)||api.entry!==c['api-precheck'].entry))throw new Error('PL API precheck must be a proper trusted Java subset');
+  if(api&&(!['java25-junit-v1','java25-gradle-junit-v1'].includes(c.runtime)||!javaRuntime||c.sourceProfile.mode!=='implementation'||!Array.isArray(api.files)||!api.files.length||new Set(api.files).size!==api.files.length||api.files.length>=tests.length||api.files.some(x=>!safePath(x)||!x.endsWith('.java')||!tests.includes(x))||!/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(api.entry)||api.entry!==c['api-precheck']!.entry))throw new Error('PL API precheck must be a proper trusted Java subset');
   if(c.feedback!==undefined&&(!c.feedback||typeof c.feedback!=='object'||Array.isArray(c.feedback)||Object.keys(c.feedback).sort().join(',')!=='requirement,what-check'||Object.values(c.feedback).some(v=>typeof v!=='string'||!v||v.length>8192)))throw Error('PL feedback requires explicit public requirement/what-check');
   const extra=c['additional-java-sources'];
   let additionalJavaSources:AdditionalJavaSources|undefined;

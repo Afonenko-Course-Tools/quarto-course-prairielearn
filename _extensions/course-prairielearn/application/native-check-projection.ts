@@ -3,19 +3,34 @@ import { NativeProjectCheckSchema } from "./native-checks.ts";
 import { selectNativeCompilerInputs } from "./native-selection.ts";
 import { prepareNativeRawSourceSelection } from "./native-check-inventory.ts";
 import { safePath } from "./source-selection.ts";
+import type * as Core from "course-core/public.ts";
+import type {
+  ArtifactFile,
+  ArtifactInventory,
+  NativeProjectFact,
+  ProjectPlan,
+} from "course-core/public.ts";
+import type { NativeProjectCheck } from "./native-checks.ts";
+import type { RuntimeProfile } from "./runtime-descriptor.ts";
+export type CheckedNativeProjectFact = Omit<NativeProjectFact, "check"> & {
+  check?: NativeProjectCheck;
+};
 /** Только private projection непосредственно materialized A1 inventories.
  * Это не resolver/reader; все paths/data получены от public Core той же операции.
  */
 export async function projectNativeChecks(
   input: {
-    Core: any;
-    fact: any;
-    sourceRows: any[];
-    student: any;
-    full: any;
-    studentPlan: any;
-    fullPlan: any;
-    runtime: any;
+    Core: Pick<
+      typeof Core,
+      "ArtifactInventorySchema" | "ProjectPlanSchema" | "ArtifactFileSchema"
+    >;
+    fact: CheckedNativeProjectFact;
+    sourceRows: readonly { source: string; sha256: string }[];
+    student: ArtifactInventory;
+    full: ArtifactInventory | undefined;
+    studentPlan: ProjectPlan;
+    fullPlan: ProjectPlan;
+    runtime: RuntimeProfile;
     courseId: string;
   },
 ) {
@@ -34,7 +49,10 @@ export async function projectNativeChecks(
     sourceRows: input.sourceRows,
     version: 2,
   });
-  const origin = (f: any, name: string) =>
+  const origin = (
+    f: Omit<ArtifactFile, "audience"> & { audience?: ArtifactFile["audience"] },
+    name: string,
+  ) =>
     selectOrigin({
       file: {
         target: f.target,
@@ -68,7 +86,10 @@ export async function projectNativeChecks(
       ref.available &&
       // Явная Java reference-группа без student ZIP policy — полное решение,
       // а не копия списка starter-файлов. Выбор role/hash/limits уже проверен.
-      !(!extras && ["java25-junit-v1", "java25-gradle-junit-v1"].includes(check.runtime)) &&
+      !(!extras &&
+        ["java25-junit-v1", "java25-gradle-junit-v1"].includes(
+          check.runtime,
+        )) &&
       ((!extras && [...names].some((n) => !primary.has(n))) ||
         extras?.["primary-required"] !== false &&
           [...primary].some((n) => !names.has(n)))
@@ -87,7 +108,7 @@ export async function projectNativeChecks(
       sources: await Promise.all(ref.files.map((f) => origin(f, f.name))),
     });
   }
-  const chosen = (files: any[], patterns: string[]) =>
+  const chosen = (files: ArtifactFile[], patterns: string[]) =>
     files.filter((f) => patterns.some((p) => matchesGlob(f.target, p))).sort((
       a,
       b,
@@ -127,7 +148,7 @@ export async function projectNativeChecks(
   if ((check["verification-tests"] ?? []).length && !verificationTests.length) {
     missing.push("verificationTests");
   }
-  const trustedRole = (f: any) =>
+  const trustedRole = (f: ArtifactFile) =>
     f.reason.startsWith("testset:")
       ? input.fullPlan.testsets.includes(f.reason.slice(8))
       : f.reason.startsWith("component:") &&
@@ -136,7 +157,7 @@ export async function projectNativeChecks(
     if (!safePath(name)) {
       throw Error("PL.SELECTION_INVALID: unsafe contract logical target");
     }
-    const files = full.files.filter((f: any) => f.target === name);
+    const files = full.files.filter((f) => f.target === name);
     if (files.length !== 1 || !trustedRole(files[0])) {
       throw Error(
         "PL.SELECTION_MIGRATION_REQUIRED: contract target must be selected trusted A1 raw file: " +
@@ -145,27 +166,35 @@ export async function projectNativeChecks(
     }
     return files[0];
   };
-  let contractCasesHash, contractCases;
-  const contractFixtures: any[] = [];
+  type Origin = Awaited<ReturnType<typeof origin>>;
+  let contractCasesHash:
+    | (Omit<Origin, "submissionRelativePath"> & { logicalTarget: string })
+    | undefined;
+  let contractCases: (ArtifactFile & { name: string }) | undefined;
+  const contractFixtures: (Origin & { logicalTarget: string })[] = [];
   if (check["contract-cases"]) {
     const name = check["contract-cases"], file = target(name);
     const selected = await origin(file, name);
     const { submissionRelativePath: _ignored, ...hashRecord } = selected;
     contractCasesHash = { ...hashRecord, logicalTarget: name };
     contractCases = { ...file, name };
-    const doc = JSON.parse(
+    const raw: unknown = JSON.parse(
       new TextDecoder("utf-8", { fatal: true }).decode(file.bytes),
     );
+    const doc = raw as Record<string, unknown>;
     if (doc.schemaVersion !== 1 || !Array.isArray(doc.cases)) {
       throw Error("PL.VERIFICATION_INVALID: contract cases");
     }
     const ids = new Set<string>();
-    for (const row of doc.cases) {
+    const cases: unknown[] = doc.cases;
+    for (const value of cases) {
+      const row = value as Record<string, unknown>;
       if (typeof row.id !== "string" || !row.id || ids.has(row.id)) {
         throw Error("PL.VERIFICATION_INVALID: case id");
       }
       ids.add(row.id);
-      for (const item of row.sources ?? []) {
+      for (const value of (row.sources ?? []) as Iterable<unknown>) {
+        const item = value as Record<string, unknown>;
         if (
           !safePath(item.fixture) ||
           !item.fixture.startsWith("tests/fixtures/") ||

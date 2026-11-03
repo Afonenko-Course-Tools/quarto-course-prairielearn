@@ -1,5 +1,6 @@
 import { posix } from "node:path";
 import { hash, safePath } from "./source-selection.ts";
+import type * as Core from "course-core/public.ts";
 /** Прежняя Core checks canonical область; localeCompare сохранён буквально. */
 export function checksCanonical(value: any): string {
   if (Array.isArray(value)) {
@@ -22,7 +23,7 @@ export function checksCanonical(value: any): string {
  * Version2 выражает shared origin явно; legacy1 его отклоняет.
  */
 type RawSourceSelectionInput = {
-  Core: any;
+  Core: Pick<typeof Core, "ArtifactFileSchema">;
   file: unknown;
   projectRoot: string;
   submissionRelativePath: string;

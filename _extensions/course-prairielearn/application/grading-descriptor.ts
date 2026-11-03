@@ -1,7 +1,8 @@
 import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
 import { closed } from "./declarations.ts";
-export function normalizeDiscovery(value: any = {}) {
+import type { NativeProjectCheck } from "./native-checks.ts";
+export function normalizeDiscovery(value: NativeProjectCheck["discovery"] = {}) {
   closed(value, [], ["min-executed", "allow-skipped"]);
   const merged = { "min-executed": 1, "allow-skipped": false, ...value };
   if (

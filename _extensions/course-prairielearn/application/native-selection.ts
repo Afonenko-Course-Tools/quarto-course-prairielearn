@@ -2,28 +2,24 @@ import { matchesGlob } from "node:path";
 import { NativeProjectCheckSchema } from "./native-checks.ts";
 import { hash, safePath } from "./source-selection.ts";
 import { runtimeDescriptor } from "./runtime-descriptor.ts";
+import type * as Core from "course-core/public.ts";
+import type { ArtifactFile, ProjectPlan } from "course-core/public.ts";
+import type { RuntimeProfile } from "./runtime-descriptor.ts";
 
-type File = {
-  target: string;
-  rawSource?: string;
-  bytes: Uint8Array;
-  sha256: string;
-  reason: string;
-  size: number;
-};
-type CoreBoundary = {
-  ArtifactInventorySchema: { parse: (value: unknown) => any };
-  ProjectPlanSchema: { parse: (value: unknown) => any };
-};
+type File = Omit<ArtifactFile, "audience">;
+type CoreBoundary = Pick<
+  typeof Core,
+  "ArtifactInventorySchema" | "ProjectPlanSchema"
+>;
 /** Pure consumer of actual checked A1 plan inventories. It never discovers files
  * or interprets metadata. Authored roots/globs keep their exact target meaning.
  */
 export async function selectNativeCompilerInputs(options: {
   core: CoreBoundary;
   check: unknown;
-  runtimeProfile: any;
-  studentPlan: unknown;
-  fullPlan: unknown;
+  runtimeProfile: RuntimeProfile;
+  studentPlan: ProjectPlan;
+  fullPlan: ProjectPlan;
   student: unknown;
   full: unknown;
 }) {
@@ -112,7 +108,7 @@ export async function selectNativeCompilerInputs(options: {
     !Array.isArray(extensions) || !extensions.length ||
     options.runtimeProfile?.javaRelease !== undefined &&
       extensions.some((e: string) => e !== ".java") ||
-    extensions.some((e: any) =>
+    extensions.some((e) =>
       typeof e !== "string" || !/^\.[a-z][a-z0-9]*$/.test(e)
     )
   ) throw Error("PL.SELECTION_INVALID: runtime extensions");
@@ -143,9 +139,7 @@ export async function selectNativeCompilerInputs(options: {
   }
   const trustedRecords = new Map<string, File>();
   for (const pattern of check.tests) {
-    const selected = (full.files as File[]).filter((f) =>
-      matchesGlob(f.target, pattern)
-    );
+    const selected = full.files.filter((f) => matchesGlob(f.target, pattern));
     if (!selected.length) {
       throw Error(
         "PL.SELECTION_MIGRATION_REQUIRED: no A1 target for tests " + pattern,
