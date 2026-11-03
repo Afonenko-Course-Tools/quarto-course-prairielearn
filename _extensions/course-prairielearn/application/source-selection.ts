@@ -28,12 +28,15 @@ function compareKeys(a: string, b: string): number {
   return left.length - right.length;
 }
 export function canonical(v: any): string {
-  if (Array.isArray(v)) return "[" + v.map(canonical).join(",") + "]";
+  return canonicalValue(v);
+}
+function canonicalValue(v: any): string {
+  if (Array.isArray(v)) return "[" + v.map(canonicalValue).join(",") + "]";
   if (v && typeof v === "object") {
     return "{" + Object.entries(v).filter(([, v]) =>
       v !== undefined
     ).sort(([a], [b]) => compareKeys(a, b)).map(([k, v]) =>
-      JSON.stringify(k) + ":" + canonical(v)
+      JSON.stringify(k) + ":" + canonicalValue(v)
     ).join(",") + "}";
   }
   return JSON.stringify(v);
