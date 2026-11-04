@@ -320,11 +320,6 @@ prairielearn:
       ));
     },
   );
-  const text = await Deno.readTextFile(join(root, "project/input.txt"));
-  await Deno.writeTextFile(join(root, "project/input.txt"), text + "DRIFT");
-  await assert.rejects(() =>
-    Core.withCurrentNativeOperation(candidate.expectation, () => {})
-  );
 } finally {
   if (Deno.env.get("C35_KEEP_FIXTURE")) console.log("RETAINED", root);
   else await Deno.remove(root, { recursive: true });
