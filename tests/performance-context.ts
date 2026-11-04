@@ -86,7 +86,7 @@ import {installTsAgent} from ${
 const agent=installTsAgent({experimentId:'pl',runId:'test',processId:'actual-entrypoint',outputDirectory:${
       JSON.stringify(root)
     },mode:'summary'});
-const run=async()=>{const mod=await import(Deno.env.get('PL_ENTRYPOINT')!);if(Deno.env.get('PL_BOUNDARY')==='render-public-body')await mod.renderPublicBody({resources:[],apiVersion:[1,23,1]},[{t:'Para',c:[{t:'Str',c:'PUBLIC'}]}],'demo/exr-test',{},'resources','client')};
+const run=async()=>{const mod=await import(Deno.env.get('PL_ENTRYPOINT')!);if(Deno.env.get('PL_BOUNDARY')==='render-public-body')await mod.renderPublicBody({owner:"demo",resources:[],apiVersion:[1,23,1]},[{t:'Para',c:[{t:'Str',c:'PUBLIC'}]}],'demo/exr-test',{},'resources','client')};
 try{if(Deno.env.get('PL_LINKED')==='yes')await agent.metrics.wrapAsync({id:'test.actual-caller',kind:'phase'},run)();else await run()}
 finally{agent.flush()}
 `,

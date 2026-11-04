@@ -64,10 +64,7 @@ Deno.test("public body resource rewrites preserve query and fragment on one veri
   const { renderPublicBody } = await import(
     "../_extensions/course-prairielearn/application/export.ts"
   );
-  const { hash } = await import(
-    "../_extensions/course-prairielearn/application/source-selection.ts"
-  );
-  const p = {
+  const p: Parameters<typeof renderPublicBody>[0] = {
     owner: "fixture",
     apiVersion: [1, 23, 1],
     resources: [{
@@ -77,7 +74,6 @@ Deno.test("public body resource rewrites preserve query and fragment on one veri
       target: "diagram.svg",
       visibility: "public",
       data: btoa("<svg/>"),
-      sha256: await hash("<svg/>"),
     }],
   };
   const ast = [{

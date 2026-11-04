@@ -325,12 +325,11 @@ ${privateMarker}
         const observed = await operation.resourceInventory({
           files: [{ source: imageSource, target: imageSource }],
         });
-        const publicResources = observed.files.map((file) => ({
+        const publicResources: Parameters<typeof renderPublicBody>[0]["resources"] = observed.files.map((file) => ({
           owner: "native",
           source: "bank.qmd",
           effectiveBase: root,
           target: file.target,
-          sha256: file.sha256,
           data: btoa(
             Array.from(file.bytes, (byte) => String.fromCharCode(byte)).join(
               "",

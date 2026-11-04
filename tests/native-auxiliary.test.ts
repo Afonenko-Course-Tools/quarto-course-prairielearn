@@ -6,7 +6,7 @@ Deno.test("Body отказывает до child при live-fence failure", asyn
   await reject(
     () =>
       renderPublicBody(
-        { apiVersion: [1, 23, 1], resources: [] },
+        { owner: "fixture", apiVersion: [1, 23, 1], resources: [] },
         [{ t: "Para", c: [{ t: "Str", c: "Тест" }] }],
         "fixture",
         {},
@@ -50,7 +50,7 @@ Deno.test("Python seed отключает site через -I -S -B", async () =>
 import { captureNativeAuxiliary } from "../_extensions/course-prairielearn/application/native-auxiliary.ts";
 const body = (auxiliary?: any) =>
   renderPublicBody(
-    { apiVersion: [1, 23, 1], resources: [] },
+    { owner: "fixture", apiVersion: [1, 23, 1], resources: [] },
     [{ t: "Para", c: [{ t: "Str", c: "PUBLIC_C5" }] }],
     "fixture",
     {},

@@ -1,3 +1,4 @@
+import type { BodyResource, PublicBodyPackage } from "course-core/body-export/model.ts";
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { renderNativeAnswer } from "./native-answer.ts";
 import { workspaceSeed } from "./workspace-seed.ts";
@@ -210,7 +211,7 @@ async function files(
   return collected.sort((a, b) => a.name.localeCompare(b.name));
 }
 export async function renderPublicBody(
-  p: any,
+  p: Pick<PublicBodyPackage, "owner" | "apiVersion" | "resources">,
   nodes: any[],
   key: string,
   questionContext: DiagnosticContext,
@@ -230,8 +231,8 @@ export async function renderPublicBody(
     markerIndex++;
   }
   const resourceMarker = "PL_CLIENT_FILE_URL_TOKEN_" + markerIndex;
-  const resources = new Map<string, any>();
-  const declaredResources = new Map<string, any>();
+  const resources = new Map<string, BodyResource>();
+  const declaredResources = new Map<string, BodyResource>();
   for (const resource of p.resources) {
     const previous = declaredResources.get(resource.target);
     if (previous && canonical(previous) !== canonical(resource)) {

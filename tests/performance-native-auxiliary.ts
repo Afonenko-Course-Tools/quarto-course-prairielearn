@@ -18,7 +18,7 @@ try {
   let guards=0, stale=false;
   const auxiliary=captureNativeAuxiliary(async()=>{guards++;if(stale)throw Error('LIVE_SOURCE_CHANGED')});
   const {renderPublicBody}=await import('../_extensions/course-prairielearn/application/export.ts');
-  const body=()=>renderPublicBody({apiVersion:[1,23,1],resources:[]},[{t:'Para',c:[{t:'Str',c:'PUBLIC'}]}],'fixture',{},'resources','client',{auxiliary});
+  const body=()=>renderPublicBody({owner:"fixture",apiVersion:[1,23,1],resources:[]},[{t:'Para',c:[{t:'Str',c:'PUBLIC'}]}],'fixture',{},'resources','client',{auxiliary});
   const result=await body();
   assert.match(result.html,/PUBLIC/);assert.equal(guards,2);assert.equal(overlays,0);
   assert.equal(await Deno.readTextFile(join(root,'child-mode')),'summary');

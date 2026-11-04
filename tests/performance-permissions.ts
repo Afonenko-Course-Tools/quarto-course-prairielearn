@@ -54,7 +54,7 @@ exit 23
         boundary === "render-public-body"
           ? `import {renderPublicBody} from ${
             JSON.stringify(pathToFileURL(entrypoint).href)
-          }; await renderPublicBody({resources:[],apiVersion:[1,23,1]},[{t:'Para',c:[{t:'Str',c:'PUBLIC'}]}],'demo/exr-test',{},'resources','client');`
+          }; await renderPublicBody({owner:"demo",resources:[],apiVersion:[1,23,1]},[{t:'Para',c:[{t:'Str',c:'PUBLIC'}]}],'demo/exr-test',{},'resources','client');`
           : `await import(${JSON.stringify(pathToFileURL(entrypoint).href)});`,
       );
       const args = [root];

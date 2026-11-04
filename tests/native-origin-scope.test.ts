@@ -161,7 +161,7 @@ Deno.test("native late bibliography keeps guarded semantic targets and legacy pr
       }]],
     }]],
   }];
-  const body = { apiVersion: [1, 23, 1], resources: [] },
+  const body = { owner: "native", apiVersion: [1, 23, 1], resources: [] },
     context = { source: "bank.qmd", id: "exr-p", field: "condition" };
   const actual = await renderPublicBody(
     body,
