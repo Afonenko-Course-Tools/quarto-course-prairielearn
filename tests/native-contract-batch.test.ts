@@ -2,8 +2,8 @@ import { withNativeProjectPlans } from "../_extensions/course-prairielearn/appli
 const assert = (v: unknown, m: string) => {
   if (!v) throw Error(m);
 };
-for (const narrow of [true, false]) {
-  Deno.test(`project plans выбирают ${narrow ? "contract" : "legacy"} batch без изменения student/full и metrics`, async () => {
+for (const withContextMethod of [true, false]) {
+  Deno.test(`project plans используют contract batch ${withContextMethod ? "с дополнительным context методом" : "без обращения к context методу"} и сохраняют student/full и metrics`, async () => {
     const events: string[] = [],
       contexts = [{ input: "/owner/projects/a/native-input.qmd" }, {
         input: "/owner/projects/b/native-input.qmd",
@@ -24,26 +24,18 @@ for (const narrow of [true, false]) {
     };
     const operation: any = {
       token: 17,
-      async withProjectContexts(requests: any, use: any) {
-        assert(this === operation, "Потерян receiver");
-        events.push("legacy");
-        assert(requests[0].inputs.length === 2, "Потеряна группировка");
-        const result = await use(batch);
-        closed = true;
-        return result;
-      },
-    };
-    if (narrow) {
-      operation.withProjectContracts = async function (
-        requests: any,
-        use: any,
-      ) {
+      async withProjectContracts(requests: any, use: any) {
         assert(this === operation, "Потерян receiver");
         events.push("contract");
         assert(requests[0].inputs.length === 2, "Потеряна группировка");
         const result = await use(batch);
         closed = true;
         return result;
+      },
+    };
+    if (withContextMethod) {
+      operation.withProjectContexts = async () => {
+        throw Error("Текущий NativeOperation не требует legacy выбора");
       };
     }
     const Core = {
@@ -75,8 +67,8 @@ for (const narrow of [true, false]) {
     }, operation);
     assert(
       events.join(",") ===
-        `${narrow ? "contract" : "legacy"},student,full,student,full,use`,
-      "Неверный API selection/order",
+        "contract,student,full,student,full,use",
+      "Неверный contract API/order",
     );
     assert(
       result.value === "exact" &&
@@ -86,45 +78,3 @@ for (const narrow of [true, false]) {
     );
   });
 }
-Deno.test("ошибка contract batch сохраняется без silent legacy retry", async () => {
-  const sentinel = Error("original contract failure");
-  let legacy = 0, caught: unknown;
-  try {
-    await withNativeProjectPlans(
-      {},
-      "/owner",
-      [],
-      { projects: [] },
-      async () => {},
-      {
-        withProjectContracts: async () => {
-          throw sentinel;
-        },
-        withProjectContexts: async () => {
-          legacy++;
-        },
-      },
-    );
-  } catch (e) {
-    caught = e;
-  }
-  assert(caught === sentinel && legacy === 0, "Ошибка скрыта fallback");
-});
-Deno.test("feature check принимает contract API без legacy метода", async () => {
-  const metrics = { inspectCalls: 0, fullWalks: 0, sourceBytesRead: 0 };
-  const result = await withNativeProjectPlans(
-    {},
-    "/owner",
-    [],
-    { projects: [] },
-    async () => "exact",
-    {
-      withProjectContracts: async (_r: any, use: any) =>
-        await use({ groups: [], metrics }),
-    },
-  );
-  assert(
-    result.value === "exact" && result.projectContextMetrics.final === metrics,
-    "Feature check требует отсутствующий legacy метод",
-  );
-});

@@ -1,3 +1,4 @@
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import { exportCourse } from "../_extensions/course-prairielearn/application/export-course.ts";
 import { hash } from "../_extensions/course-prairielearn/application/source-selection.ts";
 const assert = (v: unknown, m: string) => {
@@ -11,7 +12,7 @@ const image = (s: string) => ({
     c: [["", [], []], [{ t: "Str", c: "Диаграмма" }], [s, ""]],
   }],
 });
-const assignment = { requirement: "required", workMode: "individual" };
+const assignment: PublicBodyPackage["works"][number]["slots"][number]["assignment"] = { requirement: "required", workMode: "individual" };
 function work(id: string, exr = "exr-a"): any {
   return {
     id,
@@ -36,7 +37,7 @@ function work(id: string, exr = "exr-a"): any {
   };
 }
 async function fixture(
-  run: (input: any, root: string, body: (w: any) => any) => Promise<void>,
+  run: (input: any, root: string, body: (w: any) => PublicBodyPackage) => Promise<void>,
 ) {
   const root = await Deno.makeTempDir({ prefix: "whole-bank-" });
   try {
@@ -46,7 +47,7 @@ async function fixture(
       "PUBLIC_STARTER",
     );
     const first = work("sec-first"), second = work("sec-unit-a");
-    const body = (w: any) => ({
+    const body = (w: any): PublicBodyPackage => ({
       schema: "course-body-package-v2",
       owner: "fixture",
       release: "native",
@@ -188,7 +189,6 @@ Deno.test("whole-bank: public menu context uses its original resources and exclu
           target: "menu.svg",
           visibility: "public",
           data: btoa("<svg>MENU</svg>"),
-          sha256: await hash("<svg>MENU</svg>"),
         }];
       }
       return p;
@@ -314,7 +314,6 @@ for (const mappingOnly of [false, true]) {
             target: "q.svg",
             visibility: "public",
             data: btoa(data),
-            sha256: await hash(data),
           }];
           return p;
         };
@@ -330,14 +329,13 @@ Deno.test("whole-bank: ambiguous resource target in public projection refuses", 
       );
       p.questions[0].condition = [image("q.svg")];
       p.resources = await Promise.all(
-        ["<svg>A</svg>", "<svg>B</svg>"].map(async (data) => ({
+        ["<svg>A</svg>", "<svg>B</svg>"].map(async (data): Promise<PublicBodyPackage["resources"][number]> => ({
           owner: "fixture",
           source: "bank/a.qmd",
           effectiveBase: root,
           target: "q.svg",
           visibility: "public",
           data: btoa(data),
-          sha256: await hash(data),
         })),
       );
       return p;
@@ -405,7 +403,6 @@ for (const conflict of [false, true]) {
               target: "shared.svg",
               visibility: "public",
               data: btoa(data),
-              sha256: await hash(data),
             }];
           }
           return p;

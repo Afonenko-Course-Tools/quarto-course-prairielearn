@@ -1,3 +1,4 @@
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 // Синтетический export unit: настоящий Git/ZIP/Pandoc, без NativeRun и рендера курса.
 import {exportPrairieLearn} from '../_extensions/course-prairielearn/application/export.ts';
 import {join,relative} from 'node:path';
@@ -36,7 +37,7 @@ Deno.test('Git clone переносит полный native payload, а starter 
   const zip=join(root,'starter.zip');
   await command(root,'python3',['-c','import pathlib,sys,zipfile; r=pathlib.Path(sys.argv[1]); z=zipfile.ZipFile(sys.argv[2],"w"); [z.write(p,p.relative_to(r)) for p in sorted(r.rglob("*")) if p.is_file()]; z.close()',student,zip]);
   const archive=await Deno.readFile(zip);
-  const pkg={schema:'course-body-package-v2',owner:'synthetic',release:'native',apiVersion:[1,23,1],questions:[{owner:'synthetic',id:'exr-report',key:'synthetic/exr-report',title:'История Git',difficulty:'introductory',source:'report.qmd',visibility:'public',statementVisibility:'open',hasPublicSolution:false,answerType:'manual',condition:[{t:'Para',c:[{t:'Str',c:'Распакуйте комплект.'}]}],publicAnswer:[]}],works:[{owner:'synthetic',id:'sec-report',key:'synthetic/sec-report',source:'report.qmd',kind:'lab',title:'История Git',slots:[{id:'synthetic/sec-report/exr-report',selection:'fixed',candidates:['synthetic/exr-report'],assignment:{requirement:'required',workMode:'individual'}}]}],resources:[]};
+  const pkg: PublicBodyPackage={schema:'course-body-package-v2',owner:'synthetic',release:'native',apiVersion:[1,23,1],questions:[{owner:'synthetic',id:'exr-report',key:'synthetic/exr-report',title:'История Git',difficulty:'introductory',source:'report.qmd',visibility:'public',statementVisibility:'open',hasPublicSolution:false,answerType:'manual',condition:[{t:'Para',c:[{t:'Str',c:'Распакуйте комплект.'}]}],publicAnswer:[]}],works:[{owner:'synthetic',id:'sec-report',key:'synthetic/sec-report',source:'report.qmd',kind:'lab',title:'История Git',slots:[{id:'synthetic/sec-report/exr-report',selection:'fixed',candidates:['synthetic/exr-report'],assignment:{requirement:'required',workMode:'individual'}}]}],resources:[]};
   const output=join(root,'native');
   await exportPrairieLearn(pkg,{projectRoot:root,projects:{'exr-report':'/projects/report'},studentArtifacts:{'exr-report':{files,archive}}},{questions:{'exr-report':{topic:'Synthetic',grading:{method:'manual'},submission:{mode:'upload'},files:[]}}},output);
   const intended=await inventory(output);

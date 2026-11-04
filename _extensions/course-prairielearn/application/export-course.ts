@@ -1,3 +1,4 @@
+import type { BodyResource, PublicBodyPackage } from "course-core/body-export/model.ts";
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { nativeAnswerBinding } from "./native-delivery.ts";
 import { loadPublicationConditions } from "./publication-conditions.ts";
@@ -146,7 +147,7 @@ export async function exportCourse<Checks extends ExportChecks>(
     instance: string;
     output: string;
     checksOutput: string;
-    body: (work: string) => Promise<any>;
+    body: (work: string) => Promise<PublicBodyPackage>;
     candidateImage?: string;
     deferPublish?: boolean;
     nativeBody?: boolean;
@@ -188,7 +189,7 @@ export async function exportCourse<Checks extends ExportChecks>(
     }
     return work;
   });
-  const menuBodies = new Map<string, any>();
+  const menuBodies = new Map<string, PublicBodyPackage>();
   const unitMenus = nativeUnitMenus(works, content.assessments);
   const active = new Set();
   for (const w of works) {
@@ -315,12 +316,14 @@ export async function exportCourse<Checks extends ExportChecks>(
         studentArtifacts: Record<string, StudentArtifact> = {};
       const contexts = [{ work, body: p, menu: false }];
       for (const menu of unitMenus.get(work.id) ?? []) {
-        if (!menuBodies.has(menu.id)) {
-          menuBodies.set(menu.id, await input.body(menu.id));
+        let body = menuBodies.get(menu.id);
+        if (!body) {
+          body = await input.body(menu.id);
+          menuBodies.set(menu.id, body);
         }
         contexts.push({
           work: menu,
-          body: menuBodies.get(menu.id),
+          body,
           menu: true,
         });
       }
@@ -668,19 +671,17 @@ export async function exportCourse<Checks extends ExportChecks>(
           }
         }
         const nativeFiles = await inventory(join(partial, base));
-        const resourceBindings = [...new Map<string, any>(
+        const resourceBindings = [...new Map<string, BodyResource>(
           p.resources
-            .filter((resource: any) =>
+            .filter((resource) =>
               Object.hasOwn(
                 nativeFiles,
                 "clientFilesQuestion/" + resource.target,
               )
             )
-            .map((resource: any) =>
-              [resource.target, resource] as [string, any]
-            ),
+            .map((resource) => [resource.target, resource]),
         ).values()]
-          .sort((left: any, right: any) =>
+          .sort((left, right) =>
             left.target.localeCompare(right.target)
           );
         const snapshot = canonical({

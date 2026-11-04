@@ -1,3 +1,4 @@
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import { question } from "../_extensions/course-prairielearn/application/declarations.ts";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 import { infoQuestion } from "../_extensions/course-prairielearn/application/native-validators.js";
@@ -17,7 +18,7 @@ export const workspaceOptions = {
     ".pl-seed/identity.jso[n]",
   ],
 };
-export const body = {
+export const body: PublicBodyPackage = {
   schema: "course-body-package-v2",
   owner: "synthetic",
   release: "native",

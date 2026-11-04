@@ -1,3 +1,4 @@
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 // Ограниченный lifecycle harness; scope callbacks здесь НЕ genuine Core operation/prior P.
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 import { exportCourse } from "../_extensions/course-prairielearn/application/export-course.ts";
@@ -28,16 +29,21 @@ async function fixture(course: boolean) {
   const answer = { type: "manual", submission: "text" },
     id = "exr-answer",
     key = "fixture/" + id;
+  const kind: PublicBodyPackage["works"][number]["kind"] = "lab";
+  const selection: PublicBodyPackage["works"][number]["slots"][number]["selection"] = "fixed";
+  const assignment: PublicBodyPackage["works"][number]["slots"][number]["assignment"] = {
+    requirement: "required", workMode: "individual",
+  };
   const work = {
     id: "sec-work",
     source: "work.qmd",
-    kind: "lab",
+    kind,
     title: "Работа",
     slots: [{
       id,
-      selection: "fixed",
+      selection,
       candidates: [id],
-      assignment: { requirement: "required", workMode: "individual" },
+      assignment,
     }],
     extensions: {
       prairielearn: {
@@ -49,7 +55,7 @@ async function fixture(course: boolean) {
       },
     },
   };
-  const pkg = {
+  const pkg: PublicBodyPackage = {
     schema: "course-body-package-v2",
     owner: "fixture",
     release: "native",

@@ -1,3 +1,5 @@
+import type { NativeOperation, NativeAssignmentDeliveryOptions } from "course-core/public.ts";
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import { captureNativeAuxiliary } from "./native-auxiliary.ts";
 import { dirname, join, resolve } from "node:path";
 import { createNativeAdapter } from "./native-adapter.ts";
@@ -16,6 +18,8 @@ import {
   nativeReferenceBindings,
   publicExtension,
 } from "./native-materialize.ts";
+type NativeAdapter = ReturnType<typeof createNativeAdapter>;
+type NativeDelivered = Awaited<ReturnType<NativeAdapter["assignmentDelivery"]>>;
 export type NativeProjectPlansResult<T> = {
   value: T;
   projectContextMetrics: Readonly<{
@@ -31,16 +35,8 @@ export async function withNativeProjectPlans<T>(
   profiles: string[],
   witness: any,
   use: (plans: any[], checkpoint: () => Promise<void>) => Promise<T>,
-  operation: any,
+  operation: NativeOperation,
 ): Promise<NativeProjectPlansResult<T>> {
-  const withProjects = typeof operation?.withProjectContracts === "function"
-    ? operation.withProjectContracts
-    : operation?.withProjectContexts;
-  if (typeof withProjects !== "function") {
-    throw Error(
-      "PL.NATIVE_PROJECT_CONTEXT_REUSE_REQUIRED: public current-operation A1 batch unavailable; no standalone fallback",
-    );
-  }
   const formats = [
     ...new Set(witness.projects.map((p: any) => p.format)),
   ] as string[];
@@ -70,10 +66,7 @@ export async function withNativeProjectPlans<T>(
     }
     return snapshot as Readonly<Record<string, number>>;
   };
-  const value = await withProjects.call(
-    operation,
-    requests,
-    async (batch: any) => {
+  const useBatch = async (batch: any): Promise<T> => {
       retained = batch;
       // Capability захватывается только этой callback; старый Core всегда full.
       const checkpoint = typeof batch.checkpoint === "function"
@@ -123,8 +116,8 @@ export async function withNativeProjectPlans<T>(
       const result = await use(plans, checkpoint);
       inside = metrics();
       return result;
-    },
-  );
+  };
+  const value = await operation.withProjectContracts(requests, useBatch);
   const final = metrics();
   if (!inside) {
     throw Error("PL.NATIVE_METRICS_UNAVAILABLE: callback observation missing");
@@ -136,21 +129,21 @@ export async function withNativeProjectPlans<T>(
 export async function withNativeAssignments<T>(
   input: {
     Core: any;
-    operation: any;
+    operation: NativeOperation;
     descriptor: any;
     selection: {
       expectedSources: string[];
       assessments: { source: string; id: string }[];
     };
-    references?: unknown;
+    references?: NativeAssignmentDeliveryOptions["references"];
   },
   use: (
     prepared: {
-      adapter: any;
-      proof: any;
-      witness: any;
-      projectPlans: any[];
-      deliveries: any[];
+      adapter: NativeAdapter;
+      proof: Awaited<ReturnType<NativeAdapter["validateCourse"]>>;
+      witness: Awaited<ReturnType<typeof nativeProjectWitness>>;
+      projectPlans: NativeAssignmentDeliveryOptions["projectPlans"];
+      deliveries: NativeDelivered[];
       checkpoint: () => Promise<void>;
     },
   ) => Promise<T>,
@@ -174,7 +167,7 @@ export async function withNativeAssignments<T>(
     descriptor.identity.profiles,
     witness,
     async (projectPlans, checkpoint) => {
-      const deliveries = [];
+      const deliveries: NativeDelivered[] = [];
       for (const assessment of selection.assessments) {
         deliveries.push(
           await adapter.assignmentDelivery(
@@ -238,7 +231,7 @@ export function authoredNativeSettings(value: any) {
 export async function prepareNativeCourse(
   input: {
     Core: any;
-    operation: any;
+    operation: NativeOperation;
     descriptor: any;
     selection: {
       expectedSources: string[];
@@ -286,7 +279,7 @@ export async function prepareNativeCourse(
       const courseId = deliveries[0]?.publicPackage.owner;
       if (
         !courseId ||
-        deliveries.some((d: any) => d.publicPackage.owner !== courseId)
+        deliveries.some((d) => d.publicPackage.owner !== courseId)
       ) throw Error("PL.ASSIGNMENT_CHANGED: course owner");
       const rows = witness.sourceRows,
         bySource = new Map(rows.map((r: any) => [r.source, r.sha256]));
@@ -327,7 +320,7 @@ export async function prepareNativeCourse(
         nativeResponseSlots: any = {},
         artifacts: Record<string, Materialized> = {},
         settings: any = {},
-        bodies = new Map<string, any>();
+        bodies = new Map<string, PublicBodyPackage>();
       // Введение каждого реально используемого меню готово до дорогих A1 ZIP.
       // Assignment membership проверяет Core по раннему observed context intent.
       if (options.instance) {
@@ -390,10 +383,10 @@ export async function prepareNativeCourse(
         }
         return registryInput.value;
       };
-      const materializationTotal = new Set(deliveries.flatMap((d: any) =>
-        d.publicPackage.questions.filter((q: any) =>
+      const materializationTotal = new Set(deliveries.flatMap((d) =>
+        d.publicPackage.questions.filter((q) =>
           !d.nativeAnswers[q.id]
-        ).map((q: any) =>
+        ).map((q) =>
           q.id
         )
       )).size;
@@ -430,7 +423,7 @@ export async function prepareNativeCourse(
           const facts = witness.projects.filter((p: any) =>
             p.source === q.source && p.fact.exerciseId === q.id
           );
-          const pairs = projectPlans.filter((p: any) =>
+          const pairs = projectPlans.filter((p) =>
             p.source === q.source && p.exerciseId === q.id
           );
           if (facts.length !== 1 || pairs.length !== 1) {
@@ -439,16 +432,16 @@ export async function prepareNativeCourse(
           const fact = facts[0].fact,
             business = adapter.business(q.source),
             declaration = adapter.validatedInput(q.source).declarations.find((
-              d: any,
+              d,
             ) => d.id === q.id);
           if (
             fact.check &&
-            canonical(
+            (!declaration || canonical(
                 decodeNativeCheck(
                   business.raw.projectChecks,
                   declaration.attributes["project-check"],
                 ),
-              ) !== canonical(fact.check)
+              ) !== canonical(fact.check))
           ) throw Error("PL.CHECKS_CHANGED: Core/C policy parity");
           const runtime = fact.check
             ? (await registry()).profiles?.[fact.check.runtime]
@@ -539,13 +532,14 @@ export async function prepareNativeCourse(
           output,
           checksOutput: options.checksOutput,
           body: async (id) => {
-            if (!bodies.has(id)) {
+            const body = bodies.get(id);
+            if (!body) {
               throw Error(
                 "PL.NATIVE_INTENT_INCOMPLETE: selected menu context absent: " +
                   id,
               );
             }
-            return bodies.get(id);
+            return body;
           },
           candidateImage: options.candidateImage,
           deferPublish: true,

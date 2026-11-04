@@ -1,3 +1,4 @@
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import {question} from '../_extensions/course-prairielearn/application/declarations.ts';
 import {gradingPolicy,validateGradingComponents} from '../_extensions/course-prairielearn/application/grading-policy.ts';
 const assert=(value:unknown,message:string)=>{if(!value)throw Error(message)};
@@ -33,7 +34,7 @@ Deno.test('manual upload экспортируется без runtime и tests, �
  const root=await Deno.makeTempDir({prefix:'manual-export-'});
  try{
   await Deno.mkdir(root+'/projects/report/student',{recursive:true});await Deno.writeTextFile(root+'/projects/report/student/README.md','PUBLIC_README');
-  const pkg={schema:'course-body-package-v2',owner:'synthetic',release:'native',apiVersion:[1,23,1],questions:[{owner:'synthetic',id:'exr-report',key:'synthetic/exr-report',title:'Исследование',difficulty:'introductory',source:'report.qmd',visibility:'public',statementVisibility:'open',hasPublicSolution:false,answerType:'manual',condition:[{t:'Para',c:[{t:'Str',c:'PUBLIC_CONDITION'}]}],publicAnswer:[]}],works:[{owner:'synthetic',id:'sec-report',key:'synthetic/sec-report',source:'report.qmd',kind:'lab',title:'Исследование',slots:[{id:'synthetic/sec-report/exr-report',selection:'fixed',candidates:['synthetic/exr-report'],assignment:{requirement:'required',workMode:'individual'}}]}],resources:[]};
+  const pkg: PublicBodyPackage={schema:'course-body-package-v2',owner:'synthetic',release:'native',apiVersion:[1,23,1],questions:[{owner:'synthetic',id:'exr-report',key:'synthetic/exr-report',title:'Исследование',difficulty:'introductory',source:'report.qmd',visibility:'public',statementVisibility:'open',hasPublicSolution:false,answerType:'manual',condition:[{t:'Para',c:[{t:'Str',c:'PUBLIC_CONDITION'}]}],publicAnswer:[]}],works:[{owner:'synthetic',id:'sec-report',key:'synthetic/sec-report',source:'report.qmd',kind:'lab',title:'Исследование',slots:[{id:'synthetic/sec-report/exr-report',selection:'fixed',candidates:['synthetic/exr-report'],assignment:{requirement:'required',workMode:'individual'}}]}],resources:[]};
   await exportPrairieLearn(pkg,{projectRoot:root,projects:{'exr-report':'/projects/report'}},{questions:{'exr-report':{topic:'Synthetic',grading:{method:'manual'},submission:{mode:'upload'},files:[]}}},root+'/out');
   const base=root+'/out/questions/synthetic/exr-report',info=JSON.parse(await Deno.readTextFile(base+'/info.json')),html=await Deno.readTextFile(base+'/question.html');
   assert(infoQuestion(info)&&info.gradingMethod==='Manual'&&info.showCorrectAnswer===false&&!info.externalGradingOptions,'Native Manual declaration invalid');

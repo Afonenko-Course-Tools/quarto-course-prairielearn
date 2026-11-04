@@ -1,3 +1,4 @@
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import { workspaceSeed } from "../_extensions/course-prairielearn/application/workspace-seed.ts";
 // Реальные pinned recipe/Python/Git и C packages; Body/config — explicit harness, не assignment/P.
 import { assert, fixture } from "./native-auxiliary-fixtures.ts";
@@ -44,16 +45,21 @@ for (
       });
       await Deno.writeFile(path, file.bytes);
     }
+    const kind: PublicBodyPackage["works"][number]["kind"] = "lab";
+    const selection: PublicBodyPackage["works"][number]["slots"][number]["selection"] = "fixed";
+    const assignment: PublicBodyPackage["works"][number]["slots"][number]["assignment"] = {
+      requirement: "required", workMode: "individual",
+    };
     const work = {
       id: "sec-work",
       source: "work.qmd",
-      kind: "lab",
+      kind,
       title: "Работа",
       slots: [{
         id,
-        selection: "fixed",
+        selection,
         candidates: [id],
-        assignment: { requirement: "required", workMode: "individual" },
+        assignment,
       }],
       extensions: {
         prairielearn: {
@@ -65,7 +71,7 @@ for (
         },
       },
     };
-    const pkg = {
+    const pkg: PublicBodyPackage = {
       schema: "course-body-package-v2",
       owner: "fixture",
       release: "native",

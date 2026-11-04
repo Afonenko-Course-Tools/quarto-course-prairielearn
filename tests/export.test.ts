@@ -1,9 +1,10 @@
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import { stripVTControlCharacters } from "node:util";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 const assert = (v: unknown, m: string) => {
   if (!v) throw Error(m);
 };
-const p = () => ({
+const p = (): PublicBodyPackage => ({
   schema: "course-body-package-v2",
   owner: "demo",
   release: "native",

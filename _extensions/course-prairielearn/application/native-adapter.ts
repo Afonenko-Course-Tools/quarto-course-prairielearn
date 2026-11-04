@@ -1,6 +1,10 @@
 import type * as CorePublic from "course-core/public.ts";
 import type {
   NativeOperationIdentity,
+  NativeOperation,
+  NativeAssignmentRequest,
+  NativeAssignmentDeliveryOptions,
+  NativeAdapterValidationInput,
   NativePendingOperationExpectation,
   NativePreparedLease,
   NativePreparedOperation,
@@ -223,15 +227,17 @@ export function createNativeAdapter(
     : options.core.NativeOperationIdentitySchema.parse(
       options.preparedIdentity,
     );
-  const loaded = new Map<string, ReturnType<typeof decodeNativeBusiness>>();
-  const effectiveInputs = new Map<string, any>();
+  const captured = new Map<string, {
+    business: ReturnType<typeof decodeNativeBusiness>;
+    input: NativeAdapterValidationInput;
+  }>();
   let composing = false;
   let validatingRequest: Awaited<ReturnType<typeof requestFor>> | undefined;
   let validatedCourse: {
-    operation: any;
-    identity: any;
-    request: any;
-    proof: any;
+    operation: NativeOperation;
+    identity: NativeOperation["identity"];
+    request: Parameters<NativeOperation["validateRelease"]>[0];
+    proof: Awaited<ReturnType<NativeOperation["validateRelease"]>>;
   } | undefined;
   const adapter = {
     name: "prairielearn",
@@ -312,16 +318,15 @@ export function createNativeAdapter(
         ) sources.push({ path: common.source, kind: "file" });
       }
       if (composing) {
-        loaded.set(input.origin.source, business);
-        effectiveInputs.set(input.origin.source, input);
+        captured.set(input.origin.source, { business, input });
       }
       return { sources };
     },
     async validateCourse(
-      operation: any,
-      request: { expectedSources: string[]; courseId?: string },
+      operation: NativeOperation,
+      request: Parameters<NativeOperation["validateRelease"]>[0],
       checkpoint?: () => Promise<void>,
-    ) {
+    ): Promise<Awaited<ReturnType<NativeOperation["validateRelease"]>>> {
       if (composing) throw Error("PL.ASSESSMENT_INVALID: recursive validation");
       if (
         validatedCourse && validatedCourse.operation === operation &&
@@ -333,13 +338,11 @@ export function createNativeAdapter(
           return validatedCourse.proof;
         } catch (error) {
           validatedCourse = undefined;
-          loaded.clear();
-          effectiveInputs.clear();
+          captured.clear();
           throw error;
         }
       }
-      loaded.clear();
-      effectiveInputs.clear();
+      captured.clear();
       validatedCourse = undefined;
       composing = true;
       try {
@@ -365,12 +368,14 @@ export function createNativeAdapter(
         await operation.assertCurrent();
         const proof = await operation.validateRelease(request, [adapter]);
         if (
-          loaded.size !== request.expectedSources.length ||
-          request.expectedSources.some((source) => !loaded.has(source))
+          captured.size !== request.expectedSources.length ||
+          request.expectedSources.some((source) => !captured.has(source))
         ) throw Error("PL.ASSESSMENT_INVALID: missing authenticated source");
-        assertNativeSeedTargets([...loaded.values()]);
+        assertNativeSeedTargets(
+          [...captured.values()].map(({ business }) => business),
+        );
         const methods: Record<string, "external" | "manual" | "mixed"> = {};
-        for (const business of loaded.values()) {
+        for (const { business } of captured.values()) {
           for (const [id, settings] of Object.entries(business.questions)) {
             if (Object.hasOwn(methods, id)) {
               throw Error("PL.ASSESSMENT_INVALID: repeated declaration");
@@ -378,8 +383,7 @@ export function createNativeAdapter(
             methods[id] = settings.grading.method;
           }
         }
-        for (const [source, business] of loaded) {
-          const input = effectiveInputs.get(source);
+        for (const [source, { business, input }] of captured) {
           if (input.assessment && business.assessment) {
             validateGradingComponents({
               ...input.assessment,
@@ -402,8 +406,7 @@ export function createNativeAdapter(
         };
         return proof;
       } catch (error) {
-        loaded.clear();
-        effectiveInputs.clear();
+        captured.clear();
         throw error;
       } finally {
         composing = false;
@@ -414,9 +417,9 @@ export function createNativeAdapter(
      * живой composition. Этот bridge не создаёт scope/plan/condition authority.
      */
     async assignmentDelivery(
-      operation: any,
-      request: { source: string; assessmentId: string },
-      options: { projectPlans: readonly unknown[]; references?: unknown },
+      operation: NativeOperation,
+      request: NativeAssignmentRequest,
+      options: NativeAssignmentDeliveryOptions,
       release: { expectedSources: string[]; courseId?: string },
       checkpoint?: () => Promise<void>,
     ) {
@@ -442,15 +445,18 @@ export function createNativeAdapter(
       ) {
         throw Error("PL.ASSIGNMENT_CHANGED: public delivery binding");
       }
-      const nativeAnswers: Record<string, unknown> = {},
-        nativeSettings: Record<string, unknown> = {};
+      const nativeAnswers: Record<
+        string,
+        NonNullable<NativeAdapterValidationInput["declarations"][number]["answer"]>
+      > = {},
+        nativeSettings: ReturnType<typeof decodeNativeBusiness>["questions"] = {};
       const ids = new Set<string>();
       for (const question of delivery.publicPackage.questions) {
-        const input = effectiveInputs.get(question.source);
-        const declaration = input?.declarations.find((d: any) =>
+        const source = captured.get(question.source);
+        const declaration = source?.input.declarations.find((d) =>
           d.id === question.id
         );
-        const settings = loaded.get(question.source)?.questions[question.id];
+        const settings = source?.business.questions[question.id];
         if (
           !declaration || !settings || ids.has(question.id) ||
           !delivery.conditions[question.id]
@@ -481,11 +487,11 @@ export function createNativeAdapter(
     },
     /** Закрытое состояние PL composition; не включать в public Body/catalog/README. */
     validatedInput(source: string) {
-      const input = effectiveInputs.get(source);
-      if (!validatedCourse || !input) {
+      const value = captured.get(source);
+      if (!validatedCourse || !value) {
         throw Error("PL.CAPTURE_MISSING: validation не выполнена");
       }
-      return structuredClone(input);
+      return structuredClone(value.input);
     },
     async workspaceArtifact(
       request: {
@@ -502,20 +508,21 @@ export function createNativeAdapter(
       await adapter.validateCourse(request.operation, {
         expectedSources: request.expectedSources,
       }, request.checkpoint);
-      const business = loaded.get(request.source),
-        input = effectiveInputs.get(request.source);
-      const declaration = input?.declarations.find((d: any) =>
+      const source = captured.get(request.source),
+        business = source?.business,
+        input = source?.input;
+      const declaration = input?.declarations.find((d) =>
         d.id === request.exerciseId
       );
       if (
         !business || !declaration ||
-        request.operation.identity.operation !== input.origin.operation
+        request.operation.identity.operation !== input?.origin.operation
       ) throw Error("PL.CAPTURE_CHANGED: Workspace operation");
       const inventory = options.core.ArtifactInventorySchema.parse(
         request.inventory,
       );
       if (
-        inventory.operation !== input.origin.operation ||
+        inventory.operation !== input?.origin.operation ||
         inventory.exerciseId !== request.exerciseId ||
         inventory.audience !== "student"
       ) throw Error("PL.WORKSPACE_SEED: inventory identity");
@@ -546,11 +553,11 @@ export function createNativeAdapter(
     },
     /** Значения только после настоящего executable callback; publish владеет outer Core fence. */
     business(source: string) {
-      const result = loaded.get(source);
+      const result = captured.get(source);
       if (!validatedCourse || !result) {
         throw Error("PL.CAPTURE_MISSING: validation не выполнена");
       }
-      return structuredClone(result);
+      return structuredClone(result.business);
     },
   };
   return adapter;

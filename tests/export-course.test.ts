@@ -1,3 +1,4 @@
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import { NativeProjectCheckSchema } from "../_extensions/course-prairielearn/application/native-checks.ts";
 import {runtimeDescriptor} from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
 import {
@@ -238,7 +239,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         "single-variant": false,
       },
     };
-    const assignment = { requirement: "required", workMode: "individual" };
+    const assignment: PublicBodyPackage["works"][number]["slots"][number]["assignment"] = { requirement: "required", workMode: "individual" };
     const work = {
       id: "sec-lab",
       source: "lab.qmd",
@@ -285,7 +286,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
       sources: [selection],
       trustedTests: [test],
     };
-    const body = {
+    const body: PublicBodyPackage = {
       schema: "course-body-package-v2",
       owner: "demo",
       release: "1",
@@ -303,7 +304,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         condition: [{ t: "Para", c: [{ t: "Str", c: "PUBLIC_CONDITION" }] }],
         publicAnswer: [],
       }],
-      resources: [{owner: "demo", source: "lab.qmd", effectiveBase: root, target: "diagram.svg", visibility: "public", data: btoa("<svg>PUBLIC_DIAGRAM</svg>"), sha256: await hash("<svg>PUBLIC_DIAGRAM</svg>")}],
+      resources: [{owner: "demo", source: "lab.qmd", effectiveBase: root, target: "diagram.svg", visibility: "public", data: btoa("<svg>PUBLIC_DIAGRAM</svg>")}],
       works: [{
         owner: "demo",
         id: "sec-lab",
@@ -1122,7 +1123,7 @@ Deno.test("UUID assessment сохраняется при переименова�
   try {
     await Deno.mkdir(root + "/project/student", { recursive: true });
     await Deno.writeTextFile(root + "/project/student/README.md", "Условие");
-    const assignment = { requirement: "required", workMode: "individual" };
+    const assignment: PublicBodyPackage["works"][number]["slots"][number]["assignment"] = { requirement: "required", workMode: "individual" };
     const work: any = {
       id: "sec-lab", source: "lab.qmd", kind: "lab", title: "Работа",
       slots: [{ id: "exr-a", selection: "fixed", candidates: ["exr-a"], assignment }],
@@ -1136,7 +1137,7 @@ Deno.test("UUID assessment сохраняется при переименова�
       },
       "question-defaults": { topic: "Курс", grading: { method: "manual" }, submission: { mode: "upload" } },
     };
-    const body = {
+    const body: PublicBodyPackage = {
       schema: "course-body-package-v2", owner: "demo", release: "native", apiVersion: [1, 23, 1],
       questions: [{ owner: "demo", id: "exr-a", key: "demo/exr-a", title: "Задача", source: "a.qmd",
         visibility: "public", statementVisibility: "open", hasPublicSolution: false, answerType: "manual",

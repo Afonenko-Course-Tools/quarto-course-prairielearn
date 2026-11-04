@@ -464,7 +464,9 @@ export async function renderPublicBody(
   ).replaceAll(resourceMarker + "/", clientFilesToken + "/");
   return { html, files };
 }
-function metadata(q: any): string {
+function metadata(
+  q: Pick<PublicBodyPackage["questions"][number], "difficulty" | "time">,
+): string {
   const difficulty: Record<string, string> = {
     introductory: "Начальный",
     intermediate: "Средний",
@@ -479,7 +481,7 @@ function metadata(q: any): string {
     : "";
 }
 export async function exportPrairieLearn(
-  p: any,
+  p: PublicBodyPackage,
   context: ProjectContext,
   binding: any,
   output: string,
@@ -537,7 +539,7 @@ export async function exportPrairieLearn(
     refuse("Требуется одна работа", "works");
   }
   if (
-    !fields(work, ["owner", "id", "key", "source", "kind", "title", "slots"], [
+    !work || !fields(work, ["owner", "id", "key", "source", "kind", "title", "slots"], [
       "theoryTime",
       "relatedExercise",
       "introduction",
@@ -552,20 +554,24 @@ export async function exportPrairieLearn(
     work.theoryTime !== undefined &&
       (typeof work.theoryTime !== "number" ||
         !Number.isFinite(work.theoryTime) || work.theoryTime <= 0)
-  ) refuse("Неверные поля работы v2", "works");
+  ) return refuse("Неверные поля работы v2", "works");
   try {
     validateSlots(work.slots, p.owner, work.id, true);
   } catch (error) {
     refuse("Неверные позиции Body v2: " + String(error), "works.slots");
   }
-  const candidates = work.slots.flatMap((slot: any) => slot.candidates);
+  const candidates = work.slots.flatMap((slot) => slot.candidates);
   if (
     candidates.length !== p.questions.length ||
-    p.questions.some((q: any) => !candidates.includes(q?.key))
+    p.questions.some((q) => !candidates.includes(q?.key))
   ) refuse("Каталог должен содержать всех кандидатов", "works.slots");
-  const assignments = Object.fromEntries(
-    work.slots.flatMap((slot: any) =>
-      slot.candidates.map((id: string) => [id, slot.assignment])
+  const assignments = Object.fromEntries<
+    PublicBodyPackage["works"][number]["slots"][number]["assignment"]
+  >(
+    work.slots.flatMap((slot) =>
+      slot.candidates.map((id): [string, typeof slot.assignment] =>
+        [id, slot.assignment]
+      )
     ),
   );
   const prepared: { name: string; data: Uint8Array }[] = [];
@@ -616,7 +622,7 @@ export async function exportPrairieLearn(
         q.answerType,
       ) ||
       !Array.isArray(q.condition) || !Array.isArray(q.publicAnswer)
-    ) questionFail("Неверный публичный вопрос", "questions");
+    ) return questionFail("Неверный публичный вопрос", "questions");
     if (
       ["test", "practical"].includes(work.kind) &&
       q.statementVisibility !== "restricted"

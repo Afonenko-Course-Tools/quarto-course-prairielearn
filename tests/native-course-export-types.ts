@@ -76,3 +76,25 @@ type _PublicationSubmission = Require<Exact<PublicationQuestion["submission"], S
 type _PublicationGrading = Require<Exact<PublicationQuestion["grading"]["method"], "external" | "manual" | "mixed">>;
 type _BusinessConsumedInput = Require<NativeAdapterValidationInput extends NativeBusinessInput ? true : false>;
 type _PublicationInput = Require<Exact<ReturnType<NativePublication["adapterInputs"]>[number], NativeAdapterValidationInput>>;
+
+// Реальная Native body цепочка: Exact отклоняет any, одной assignability мало.
+import type { NativeOperation, NativeAssignmentDelivery, NativeAssignmentRequest, NativeAssignmentDeliveryOptions } from "course-core/public.ts";
+import type { PublicBodyPackage, BodyResource } from "course-core/body-export/model.ts";
+import type { createNativeAdapter } from "../_extensions/course-prairielearn/application/native-adapter.ts";
+import type { prepareNativeCourse, withNativeAssignments, withNativeProjectPlans } from "../_extensions/course-prairielearn/application/native-course.ts";
+import type { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
+type Adapter = ReturnType<typeof createNativeAdapter>;
+type Delivered = Awaited<ReturnType<Adapter["assignmentDelivery"]>>;
+type PreparedBodies = Parameters<Parameters<typeof withNativeAssignments>[1]>[0];
+type _CourseOperation = Require<Exact<Parameters<typeof prepareNativeCourse>[0]["operation"], NativeOperation>>;
+type _CompositionOperation = Require<Exact<Parameters<typeof withNativeAssignments>[0]["operation"], NativeOperation>>;
+type _ProjectOperation = Require<Exact<Parameters<typeof withNativeProjectPlans>[5], NativeOperation>>;
+type _AdapterOperation = Require<Exact<Parameters<Adapter["assignmentDelivery"]>[0], NativeOperation>>;
+type _AdapterRequest = Require<Exact<Parameters<Adapter["assignmentDelivery"]>[1], NativeAssignmentRequest>>;
+type _AdapterOptions = Require<Exact<Parameters<Adapter["assignmentDelivery"]>[2], NativeAssignmentDeliveryOptions>>;
+type _CoreDelivery = Require<Exact<Delivered["delivery"], NativeAssignmentDelivery>>;
+type _AdapterPackage = Require<Exact<Delivered["publicPackage"], PublicBodyPackage>>;
+type _CompositionPackage = Require<Exact<PreparedBodies["deliveries"][number]["publicPackage"], PublicBodyPackage>>;
+type _InputBody = Require<Exact<Awaited<ReturnType<ExportInput["body"]>>, PublicBodyPackage>>;
+type _ExporterPackage = Require<Exact<Parameters<typeof exportPrairieLearn>[0], PublicBodyPackage>>;
+type _BodyResource = Require<Exact<Awaited<ReturnType<ExportInput["body"]>>["resources"][number], BodyResource>>;
