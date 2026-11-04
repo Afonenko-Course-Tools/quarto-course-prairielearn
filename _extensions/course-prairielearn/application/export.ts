@@ -446,18 +446,6 @@ export async function renderPublicBody(
         cause,
       );
     }
-    const hash = Array.from(
-      new Uint8Array(
-        await crypto.subtle.digest("SHA-256", new Uint8Array(bytes!)),
-      ),
-      (x) => x.toString(16).padStart(2, "0"),
-    ).join("");
-    if (hash !== r.sha256) {
-      questionFail(
-        "Контрольная сумма ресурса не совпадает: " + r.target,
-        "resources.sha256",
-      );
-    }
     files.push({
       name: resourceBase + "/" + r.target,
       data: bytes!,
