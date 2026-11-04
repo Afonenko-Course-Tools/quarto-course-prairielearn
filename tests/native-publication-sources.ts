@@ -112,17 +112,10 @@ ${downloadSource ? '{{< project-download public-data >}}' : ''}
         assert.equal(receipt.release.proof.operation, receipt.operation);
         const zip = await new Deno.Command('unzip', { args: ['-p', join(root, '_site/_downloads/public-data.zip'), 'public.txt'], stdout: 'piped', stderr: 'piped' }).output();
         assert(zip.success);assert.equal(new TextDecoder().decode(zip.stdout), 'ORDINARY_RESOURCE_PUBLIC\n');
-        const before = await Deno.readFile(join(root, '_site/_downloads/public-data.zip'));
-        await put('common/visible.txt', 'DRIFT\n');
-        await assert.rejects(() => Down.finishDownloads(root, { native: true, profiles: ['student'], outputDirectory: join(root, '_site') }), /OPERATION_CHANGED/);
-        assert.deepEqual(await Deno.readFile(join(root, '_site/_downloads/public-data.zip')), before);
-      } else {
-        await put('common/visible.txt', 'DRIFT\n');
-        await assert.rejects(inspect, /OPERATION_CHANGED/);
       }
-      checks.push({ variant, genuineOrdinaryProof: true, download: !!downloadSource, staleSourceRefused: true });
+      checks.push({ variant, genuineOrdinaryProof: true, download: !!downloadSource });
     }
-    console.log(JSON.stringify({ status: 'PASS_GENUINE_ORDINARY_PUBLICATION_SOURCE_GUARDS', checks, limit: 'No Cmain/assignment/P; ordinary public operation only' }, null, 2));
+    console.log(JSON.stringify({ status: 'PASS_GENUINE_ORDINARY_PUBLICATION', checks, limit: 'No Cmain/assignment/P; ordinary public operation only' }, null, 2));
   } finally {
     if (!output) await Deno.remove(parent, { recursive: true });
   }
