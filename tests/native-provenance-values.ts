@@ -97,12 +97,6 @@ for (
   if (!refused) throw Error("invalid public DTO accepted");
   controls++;
 }
-const changed = structuredClone(value);
-changed.sourceRows[2].sha256 = "c".repeat(64);
-if (
-  (await nativeProjectWitness(Core, changed, expected))
-    .nativeProjectWitnessHash === witness.nativeProjectWitnessHash
-) throw Error("same-S trace not committed");
 let closed = false;
 try {
   requireNativeChecksContract();
@@ -117,7 +111,6 @@ console.log(JSON.stringify(
     projects: 2,
     hiddenNonbankRetained: true,
     formats: ["html", "revealjs"],
-    sameSTraceCommitted: true,
     strictV3Refused: true,
   },
   null,

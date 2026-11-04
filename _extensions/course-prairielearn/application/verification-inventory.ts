@@ -5,7 +5,6 @@ import { canonical, hash, readSelected, safePath } from "./source-selection.ts";
 
 /** Собственный private C inventory по уже выбранным bytes. Authority/currentness
  * остаются у живой Core composition; эта чистая функция их не создаёт.
- * inventoryHash не подставляется в legacy sourceSnapshotHash/inventoryHash.
  */
 export async function nativeVerificationInventory(input: {
   courseId: string;
@@ -124,7 +123,6 @@ export async function nativeVerificationInventory(input: {
   };
   return {
     ...inventory,
-    inventoryHash: await hash(canonical(inventory)),
     scenariosHash: await hash(canonical(scenarios)),
   };
 }

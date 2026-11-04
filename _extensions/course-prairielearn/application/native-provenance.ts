@@ -1,6 +1,6 @@
 import { decodeNativeCheck } from "./native-checks.ts";
 import { isDeepStrictEqual } from "node:util";
-import { canonical, hash, safePath } from "./source-selection.ts";
+import { safePath } from "./source-selection.ts";
 /** PL policy принадлежит C. Core передаёт selector и raw plane из той же
  * preprojection capture, включая скрытые/non-PL проекты. Никакого IO/authority. */
 export function normalizeNativeProjectFact(value: any, projectChecks: unknown) {
@@ -82,17 +82,13 @@ export async function nativeProjectWitness(
   if (keys.size !== p.projects.length) {
     throw Error("PL.PROVENANCE_CHANGED: omitted hidden/nonbank project");
   }
-  const witness = {
+  return {
     schema: "pl-native-project-witness-v1",
     identity: p.identity,
     ownerInputs: p.ownerInputs,
     capturedInputs: p.capturedInputs,
     sourceRows: p.sourceRows,
     projects,
-  };
-  return {
-    ...witness,
-    nativeProjectWitnessHash: await hash(canonical(witness)),
   };
 }
 /** Старые v3 hash names не принимают native witness другой области. */

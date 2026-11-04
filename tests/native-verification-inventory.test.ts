@@ -1,7 +1,7 @@
 import * as Inventory from "../_extensions/course-prairielearn/application/verification-inventory.ts";
 import { hash } from "../_extensions/course-prairielearn/application/source-selection.ts";
 
-Deno.test("native verification связывает exact case bytes, scenarios и descriptor без sourcePath IO", async () => {
+Deno.test("native verification проверяет selected bytes и сохраняет scenarios без sourcePath IO", async () => {
   const file = async (name: string, text: string) => ({
     name,
     bytes: new TextEncoder().encode(text),
@@ -50,12 +50,6 @@ Deno.test("native verification связывает exact case bytes, scenarios и
         "starter",
       ])
   ) throw Error("verification scenarios lost or phantom API/demo points");
-  const changed = structuredClone(input);
-  changed.selections["exr-one"].descriptor.sourceFiles = ["Other.java"];
-  const next = await (Inventory as any).nativeVerificationInventory(changed);
-  if (result.inventoryHash === next.inventoryHash) {
-    throw Error("descriptor not bound");
-  }
   for (
     const mutate of [
       (v: any) => v.selections["exr-one"].sources[0].bytes[0]++,

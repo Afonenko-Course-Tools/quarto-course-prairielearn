@@ -67,7 +67,7 @@ Deno.test("Selector/plane/old-normalization mismatch and unknown fields refuse b
     ]
   ) assert.throws(() => normalize(f, p));
 });
-Deno.test("nativeProjectWitness applies typed owner normalization before its complete fact hash", async () => {
+Deno.test("nativeProjectWitness сохраняет typed owner normalization и принадлежность проекта", async () => {
   const identity = { operation: "data-only" },
     expected = { identity, sources: ["hidden.qmd"] };
   const value = {
@@ -99,10 +99,6 @@ Deno.test("nativeProjectWitness applies typed owner normalization before its com
     decodeNativeCheck(policy, "native"),
   );
   assert.equal(w.projects[0].declaration.target, "manual");
-  const changed = structuredClone(value);
-  changed.documents[0].projectChecks.defaults.scoring = { mode: "all-pass" };
-  const w2 = await Provenance.nativeProjectWitness(Core, changed, expected);
-  assert.notEqual(w.nativeProjectWitnessHash, w2.nativeProjectWitnessHash);
   const bad = structuredClone(value);
   bad.documents[0].projects[0].source = "foreign.qmd";
   await assert.rejects(() =>
