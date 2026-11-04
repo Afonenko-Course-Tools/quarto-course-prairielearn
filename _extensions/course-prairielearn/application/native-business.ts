@@ -1,3 +1,11 @@
+import type { NativeAdapterValidationInput } from "course-core/public.ts";
+/** Реально читаемые поля Core input; schema/authenticity остаются у Core boundary.
+ * Полный preprojection input структурно совместим без копирования/приведения. */
+export type NativeBusinessInput = Pick<NativeAdapterValidationInput, "declarations"> & {
+  assessment?: Pick<NonNullable<NativeAdapterValidationInput["assessment"]>, "id" | "kind" | "slots">;
+  origin?: Pick<NativeAdapterValidationInput["origin"], "source">;
+  course: Partial<NativeAdapterValidationInput["course"]>;
+};
 import {
   decodeNativeMaterialization,
   NativeSeedTargetsSchema,
@@ -7,6 +15,7 @@ import { z } from "../vendor/zod/v4/index.js";
 import { createHash } from "node:crypto";
 import {
   closed,
+  object,
   declarations,
   publicationQuestion,
   question,
@@ -73,52 +82,35 @@ export const NativeBusinessSchema = z.strictObject({
 });
 export type NativeBusiness = z.output<typeof NativeBusinessSchema>;
 /** Нормализация native Pandoc scalars; metadata inheritance уже выполнил Quarto. */
-export function nativePolicy(value: unknown): any {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-  const result: any = structuredClone(value);
-  for (
-    const key of [
-      "attempts",
-      "question-points",
-      "question-max-points",
-      "max-points",
-      "grade-rate-minutes",
-      "advance-score-perc",
-      "auto-points",
-      "manual-points",
-    ]
-  ) {
-    const numeric = (v: unknown) =>
-      typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))
-        ? Number(v)
-        : v;
+export function nativePolicy(value: unknown): unknown {
+  if (!object(value)) return value;
+  const result = structuredClone(value);
+  for (const key of ["attempts", "question-points", "question-max-points", "max-points",
+    "grade-rate-minutes", "advance-score-perc", "auto-points", "manual-points"]) {
+    const numeric = (v: unknown) => typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))
+      ? Number(v) : v;
     if (Object.hasOwn(result, key)) {
-      result[key] = Array.isArray(result[key])
-        ? result[key].map(numeric)
-        : numeric(result[key]);
+      const field = result[key];
+      result[key] = Array.isArray(field) ? field.map(numeric) : numeric(field);
     }
   }
-  if (result.pass && typeof result.pass === "object") {
-    result.pass["at-least"] = typeof result.pass["at-least"] === "string"
-      ? Number(result.pass["at-least"])
-      : result.pass["at-least"];
+  const pass = result.pass;
+  if (object(pass)) {
+    pass["at-least"] = typeof pass["at-least"] === "string" ? Number(pass["at-least"]) : pass["at-least"];
   }
-  if (result["slot-overrides"]) {
-    for (const id of Object.keys(result["slot-overrides"])) {
-      result["slot-overrides"][id] = nativePolicy(result["slot-overrides"][id]);
-    }
+  const overrides = result["slot-overrides"];
+  if (object(overrides)) {
+    for (const id of Object.keys(overrides)) overrides[id] = nativePolicy(overrides[id]);
   }
   return result;
 }
-function mergePolicy(base: any, local: any): any {
-  if (!local || typeof local !== "object" || Array.isArray(local)) return local;
-  const out = { ...base };
+function mergePolicy(base: Record<string, unknown>, local: unknown): unknown {
+  if (!object(local)) return local;
+  const out: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(local)) {
-    out[key] = key !== "assignment" && value && typeof value === "object" &&
-        !Array.isArray(value) && out[key] && typeof out[key] === "object" &&
-        !Array.isArray(out[key])
-      ? mergePolicy(out[key], value)
-      : value;
+    const prior = out[key];
+    out[key] = key !== "assignment" && object(value) && object(prior)
+      ? mergePolicy(prior, value) : value;
   }
   return out;
 }
@@ -126,15 +118,16 @@ function mergePolicy(base: any, local: any): any {
 function readNativeRaw(
   value: unknown,
   context: { source?: string },
-  parseQuestion: (value: any) => unknown,
+  parseQuestion: (value: unknown) => unknown,
 ) {
   const raw = NativeBusinessSchema.parse(structuredClone(value)),
-    config = (raw.config ?? {}) as any;
+    config = raw.config ?? {};
   // Pandoc представляет numeric metadata scalar как Inlines; нормализация принадлежит PL.
-  const port = config["question-defaults"]?.submission?.workspaceOptions?.port;
-  if (typeof port === "string" && /^\d+$/.test(port)) {
-    config["question-defaults"].submission.workspaceOptions.port = Number(port);
-  }
+  const questionDefaults = config["question-defaults"];
+  const submission = object(questionDefaults) ? questionDefaults.submission : undefined;
+  const workspace = object(submission) ? submission.workspaceOptions : undefined;
+  const port = object(workspace) ? workspace.port : undefined;
+  if (object(workspace) && typeof port === "string" && /^\d+$/.test(port)) workspace.port = Number(port);
   closed(config, [], [
     "delivery",
     "question-defaults",
@@ -145,7 +138,9 @@ function readNativeRaw(
     NativeSeedTargetsSchema.parse(config["seed-targets"]);
   }
   if (config.delivery !== undefined) {
-    const keys = Object.keys(config.delivery?.instances ?? {});
+    const delivery = config.delivery;
+    const instances = object(delivery) ? delivery.instances : undefined;
+    const keys = Object.keys(object(instances) ? instances : {});
     if (!keys.length) throw Error("PL.DECLARATION_INVALID: пустые instances");
     declarations({
       ...config,
@@ -214,9 +209,9 @@ function decodeBusiness<
   Q extends Partial<ReturnType<typeof publicationQuestion>>,
 >(
   value: unknown,
-  input: any,
+  input: NativeBusinessInput,
   options: { deferComposition?: boolean },
-  parseQuestion: (value: any) => Q,
+  parseQuestion: (value: unknown) => Q,
   completeGrading: boolean,
 ) {
   const { raw, config, defaults, materialization } = readNativeRaw(value, {
@@ -237,7 +232,7 @@ function decodeBusiness<
       throw Error("PL.ANSWER_UNQUALIFIED: raw/native answer mismatch");
     }
     const attrs = declaration.attributes, base = config["question-defaults"];
-    const authored = structuredClone(base ?? {});
+    const authored: Record<string, unknown> = structuredClone(object(base) ? base : {});
     if (attrs["prairielearn-topic"] !== undefined) {
       authored.topic = attrs["prairielearn-topic"];
     }
@@ -251,16 +246,13 @@ function decodeBusiness<
         attrs["prairielearn-single-variant"] === "true";
     }
     if (attrs["prairielearn-submission"] !== undefined) {
-      authored.submission = {
-        ...authored.submission,
+      const submission: Record<string, unknown> = {
+        ...(object(authored.submission) ? authored.submission : {}),
         mode: attrs["prairielearn-submission"],
       };
-      if (authored.submission.mode !== "editor") {
-        delete authored.submission["ace-mode"];
-      }
-      if (authored.submission.mode !== "workspace") {
-        delete authored.submission.workspaceOptions;
-      }
+      if (submission.mode !== "editor") delete submission["ace-mode"];
+      if (submission.mode !== "workspace") delete submission.workspaceOptions;
+      authored.submission = submission;
     }
     const parsed = parseQuestion(authored);
     questions[declaration.id] = {
@@ -268,7 +260,7 @@ function decodeBusiness<
       grading: parsed.grading ?? { method: "external" },
     };
   }
-  let assessment: any;
+  let assessment: z.output<typeof AssessmentPolicySchema> | undefined;
   if (raw.assessment !== undefined) {
     if (!input.assessment) {
       throw Error("PL.ASSESSMENT_INVALID: нет Core assessment composition");
@@ -287,7 +279,7 @@ function decodeBusiness<
           ).digest("hex"),
       };
     }
-    const required = input.assessment.slots.filter((s: any) =>
+    const required = input.assessment.slots.filter((s) =>
       s.assignment.requirement === "required"
     );
     if (assessment.pass["at-least"] > required.length) {
@@ -304,7 +296,7 @@ function decodeBusiness<
     if (!completeGrading) {
       // Partial publication vet проверяет форму/порог; pricing требует полной delivery.
     } else if (
-      input.assessment.slots.every((s: any) =>
+      input.assessment.slots.every((s) =>
         s.candidates.every((id: string) => methods[id] !== undefined)
       )
     ) validateGradingComponents(work, methods);
@@ -327,7 +319,7 @@ function decodeBusiness<
 /** Полная delivery не получает неполные topic/submission через publication parser. */
 export function decodeNativeBusiness(
   value: unknown,
-  input: any,
+  input: NativeBusinessInput,
   options: { deferComposition?: boolean } = {},
 ) {
   return decodeBusiness(value, input, options, question, true);
@@ -335,7 +327,7 @@ export function decodeNativeBusiness(
 /** Чистая частичная publication validation, без delivery/proof/operation authority. */
 export function decodePublicationBusiness(
   value: unknown,
-  input: any,
+  input: NativeBusinessInput,
   options: { deferComposition?: boolean } = {},
 ) {
   return decodeBusiness(value, input, options, publicationQuestion, false);

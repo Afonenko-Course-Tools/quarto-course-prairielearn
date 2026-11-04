@@ -33,14 +33,22 @@ identity и exact request, с currentness fence перед каждым artifact
 Другой generation/request и failed currentness не наследуют cache; getters
 сами не читают дерево, не хешируют файлы и не запускают inspect.
 
-## Частичная publication validation
+## Обычная публикация
 
-`inspectPublication(Core, operation, {expectedSources})` проверяет genuine
-ordinary callback inputs и cross-document membership через тот же TS canon.
-Частичная политика не выдумывает отсутствующий topic/submission. Полная delivery
-по-прежнему требует обязательные поля, pricing и корректный grading. Результат
-инспекции — данные автора, не assignment/A1 authority. `inspect-grading.ts`
-читает уже завершённый текущий capture и не запускает второй inspect/render.
+`Core.withNativePublication(expectation, selection, use)` открывает живой Core view
+с actual root/outputDirectory/catalog/profiles и borrowed document/materialization
+методами. `selection` равен явному NativeReleaseRequest либо undefined для всего
+завершённого capture. `inspectPublication(publication)` читает Core-owned metadata,
+проверяет PL syntax/порог/cross-document membership и физические common-file paths.
+Политика вопроса не выдумывает отсутствующие topic/submission. Результат
+`PublicationInspection` — данные, не proof или assignment authority. Ordinary
+маршрут не вызывает full grading/seed qualification; separate course exporter
+сохраняет `createNativeAdapter` и `validateCourse`.
+
+CLI `inspect-publication.ts OWNER --projection student|author --output-directory PATH
+[--profiles student,other] [--output PATH]` потребляет тот же завершённый capture.
+Он не выбирает delivery instance/book и не запускает новый inspect/render.
+Старое имя inspect-grading удалено без alias.
 
 ## Выдача, ответы и provenance
 

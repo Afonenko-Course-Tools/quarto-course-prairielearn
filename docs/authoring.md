@@ -257,7 +257,7 @@ Question defaults задают topic/submission и необязательный 
 отсутствующее поле опускается (документированный default pinned PL: `false`).
 Явное `true` сохраняет прежний режим единственного варианта.
 `prairielearn-single-variant="true|false"` переопределяет настройку упражнения;
-`inspect-grading` показывает эффективное значение. Редкие атрибуты
+`inspect-publication` показывает эффективное значение. Редкие атрибуты
 `prairielearn-topic` и `prairielearn-submission="editor|upload"` переопределяют
 платформенные поля. Runtime и источники выбирает общий project-check. Unknown
 metadata/attributes, missing inputs, symlinks, binary/NUL/oversize и изменение
@@ -339,7 +339,7 @@ slot-overrides меняет их по local slot ID. Случайная груп
 `prairielearn.assessment-defaults.question-points` в `_quarto.yml: [9,7,5]`
 и directory `_metadata.yml: [4,2]` даёт `[9,7,5,4,2]`. Экспортёр сохраняет этот
 целиком авторский список. Если concatenation делает Exam schedule возрастающим,
-экспорт отказывается с диагностикой; проверьте результат через `inspect-grading`.
+экспорт отказывается с диагностикой; проверьте результат через `inspect-publication`.
 
 Отдельное объединение адаптера применяется между разными путями: inherited
 `prairielearn.assessment-defaults`, локальная `assessment.prairielearn` и
@@ -404,15 +404,19 @@ ID и поля отвергаются. `maxVariants` и другие непод�
 Перед созданием native файлов автор может увидеть effective значения:
 
 ```sh
-quarto run tasks/_extensions/course-prairielearn/entrypoints/inspect-grading.ts . --instance pilot --output effective-grading.json
+quarto run tasks/_extensions/course-prairielearn/entrypoints/inspect-publication.ts tasks --projection student --profiles student --output-directory _site/student --output publication.json
 ```
 
-Отчёт содержит source, kind, разрешённую policy и точный native mapping каждого
-вопроса; production registry/image не нужны, native артефакт не создаётся. Missing
-points вызывает actionable отказ с source/work/question и местом объявления.
-Delivery сохраняет все effective grading поля и overrides; у ordinary labs
-удаляется только assignment, который им не нужен. Completion по полностью
-выполненным required вопросам остаётся отдельной закрытой политикой.
+Отчёт обычной публикации содержит source/format, Core assessment composition,
+разобранную PL policy и доступные question summaries. Он не строит native grading
+mapping и не требует полного набора points; production registry/image не нужны,
+новый native артефакт не создаётся.
+
+Полный course-export отдельно строит native mapping и отказывает при missing points
+с source/work/question и местом объявления. Delivery сохраняет все effective grading
+поля и overrides; у ordinary labs удаляется только assignment, который им не нужен.
+Completion по полностью выполненным required вопросам остаётся отдельной закрытой
+политикой.
 
 Native awarded score и результат тестов различаются. Gateway берёт
 `instance_question.score_perc / 100`, а completion требует ровно 1. Pinned
@@ -656,25 +660,26 @@ patterns `explanation.m[d]` и `.pl-seed/identity.jso[n]`. Они выбираю
 
 ## Проверка публикации и полная поставка
 
-`inspectPublication(Core, operation, {expectedSources})` вызывают внутри живого
-публичного `withCurrentNativeOperation`. Этот частичный vet проверяет metadata,
-нормализацию, assignment, порог и принадлежность всех members платформе; он
-не требует отсутствующий topic/submission до полной delivery и не создаёт
-assignment authority. Core остаётся единственным владельцем AST, private
-preprojection facts, source/currentness и native format/profile binding.
+Обычный сайт открывает `Core.withNativePublication(expectation, selection, use)`.
+Core владеет общей семантикой capture, catalog, actual root/outputDirectory,
+проекцией, физическими путями и lifetime. В callback вызывают
+`inspectPublication(publication)`; его typed `PublicationInspection` содержит
+course и documents с source/format/assessment/business, без proof. PL проверяет
+свои metadata, assignment/порог, common-file paths и принадлежность members.
+Topic/submission до полной delivery остаются необязательными.
 
-Полный `createNativeAdapter` получает все четыре авторитетных metadata planes
-через typed Core validator; повторный Lua collector/child/sidecar не нужен.
-Prepared correlation сверяется до capture и полной composition. Direct DTO
-validation даёт только data result, без business/cache/proof/publish прав.
-Один private proof повторно используется только для той же operation identity
-и exact request, с currentness fence перед выдачей следующего artifact.
-Failure очищает cache; getter не читает дерево/metadata и не запускает inspect.
-`inspect-grading.ts` потребляет уже завершённый capture, не строит legacy модель.
+Ordinary публикация не требует полного grading/pricing, seed qualification,
+prepared PL correlation или certificate. Полный `createNativeAdapter`/`validateCourse`
+остаётся отдельным маршрутом course-export с прежними требованиями. Borrowed Core
+методы истекают при завершении callback; DTO не продлевает их lifetime. Остающиеся
+Core currentness/private/physical guards не заменены новым proof.
 
-### Ordinary proof и common sources в кандидате 9.0.1
-
-`inspectPublication` возвращает также `proof` — уже полученный публичный Core release result, data без новых полномочий. Для каждого упражнения common-file paths из существующего PL decoder передаются тому же Core source guard, включая скрытые декларации до projection. Cross-document grading/pricing остаётся обязанностью полной delivery, а не обычного сайта. Если Core не выбрал PL adapter, результат содержит действительный общий proof и пустой PL documents list; установленный optional PL не меняет ordinary noPL маршрут. Полный `createNativeAdapter.validateCourse` и prepared correlation не изменены.
+`inspect-publication.ts OWNER --projection student|author --output-directory PATH
+[--profiles student,other] [--output PATH]` показывает тот же business result без
+дополнительного inspect/render, instance/book selection и grading projection.
+Имена student/full задаются Quarto configuration. Роли защищают отмеченный контент
+и выбранные файлы; свежесть вычислений и немаркированный profile-dependent текст
+остаются Native execution/cache policy автора.
 
 ## Полный набор файлов авторского Java reference
 

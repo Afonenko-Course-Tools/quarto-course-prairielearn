@@ -1,7 +1,8 @@
+import type { NativeBusinessInput } from "../_extensions/course-prairielearn/application/native-business.ts";
 import { gradingPolicy } from "../_extensions/course-prairielearn/application/grading-policy.ts";
-const assert = (v: unknown, m: string) => {
+function assert(v: unknown, m: string): asserts v {
   if (!v) throw Error(m);
-};
+}
 Deno.test("required zero-ceiling Homework fails actionable; optional zero-point zero-ceiling remains supported", () => {
   const w = work();
   w.slots[0].assignment.requirement = "required";
@@ -26,7 +27,11 @@ Deno.test("required zero-ceiling Homework fails actionable; optional zero-point 
     "optional zero-ceiling policy changed",
   );
 });
-const work = () => ({
+type FixtureWork = NonNullable<NativeBusinessInput["assessment"]> & {
+  source: string;
+  extensions: { prairielearn: Record<string, unknown> };
+};
+const work = (): FixtureWork => ({
   id: "sec-lab",
   source: "tasks/lab.qmd",
   kind: "lab",
@@ -48,7 +53,7 @@ const work = () => ({
           "question-max-points": null,
         },
       },
-    } as any,
+    },
   },
 });
 Deno.test("authored scores and retry controls preserve scalar values and per-question null/overrides", () => {
@@ -119,7 +124,7 @@ Deno.test("Exam accepts nonincreasing arrays, clears max; Homework rejects array
       ["slot-overrides", { "exr-a": null }],
       ["slot-overrides", { "exr-unknown": { "question-points": 1 } }],
       ["slot-overrides", { "exr-a": { unknown: 1 } }],
-    ] as [string, any][]
+    ] satisfies [string, unknown][]
   ) {
     const w = work();
     w.extensions.prairielearn[field] = value;
@@ -206,6 +211,7 @@ Deno.test("Локальный native UUID проходит business contract п�
     const decoded = decodeNativeBusiness(raw, {
       course: { id: "demo" }, assessment, declarations: [],
     }, { deferComposition: true });
+    assert(decoded.assessment !== undefined, "Авторская политика должна присутствовать");
     assert(decoded.assessment.uuid === uuid, "Native business потерял явную identity");
     gradingPolicy({ ...assessment, extensions: { prairielearn: decoded.assessment } });
   }

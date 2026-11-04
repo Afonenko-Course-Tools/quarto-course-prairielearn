@@ -2,9 +2,9 @@ import { NativeSeedTargetsSchema } from "./native-materialization.ts";
 import { submission as parseSubmission } from "./submission.ts";
 import { createMetrics as __createMetrics } from "../observability/bridge.ts";
 const __metrics = __createMetrics("course-prairielearn");
-export const object = (v: any) =>
+export const object = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
-export function closed(v: any, required: string[], optional: string[] = []) {
+export function closed(v: unknown, required: string[], optional: string[] = []) {
   if (!object(v)) throw new Error("PL.DECLARATION_INVALID: expected map");
   const missing = required.filter((k) => !Object.hasOwn(v, k));
   const unknown = Object.keys(v).filter((k) =>
@@ -18,26 +18,23 @@ export function closed(v: any, required: string[], optional: string[] = []) {
           : "unknown " + unknown.join(", ")),
     );
   }
+  return v;
 }
-function readQuestion(v: any, complete: boolean) {
-  closed(
-    v,
-    complete ? ["topic", "submission"] : [],
-    complete
-      ? ["single-variant", "grading"]
-      : ["topic", "submission", "single-variant", "grading"],
-  );
-  if (
-    Object.hasOwn(v, "single-variant") &&
-    typeof v["single-variant"] !== "boolean"
-  ) {
-    throw Error("PL single-variant requires boolean");
+function readQuestion(value: unknown, complete: boolean) {
+  const v = closed(value, complete ? ["topic", "submission"] : [], complete
+    ? ["single-variant", "grading"] : ["topic", "submission", "single-variant", "grading"]);
+
+  let singleVariant: boolean | undefined;
+  if (Object.hasOwn(v, "single-variant")) {
+    const value = v["single-variant"];
+    if (typeof value !== "boolean") throw Error("PL single-variant requires boolean");
+    singleVariant = value;
   }
-  if (
-    Object.hasOwn(v, "topic") &&
-    (typeof v.topic !== "string" || !v.topic.trim())
-  ) {
-    throw Error("PL topic required");
+  let topic: string | undefined;
+  if (Object.hasOwn(v, "topic")) {
+    const value = v.topic;
+    if (typeof value !== "string" || !value.trim()) throw Error("PL topic required");
+    topic = value;
   }
   const submission = Object.hasOwn(v, "submission")
     ? parseSubmission(v.submission, true)
@@ -51,46 +48,36 @@ function readQuestion(v: any, complete: boolean) {
       "PL.WORKSPACE_INVALID: Workspace требует Manual и single-variant: true",
     );
   }
-  return { submission, grading };
+  return { submission, grading, topic, singleVariant };
 }
 /** Частичная native publication policy: отсутствие поля не становится default delivery. */
-export function publicationQuestion(v: any) {
-  const { submission, grading } = readQuestion(v, false);
+export function publicationQuestion(v: unknown) {
+  const { submission, grading, topic, singleVariant } = readQuestion(v, false);
   return {
-    ...(Object.hasOwn(v, "topic") ? { topic: v.topic } : {}),
-    ...(submission ? { submission } : {}),
-    grading,
-    ...(Object.hasOwn(v, "single-variant")
-      ? { singleVariant: v["single-variant"] }
-      : {}),
+    ...(topic !== undefined ? { topic } : {}),
+    ...(submission ? { submission } : {}), grading,
+    ...(singleVariant !== undefined ? { singleVariant } : {}),
     ...(submission?.mode === "workspace" ? { singleVariant: true } : {}),
   };
 }
-export function question(v: any) {
-  const { submission, grading } = readQuestion(v, true);
+export function question(v: unknown) {
+  const { submission, grading, topic, singleVariant } = readQuestion(v, true);
   return {
-    topic: v.topic,
-    ...(v.grading !== undefined && v.grading !== "external" ? { grading } : {}),
-    ...(Object.hasOwn(v, "single-variant")
-      ? { singleVariant: v["single-variant"] }
-      : {}),
-    ...(submission!.mode === "workspace" ? { singleVariant: true } : {}),
+    topic: topic!,
+    ...(grading.method !== "external" ? { grading } : {}),
+    ...(singleVariant !== undefined ? { singleVariant } : {}),
+    ...(submission?.mode === "workspace" ? { singleVariant: true } : {}),
     submission: submission!,
   };
 }
-export function gradingMethod(
-  value: any,
-): { method: "external" | "manual" | "mixed" } {
-  if (value === undefined || value === "external") {
-    return { method: "external" };
+export function gradingMethod(value: unknown): { method: "external" | "manual" | "mixed" } {
+  if (value === undefined || value === "external") return { method: "external" };
+  const record = closed(value, ["method"]);
+  const method = record.method;
+  if (method !== "manual" && method !== "mixed") {
+    throw Error("PL.GRADING_INVALID: grading.method должен быть manual или mixed");
   }
-  closed(value, ["method"]);
-  if (!["manual", "mixed"].includes(value.method)) {
-    throw Error(
-      "PL.GRADING_INVALID: grading.method должен быть manual или mixed",
-    );
-  }
-  return { method: value.method };
+  return { method };
 }
 export function declarations(raw: any, key: string) {
   closed(raw, ["delivery", "question-defaults"], [

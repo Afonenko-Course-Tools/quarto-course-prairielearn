@@ -43,8 +43,9 @@ delivery v3/v4 сохраняют собственные версии. `contract
 владельца; исполняемые business contracts находятся в TypeScript.
 Точная source dependency задаётся CI; номера descriptor не дают runtime authority.
 Полная поставка требует genuine Core operation, independent prior P и проверенного
-Platform image digest. Частичный publication vet — data inspection без assignment
-прав. Новый кандидат не объявляется выпущенным до OTHER review и paired CI.
+Platform image digest. Обычный `Core.withNativePublication` + `inspectPublication(publication)` —
+типизированная business inspection без full grading/seed gate и release certificate;
+borrowed методы остаются ограничены callback. Полная delivery — отдельный API. Новый кандидат не объявляется выпущенным до OTHER review и paired CI.
 
 ## Reference-only единицы и повторные вопросы
 

@@ -22,7 +22,7 @@ export async function withNativeCaptureScope(request,options,use){
     join(core, "public.ts"),
     `
 export const NativeOperationIdentitySchema={parse:v=>v};
-export async function withCurrentNativeOperation(expectation,use){
+export async function withNativePublication(expectation,selection,use){
  await Deno.writeTextFile(${
       JSON.stringify(log)
     },JSON.stringify({expectation,use:typeof use}));
@@ -65,10 +65,10 @@ if(Deno.args[1]==='active')installTsAgent({processId:'native-negative',outputDir
       JSON.stringify(root)
     }});
 const Command=Deno.Command;Deno.Command=new Proxy(Command,{construct(){throw Error('UNEXPECTED_NATIVE_CHILD')}});
-if(Deno.args[2]==='inspect'){Deno.args.splice(0,Deno.args.length,Deno.args[0],'--instance','fixture');await import(${
+if(Deno.args[2]==='inspect'){Deno.args.splice(0,Deno.args.length,Deno.args[0]+'/tasks','--projection','author','--output-directory','_generated/prairielearn-native-render');await import(${
       JSON.stringify(
         new URL(
-          "../_extensions/course-prairielearn/entrypoints/inspect-grading.ts",
+          "../_extensions/course-prairielearn/entrypoints/inspect-publication.ts",
           import.meta.url,
         ).href,
       )

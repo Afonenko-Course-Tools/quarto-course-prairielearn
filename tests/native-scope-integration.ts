@@ -107,6 +107,15 @@ prairielearn:
   await capture();
   const candidate = await readNativeAdapterExpectation(Core, root);
   assert.deepEqual(candidate.identity.profiles, ["student"]);
+  await Core.withNativePublication(candidate.expectation,
+    { expectedSources: ["index.qmd", "slides.qmd"] },
+    async (publication: import("course-core/public.ts").NativePublication) => {
+      const data = await PL.inspectPublication(publication);
+      assert.equal(data.documents.length, 2);
+    });
+  await assert.rejects(() => Core.withNativePublication(candidate.expectation,
+    { expectedSources: ["index.qmd"] },
+    (publication: import("course-core/public.ts").NativePublication) => PL.inspectPublication(publication)), /RELEASE.COVERAGE/);
   await Core.withCurrentNativeOperation(
     candidate.expectation,
     async (op: any) => {
@@ -281,13 +290,6 @@ prairielearn:
       checks.push(
         "post-acquisition candidate drift: same-op exact request reuses proof with0 candidate reads; new request rereads/refuses and clears cache",
       );
-      const data = await PL.inspectPublication(Core, op, request);
-      assert.equal(data.documents.length, 2);
-      checks.push("genuine installed public partial consumer");
-      await assert.rejects(() =>
-        PL.inspectPublication(Core, op, { expectedSources: ["index.qmd"] })
-      );
-      checks.push("partial owner coverage refused");
       const copy = {
         ...op,
         assertCurrent: async () => {

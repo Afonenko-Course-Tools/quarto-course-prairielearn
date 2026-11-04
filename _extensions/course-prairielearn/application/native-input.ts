@@ -1,3 +1,4 @@
+import type { NativeAdapterValidationInput } from "course-core/public.ts";
 import type { PublicCore } from "./native-adapter.ts";
 
 /** Единственный data decoder уже аутентичного immutable Core callback input.
@@ -14,7 +15,11 @@ export function nativeBusinessInput(
   Core: Pick<PublicCore, "NativeAdapterValidationInputSchema">,
   value: unknown,
 ) {
-  const input = Core.NativeAdapterValidationInputSchema.parse(value);
+  return parsedNativeBusinessInput(Core.NativeAdapterValidationInputSchema.parse(value));
+}
+
+/** Mapping actual parsed Core input; эта функция не создаёт capability. */
+export function parsedNativeBusinessInput(input: NativeAdapterValidationInput) {
   const envelope = input.nativeMetadata, slots = nativeMetadataReadSet;
   if (
     !envelope || !Array.isArray(envelope.readSet) ||

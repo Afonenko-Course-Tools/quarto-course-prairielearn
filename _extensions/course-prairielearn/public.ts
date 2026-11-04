@@ -22,3 +22,5 @@ export {
 export { selectNativeCompilerInputs } from "./application/native-selection.ts";
 
 export { inspectPublication } from "./application/native-publication.ts";
+
+export type { PublicationInspection } from "./application/native-publication.ts";

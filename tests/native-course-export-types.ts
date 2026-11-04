@@ -62,3 +62,17 @@ type _NativeDescriptor = Require<
     ReturnType<typeof runtimeDescriptor<NativeProjectCheck>>
   >
 >;
+
+// Ordinary publication сохраняет реальные decoded scalar/policy types, без any.
+import type { NativeAdapterValidationInput, NativePublication } from "course-core/public.ts";
+import type { PublicationInspection } from "../_extensions/course-prairielearn/public.ts";
+import type { NativeBusinessInput, AssessmentPolicySchema } from "../_extensions/course-prairielearn/application/native-business.ts";
+import type { Submission } from "../_extensions/course-prairielearn/application/submission.ts";
+type PublicationBusiness = PublicationInspection["documents"][number]["business"];
+type PublicationQuestion = PublicationBusiness["questions"][string];
+type _PublicationPolicy = Require<Exact<PublicationBusiness["assessment"], ReturnType<typeof AssessmentPolicySchema.parse> | undefined>>;
+type _PublicationTopic = Require<Exact<PublicationQuestion["topic"], string | undefined>>;
+type _PublicationSubmission = Require<Exact<PublicationQuestion["submission"], Submission | undefined>>;
+type _PublicationGrading = Require<Exact<PublicationQuestion["grading"]["method"], "external" | "manual" | "mixed">>;
+type _BusinessConsumedInput = Require<NativeAdapterValidationInput extends NativeBusinessInput ? true : false>;
+type _PublicationInput = Require<Exact<ReturnType<NativePublication["adapterInputs"]>[number], NativeAdapterValidationInput>>;

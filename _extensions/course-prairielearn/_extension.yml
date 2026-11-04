@@ -9,7 +9,7 @@ contributes:
     course-prairielearn:
       package-contract: course-body-package-v2
       entrypoint: entrypoints/export.ts
-      grading-inspection-entrypoint: entrypoints/inspect-grading.ts
+      publication-inspection-entrypoint: entrypoints/inspect-publication.ts
       native-entrypoint: entrypoints/export-course.ts
       native-contract: course-native-delivery-v3
       core-version: 9.0.0
