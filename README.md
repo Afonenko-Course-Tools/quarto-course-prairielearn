@@ -338,6 +338,13 @@ ordinary publication: Core проверяет общую семантику capt
 публикации. Cache freshness и произвольный немаркированный computed text не получают
 новой гарантии приватности: профили выбираются конфигурацией Quarto.
 
-## Native project contracts 9.0.2
+## Текущий договор native-проектов
 
-Экспортёр предпочитает публичный `withProjectContracts` Core 9.3.0 для планов student/full. Если этот метод отсутствует, сохраняется `withProjectContexts`; ошибка нового метода не запускает повтор через старый. Правила grading, release proof и currentness не меняются. Source ref требует собственной проверки установленной композиции.
+Экспортёр использует публичный пакетный loader Core с каталогами проектов.
+Пути описываются адресами `{path, base?}`; общие ресурсы явно объявляют
+`base: config`. Действительные файлы и байты передаются без собственных SHA,
+origin DTO и свидетельств актуальности. Public delivery v5 и private checks v3
+обновляются совместно с Platform. Git refs и OCI digests сохраняются.
+
+См. [договор контекстов](docs/native-operation-reuse-consumer.md) и
+[правила автора](docs/authoring.md#допустимый-состав-java-ответа).

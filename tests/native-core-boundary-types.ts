@@ -1,7 +1,7 @@
 // Только статическая проверка реального public Core и сохранения parse outputs.
 import type * as Core from "course-core/public.ts";
 import type {
-  ArtifactInventory,
+  ArtifactFiles,
   NativeAdapterValidationInput,
   NativeOperationIdentity,
   NativePreparedOperation,
@@ -30,8 +30,8 @@ type _Input = Require<
 >;
 type _Inventory = Require<
   Exact<
-    ReturnType<PublicCore["ArtifactInventorySchema"]["parse"]>,
-    ArtifactInventory
+    ReturnType<PublicCore["ArtifactFilesSchema"]["parse"]>,
+    ArtifactFiles
   >
 >;
 type _Identity = Require<

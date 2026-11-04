@@ -1,7 +1,7 @@
 // Статические гарантии checked selection → genuine Core materialization.
 import type * as Core from "course-core/public.ts";
 import type {
-  ArtifactInventory,
+  ArtifactFiles,
   MaterializableCondition,
   MaterializationBindings,
   NativeAssignmentProjectPlans,
@@ -42,8 +42,8 @@ type _ParsedPlan = Require<
 >;
 type _ParsedInventory = Require<
   Exact<
-    ReturnType<Selection["core"]["ArtifactInventorySchema"]["parse"]>,
-    ArtifactInventory
+    ReturnType<Selection["core"]["ArtifactFilesSchema"]["parse"]>,
+    ArtifactFiles
   >
 >;
 type _Pair = Require<
@@ -71,7 +71,7 @@ type _ReferenceBindings = Require<
 type _Inventory = Require<
   Exact<
     Awaited<ReturnType<typeof materializeNativeQuestion>>["student"],
-    ArtifactInventory
+    ArtifactFiles
   >
 >;
 type _Check = Require<
@@ -109,7 +109,24 @@ type _Sources = Require<
 >;
 type _References = Require<
   Exact<
-    Projection["project"]["references"][number]["sources"][number]["sha256"],
+    Projection["project"]["references"][number]["sources"][number]["data"],
     string
   >
+>;
+
+// Выдача получает текущие bytes и обязательный студенческий комплект.
+import type { exportCourse } from "../_extensions/course-prairielearn/application/export-course.ts";
+import type { ArtifactFile } from "course-core/public.ts";
+type ExportInput = Parameters<typeof exportCourse>[0];
+type _ArtifactFields = Require<
+  Exact<keyof ArtifactFile, "target" | "audience" | "reason" | "bytes">
+>;
+type _RequiredNativeBytes = Require<
+  undefined extends ExportInput["nativeInputs"] ? false : true
+>;
+type _RequiredStudentArtifact = Require<
+  undefined extends ExportInput["studentArtifact"] ? false : true
+>;
+type _RequiredContent = Require<
+  undefined extends ExportInput["content"] ? false : true
 >;

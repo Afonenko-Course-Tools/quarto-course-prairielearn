@@ -46,10 +46,14 @@ for (
       await Deno.writeFile(path, file.bytes);
     }
     const kind: PublicBodyPackage["works"][number]["kind"] = "lab";
-    const selection: PublicBodyPackage["works"][number]["slots"][number]["selection"] = "fixed";
-    const assignment: PublicBodyPackage["works"][number]["slots"][number]["assignment"] = {
-      requirement: "required", workMode: "individual",
-    };
+    const selection:
+      PublicBodyPackage["works"][number]["slots"][number]["selection"] =
+        "fixed";
+    const assignment:
+      PublicBodyPackage["works"][number]["slots"][number]["assignment"] = {
+        requirement: "required",
+        workMode: "individual",
+      };
     const work = {
       id: "sec-work",
       source: "work.qmd",
@@ -172,13 +176,12 @@ for (
         }],
       },
       checks: {
-        schemaVersion: 1,
+        schemaVersion: 3,
         courseId: "fixture",
         bookRoot: "tasks",
-        sourceSnapshotHash: "a".repeat(64),
-        inventoryHash: "b".repeat(64),
         projects: [],
       },
+      nativeInputs: {},
       registry: { schemaVersion: 1, profiles: {} },
       config,
       instance: "test",
@@ -190,7 +193,7 @@ for (
       deferPublish: true,
     }).then((p) => p.publish());
     assert(
-      delivery.schemaVersion === 4 || mode === "upload",
+      delivery.schemaVersion === 5 || mode === "upload",
       "Delivery dispatch",
     );
     await Deno.writeFile(

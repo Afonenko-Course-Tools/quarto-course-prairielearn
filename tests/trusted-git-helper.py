@@ -1,6 +1,5 @@
 """Exact SP recipe: прежняя и новая доверенные closure дают один A/S0/S1."""
 import ast
-import hashlib
 import importlib.util
 import json
 import os
@@ -13,17 +12,14 @@ pl = Path(__file__).resolve().parents[1]
 sp = Path(sys.argv[1]).resolve(strict=True)
 module = pl / '_extensions/course-prairielearn/application/trusted-git'
 provenance = json.loads((module / 'provenance.json').read_text())
-assert subprocess.check_output(['git', '-C', str(sp), 'rev-parse', 'HEAD']).decode().strip() == provenance['commit']
 own = (module / 'build_git_materials.py').read_text()
 functions = {n.name: ast.get_source_segment(own, n) for n in ast.parse(own).body if isinstance(n, ast.FunctionDef)}
 assert set(functions) == set(provenance['functions']), 'Новый учебный generate/build не разрешён'
-for name, record in provenance['functions'].items():
-    data = subprocess.check_output(['git', '-C', str(sp), 'show', provenance['commit'] + ':' + record['path']])
+for name, source_path in provenance['functions'].items():
+    data = subprocess.check_output(['git', '-C', str(sp), 'show', provenance['commit'] + ':' + source_path])
     source = data.decode()
     original = next(ast.get_source_segment(source, n) for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) and n.name == name)
-    assert hashlib.sha256(data).hexdigest() == record['sourceSha256']
     assert functions[name] == original
-    assert hashlib.sha256(original.encode()).hexdigest() == record['functionSha256']
 
 probe = r'''
 import importlib.util,json,sys

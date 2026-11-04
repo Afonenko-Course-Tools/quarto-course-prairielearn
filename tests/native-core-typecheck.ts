@@ -1,7 +1,7 @@
 // Адресный checker: Source repo Core либо owner/extension установленной composition.
 // Запуск: quarto run tests/native-core-typecheck.ts CORE_ROOT
 // --course-export ограничивает запуск новым affected graph и его одним negative.
-// --legacy-boundary проверяет legacy/native handoff и только два его negatives.
+// --legacy-boundary — сохранённое имя режима проверки runtime/native handoff.
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeNativeCoreImportMap } from "../tools/native-core-import-map.ts";
@@ -57,33 +57,41 @@ try {
     `,
     "TS2353",
   ];
-  const legacyNegatives = [
+  const boundaryNegatives = [
     [
-      "legacy-is-not-native-bytes",
+      "selected-file-needs-bytes",
       `
       import type {NativeCompilerInput} from "pl-native/export-course.ts";
-      import type {LegacyPhysicalSelection} from "pl-native/legacy-checks.ts";
-      declare const legacy: LegacyPhysicalSelection;
-      const native: NativeCompilerInput["tests"][number] = legacy;
+      const file: NativeCompilerInput["sources"][number] = {name:"Study.java",data:"YWJj"};
     `,
-      "TS2739",
+      "TS2353",
     ],
     [
-      "owner-is-not-physical",
+      "artifact-has-no-raw-source",
       `
-      import type {LegacyPhysicalSelection} from "pl-native/legacy-checks.ts";
-      const legacy: LegacyPhysicalSelection = {ownerRelativePath:"shared/Checks.java",submissionRelativePath:"Checks.java",sha256:"hash"};
+      import type {ArtifactFile} from "course-core/public.ts";
+      declare const file:ArtifactFile;
+      const physical:ArtifactFile={...file,rawSource:"private/Study.java"};
+    `,
+      "TS2353",
+    ],
+    [
+      "export-needs-content",
+      `
+      import {exportCourse} from "pl-native/export-course.ts";
+      declare const input:Parameters<typeof exportCourse>[0];
+      exportCourse({...input,result:{model:{}}});
     `,
       "TS2353",
     ],
   ];
   for (
     const [name, code, diagnostic] of legacyBoundary
-      ? legacyNegatives
+      ? boundaryNegatives
       : courseExport
       ? [nativeWriterSource]
       : [
-        ...legacyNegatives,
+        ...boundaryNegatives,
         nativeWriterSource,
         [
           "authored-feedback",

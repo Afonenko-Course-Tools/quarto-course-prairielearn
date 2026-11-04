@@ -43,7 +43,9 @@ async function copyTree(from: string, to: string) {
 import { exportCourse } from "../_extensions/course-prairielearn/application/export-course.ts";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 import { infoQuestion } from "../_extensions/course-prairielearn/application/native-validators.js";
-const forms: NonNullable<NativeAdapterValidationInput["declarations"][number]["answer"]>[] = [{ type: "manual", submission: "text" }, {
+const forms: NonNullable<
+  NativeAdapterValidationInput["declarations"][number]["answer"]
+>[] = [{ type: "manual", submission: "text" }, {
   type: "numeric",
   key: { value: 734129, tolerance: { absolute: 0.1 } },
 }, {
@@ -209,12 +211,14 @@ for (const answer of forms) {
             projects: [],
           },
           checks: {
-            schemaVersion: 1,
+            schemaVersion: 3,
             courseId: "fixture",
             bookRoot: "tasks",
-            sourceSnapshotHash: "a".repeat(64),
-            inventoryHash: "b".repeat(64),
             projects: [],
+          },
+          nativeInputs: {},
+          studentArtifact: async () => {
+            throw Error("Ответ без проекта не запрашивает student artifact");
           },
           registry: { schemaVersion: 1, profiles: {} },
           config,

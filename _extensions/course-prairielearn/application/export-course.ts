@@ -1,15 +1,15 @@
-import type { BodyResource, PublicBodyPackage } from "course-core/body-export/model.ts";
+import type {
+  BodyResource,
+  PublicBodyPackage,
+} from "course-core/body-export/model.ts";
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { nativeAnswerBinding } from "./native-delivery.ts";
-import { loadPublicationConditions } from "./publication-conditions.ts";
 import { createMetrics as __createMetrics } from "../observability/bridge.ts";
 const __metrics = __createMetrics("course-prairielearn");
 import { nativeSlotZones, qualifiedSlots } from "./slots.ts";
 import { dirname, join, relative, resolve } from "node:path";
-import { verificationInventoryHash } from "./verification-inventory.ts";
 import { gradingPolicy, validateGradingComponents } from "./grading-policy.ts";
 import { completionPolicy } from "./completion.ts";
-import { runtimeDescriptor } from "./runtime-descriptor.ts";
 import * as validators from "./native-validators.js";
 import { validateAssessmentSemantics } from "./native-semantics.ts";
 import {
@@ -22,14 +22,9 @@ import { declarations, gradingMethod, question } from "./declarations.ts";
 import type { materializeNativeQuestion } from "./native-materialize.ts";
 import type { StudentArtifact } from "./export.ts";
 import type { NativeProjectFact } from "course-core/public.ts";
-import type { CheckSourceOrigin, ExportChecks } from "./legacy-checks.ts";
-import {
-  canonical,
-  hash,
-  readSelected,
-  safePath,
-  selectedSources,
-} from "./source-selection.ts";
+import type { NativeCourseChecks } from "./native-check-inventory.ts";
+import { isDeepStrictEqual } from "node:util";
+import { canonical, safePath } from "./source-selection.ts";
 /** Один matcher для раннего native context и окончательной сборки. */
 export function nativeUnitMenus(
   works: any[],
@@ -98,7 +93,7 @@ async function absent(path: string) {
   }
 }
 async function inventory(root: string) {
-  const files: Record<string, string> = {};
+  const files: Record<string, Uint8Array> = {};
   async function walk(dir: string) {
     for (
       const e of [...await Array.fromAsync(Deno.readDir(dir))].sort((a, b) =>
@@ -108,8 +103,8 @@ async function inventory(root: string) {
       const path = join(dir, e.name);
       if (e.isDirectory) await walk(path);
       else if (e.isFile) {
-        files[relative(root, path).replaceAll("\\", "/")] = await hash(
-          await Deno.readFile(path),
+        files[relative(root, path).replaceAll("\\", "/")] = await Deno.readFile(
+          path,
         );
       } else throw new Error("PL unexpected artifact");
     }
@@ -134,14 +129,12 @@ export type NativeCompilerInput = Pick<NativeSelection, "descriptor"> & {
   tests: readonly Pick<NativeSelection["tests"][number], "name" | "bytes">[];
 };
 
-export async function exportCourse<Checks extends ExportChecks>(
+export async function exportCourse(
   input: {
     courseId: string;
     projectRoot: string;
-    /** Прежний collected input; native composition передаёт content напрямую. */
-    result?: any;
-    content?: ExportCourseContent;
-    checks: Checks;
+    content: ExportCourseContent;
+    checks: NativeCourseChecks;
     config: any;
     registry: any;
     instance: string;
@@ -152,24 +145,18 @@ export async function exportCourse<Checks extends ExportChecks>(
     deferPublish?: boolean;
     nativeBody?: boolean;
     nativeAuxiliary?: NativeAuxiliary;
-    nativeInputs?: Record<string, NativeCompilerInput>;
+    nativeInputs: Record<string, NativeCompilerInput>;
     nativeAnswers?: Record<string, any>;
     nativeResponseSlots?: Record<string, any[]>;
-    nativeVerification?: { scenarios: any[]; scenariosHash: string };
-    publicationConditions?: string;
-    publicationSource?: { repository: string; commit: string; book: string };
-    studentArtifact?: (
+    studentArtifact: (
       fact: Pick<NativeProjectFact, "exerciseId">,
     ) => Promise<StudentArtifact>;
   },
 ) {
-  if (input.content && input.result) {
-    throw Error("PL.INPUT_INVALID: ambiguous course content");
-  }
-  const content = input.content ?? input.result?.model;
+  const content = input.content;
   if (
     !content || !Array.isArray(content.assessments) ||
-    input.content && !Array.isArray(content.exercises)
+    !Array.isArray(content.exercises)
   ) {
     throw Error("PL.INPUT_INVALID: course content required");
   }
@@ -223,22 +210,6 @@ export async function exportCourse<Checks extends ExportChecks>(
     uuidOwners.set(uuid.toLowerCase(), work.id);
     assessmentUuids.set(work.id, uuid);
   }
-  const selectedIds = input.publicationConditions
-    ? new Set(
-      works.flatMap((w: any) => [
-        ...(w.slots ?? []).flatMap((slot: any) => slot.candidates),
-        ...(w.relatedExercise ? [w.relatedExercise] : []),
-      ]),
-    )
-    : undefined;
-  const publicationConditions = input.publicationConditions
-    ? await loadPublicationConditions(input.publicationConditions, {
-      courseId: input.courseId,
-      projectRoot: input.projectRoot,
-      source: input.publicationSource!,
-      exercises: content.exercises.filter((e: any) => selectedIds!.has(e.id)),
-    })
-    : undefined;
   const stage = await Deno.makeTempDir({
       dir: dirname(out),
       prefix: ".pl-course-",
@@ -378,7 +349,7 @@ export async function exportCourse<Checks extends ExportChecks>(
           await Deno.mkdir(dirname(target), { recursive: true });
           try {
             if (
-              await hash(await Deno.readFile(target)) !== await hash(file.data)
+              !isDeepStrictEqual(await Deno.readFile(target), file.data)
             ) {
               throw new Error(
                 "PL конфликт публичного ресурса обзора: " + file.name,
@@ -425,13 +396,13 @@ export async function exportCourse<Checks extends ExportChecks>(
           );
           continue;
         }
-        if (input.studentArtifact) {
-          const fact = content.projects?.find((f: any) =>
-            f.exerciseId === q.id && f.bankMember
-          );
-          if (!fact) throw Error("PL student artifact project fact missing");
-          studentArtifacts[q.id] = await input.studentArtifact(fact);
+        const artifactFact = content.projects?.find((f: any) =>
+          f.exerciseId === q.id && f.bankMember
+        );
+        if (!artifactFact) {
+          throw Error("PL student artifact project fact missing");
         }
+        studentArtifacts[q.id] = await input.studentArtifact(artifactFact);
         if (method === "manual") {
           const fact = content.projects?.find((f: any) =>
             f.exerciseId === q.id && f.bankMember
@@ -448,12 +419,10 @@ export async function exportCourse<Checks extends ExportChecks>(
               throw Error("PL manual project symlink forbidden");
             }
           }
-          const files = studentArtifacts[q.id]
-            ? studentArtifacts[q.id].files.map((f) => ({
-              name: f.name,
-              data: f.bytes,
-            }))
-            : await publicProjectFiles(join(actual, "student"));
+          const files = studentArtifacts[q.id].files.map((f) => ({
+            name: f.name,
+            data: f.bytes,
+          }));
           if (!files.length) throw Error("PL manual student files missing");
           const project = join(scratch, q.id);
           projects[q.id] = "/" + q.id;
@@ -489,12 +458,13 @@ export async function exportCourse<Checks extends ExportChecks>(
         }
         const profile = input.registry.profiles?.[fact.check.runtime];
         const nativeSelection = input.nativeInputs?.[q.id];
-        const sources = nativeSelection
-          ? nativeSelection.sources.map((s) => ({
-            name: s.name,
-            data: s.bytes,
-          }))
-          : await selectedSources(root, fact, profile);
+        if (!nativeSelection) {
+          throw Error("PL.SELECTION_INVALID: selected native bytes required");
+        }
+        const sources = nativeSelection.sources.map((file) => ({
+          name: file.name,
+          data: file.bytes,
+        }));
         if (
           ![1, 2].includes(input.registry.schemaVersion) || !profile ||
           profile.mode !== fact.check.sourceProfile.mode
@@ -520,63 +490,20 @@ export async function exportCourse<Checks extends ExportChecks>(
           });
           await Deno.writeFile(join(project, "student", s.name), s.data);
         }
-        if (
-          !(nativeSelection
-            ? nativeSelection.tests.length
-            : fact.trustedTests.length)
-        ) {
-          throw new Error("PL trusted tests missing");
+        if (!nativeSelection.tests.length) {
+          throw Error("PL trusted tests missing");
         }
         const testNames = new Set<string>();
-        type TrustedTest =
-          | {
-            kind: "native";
-            submissionRelativePath: string;
-            bytes: NativeCompilerInput["tests"][number]["bytes"];
+        for (const file of nativeSelection.tests) {
+          if (testNames.has(file.name) || file.name === "grading-job.json") {
+            throw Error("PL duplicate or reserved trusted test path");
           }
-          | { kind: "legacy"; origin: CheckSourceOrigin };
-        function* legacyTests(
-          origins: readonly CheckSourceOrigin[],
-        ): Generator<TrustedTest> {
-          for (const origin of origins) yield { kind: "legacy", origin };
+          testNames.add(file.name);
+          const target = join(project, "tests", file.name);
+          await Deno.mkdir(dirname(target), { recursive: true });
+          await Deno.writeFile(target, file.bytes);
         }
-        for (
-          const selectedTest of nativeSelection
-            ? nativeSelection.tests.map((t): TrustedTest => ({
-              kind: "native",
-              submissionRelativePath: t.name,
-              bytes: t.bytes,
-            }))
-            : legacyTests(fact.trustedTests)
-        ) {
-          const test = selectedTest.kind === "native"
-            ? selectedTest
-            : selectedTest.origin;
-          if (
-            testNames.has(test.submissionRelativePath) ||
-            test.submissionRelativePath === "grading-job.json"
-          ) throw new Error("PL duplicate or reserved trusted test path");
-          testNames.add(test.submissionRelativePath);
-          const bytes = selectedTest.kind === "native"
-            ? selectedTest.bytes
-            : await readSelected(root, selectedTest.origin);
-          await Deno.mkdir(
-            dirname(join(project, "tests", test.submissionRelativePath)),
-            { recursive: true },
-          );
-          await Deno.writeFile(
-            join(project, "tests", test.submissionRelativePath),
-            bytes,
-          );
-        }
-        const c = fact.check;
-        const descriptor = nativeSelection?.descriptor ?? runtimeDescriptor(
-          c,
-          profile,
-          sources.map((s: any) => s.name),
-          fact.trustedTests.map((t) => t.submissionRelativePath),
-          fact.apiPrecheck,
-        );
+        const c = fact.check, descriptor = nativeSelection.descriptor;
         await Deno.writeTextFile(
           join(project, "tests/grading-job.json"),
           JSON.stringify(descriptor, null, 2) + "\n",
@@ -600,7 +527,10 @@ export async function exportCourse<Checks extends ExportChecks>(
           submission: { ...settings.submission },
           projectCheck: c.profile,
           runtime: c.runtime,
-          sources: fact.sources,
+          sources: fact.sources.map((file) => ({
+            projectRelativePath: file.target,
+            submissionRelativePath: file.name,
+          })),
           sourceRoot: fact.projectRoot,
         };
       }
@@ -614,9 +544,6 @@ export async function exportCourse<Checks extends ExportChecks>(
           projects,
           studentArtifacts,
           nativeAnswers: input.nativeAnswers,
-          publicationConditions: publicationConditions
-            ? Object.fromEntries(publicationConditions.artifacts)
-            : undefined,
         },
         binding,
         partial,
@@ -649,16 +576,10 @@ export async function exportCourse<Checks extends ExportChecks>(
         const f = input.checks.projects.find((f) => f.exerciseId === q.id);
         if (f?.check) {
           for (
-            const s of input.nativeInputs?.[q.id]
-              ? input.nativeInputs[q.id].sources.map((s) => ({
-                name: s.name,
-                data: s.bytes,
-              }))
-              : await selectedSources(
-                resolve(input.projectRoot, f.projectRoot),
-                f,
-                input.registry.profiles[f.check.runtime],
-              )
+            const s of input.nativeInputs[q.id].sources.map((file) => ({
+              name: file.name,
+              data: file.bytes,
+            }))
           ) {
             const path = join(
               partial,
@@ -681,9 +602,7 @@ export async function exportCourse<Checks extends ExportChecks>(
             )
             .map((resource) => [resource.target, resource]),
         ).values()]
-          .sort((left, right) =>
-            left.target.localeCompare(right.target)
-          );
+          .sort((left, right) => left.target.localeCompare(right.target));
         const snapshot = canonical({
           question: q,
           binding: binding.questions[q.id],
@@ -693,8 +612,7 @@ export async function exportCourse<Checks extends ExportChecks>(
         if (await exists(join(stage, base))) {
           if (
             questionSnapshots.get(q.key) !== snapshot ||
-            canonical(await inventory(join(stage, base))) !==
-              canonical(nativeFiles)
+            !isDeepStrictEqual(await inventory(join(stage, base)), nativeFiles)
           ) {
             throw Error("PL конфликт повторного вопроса: " + q.key);
           }
@@ -753,16 +671,9 @@ export async function exportCourse<Checks extends ExportChecks>(
         },
       );
     }
-    if (publicationConditions) await publicationConditions.check();
     const files = await inventory(stage);
-    const version =
-      input.nativeBody || Object.keys(input.nativeAnswers ?? {}).length ||
-        Object.values(questions).some((q: any) =>
-          q.submission?.mode === "workspace"
-        )
-        ? 4
-        : 3;
-    if (version === 4) {
+    const version = 5;
+    {
       for (const [key, value] of Object.entries(questions) as [string, any][]) {
         if (value.kind === "native-answer") continue;
         if (value.submission.mode === "workspace") {
@@ -778,9 +689,7 @@ export async function exportCourse<Checks extends ExportChecks>(
             seed: {
               schema: "pl-git-workspace-seed-v1",
               archive: "workspace/.pl-seed/starter.zip",
-              archiveSha256: files[prefix + "starter.zip"],
               manifest: "workspace/.pl-seed/manifest.json",
-              manifestSha256: files[prefix + "manifest.json"],
             },
           };
         } else questions[key] = { kind: "project", ...value };
@@ -790,17 +699,6 @@ export async function exportCourse<Checks extends ExportChecks>(
       schemaVersion: version,
       courseId: input.courseId,
       bookRoot: input.checks.bookRoot,
-      sourceSnapshotHash: input.checks.sourceSnapshotHash,
-      inventoryHash: input.checks.inventoryHash,
-      verificationInventoryHash: input.nativeVerification?.scenariosHash ??
-        await verificationInventoryHash(
-          input.checks,
-          input.projectRoot,
-          Object.keys(questions).filter((key) =>
-            questions[key].grading?.method !== "manual" &&
-            !input.nativeAnswers?.[key.slice(input.courseId.length + 1)]
-          ),
-        ),
       questions: Object.keys(questions).sort(),
       gradingPayloads: questions,
       works: works.map((w: any) => ({
@@ -820,32 +718,9 @@ export async function exportCourse<Checks extends ExportChecks>(
           selfEnrollment: d.instance["self-enrollment"],
         },
       },
-      files,
+      files: Object.keys(files).sort(),
       ...(input.candidateImage ? { candidate: true } : {}),
     };
-    if (input.nativeVerification) {
-      const actual = Object.keys(questions).filter((key) =>
-        questions[key].grading.method !== "manual" &&
-        !input.nativeAnswers?.[key.slice(input.courseId.length + 1)]
-      ).sort();
-      const expected = [
-        ...new Set(
-          input.nativeVerification.scenarios.map((s) => s.qualifiedId),
-        ),
-      ].sort();
-      if (
-        canonical(actual) !== canonical(expected) ||
-        await hash(canonical(input.nativeVerification.scenarios)) !==
-          input.nativeVerification.scenariosHash
-      ) throw Error("PL.VERIFICATION_CHANGED: native scenario scope");
-    }
-    delivery.deliveryHash = await hash(canonical(delivery));
-    if (publicationConditions) {
-      console.log(
-        "PL publication conditions dependency " +
-          JSON.stringify(publicationConditions.provenance),
-      );
-    }
     await write("delivery.json", delivery);
     await Deno.mkdir(dirname(privateOut), { recursive: true });
     const privateStage = await Deno.makeTempFile({
@@ -875,7 +750,6 @@ export async function exportCourse<Checks extends ExportChecks>(
       try {
         await absent(out);
         await absent(privateOut);
-        if (publicationConditions) await publicationConditions.check();
         await Deno.rename(privateStage, privateOut);
         try {
           await Deno.rename(stage, out);

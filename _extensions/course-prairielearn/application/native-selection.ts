@@ -1,6 +1,6 @@
 import { matchesGlob } from "node:path";
 import { NativeProjectCheckSchema } from "./native-checks.ts";
-import { hash, safePath } from "./source-selection.ts";
+import { safePath } from "./source-selection.ts";
 import { runtimeDescriptor } from "./runtime-descriptor.ts";
 import type * as Core from "course-core/public.ts";
 import type { ArtifactFile, ProjectPlan } from "course-core/public.ts";
@@ -9,7 +9,7 @@ import type { RuntimeProfile } from "./runtime-descriptor.ts";
 type File = Omit<ArtifactFile, "audience">;
 type CoreBoundary = Pick<
   typeof Core,
-  "ArtifactInventorySchema" | "ProjectPlanSchema"
+  "ArtifactFilesSchema" | "ProjectPlanSchema"
 >;
 /** Pure consumer of actual checked A1 plan inventories. It never discovers files
  * or interprets metadata. Authored roots/globs keep their exact target meaning.
@@ -24,21 +24,19 @@ export async function selectNativeCompilerInputs(options: {
   full: unknown;
 }) {
   const check = NativeProjectCheckSchema.parse(options.check);
-  const student = options.core.ArtifactInventorySchema.parse(options.student),
-    full = options.core.ArtifactInventorySchema.parse(options.full);
+  const student = options.core.ArtifactFilesSchema.parse(options.student),
+    full = options.core.ArtifactFilesSchema.parse(options.full);
   const studentPlan = options.core.ProjectPlanSchema.parse(options.studentPlan),
     fullPlan = options.core.ProjectPlanSchema.parse(options.fullPlan);
   if (
     student.audience !== "student" || full.audience !== "full" ||
     studentPlan.audience !== "student" || fullPlan.audience !== "full" ||
-    student.operation !== full.operation ||
     student.exerciseId !== full.exerciseId ||
     studentPlan.input !== fullPlan.input
   ) throw Error("PL.SELECTION_INVALID: inventories/plan identity mismatch");
   const file = async (value: File, name: string) => {
     if (
-      !safePath(name) || value.size !== value.bytes.length ||
-      await hash(value.bytes) !== value.sha256
+      !safePath(name)
     ) {
       throw Error("PL.SELECTION_CHANGED: inventory bytes");
     }
@@ -46,11 +44,8 @@ export async function selectNativeCompilerInputs(options: {
     return {
       name,
       bytes,
-      sha256: value.sha256,
-      size: value.size,
       target: value.target,
       reason: value.reason,
-      ...(value.rawSource === undefined ? {} : { rawSource: value.rawSource }),
     };
   };
   const under = (target: string, root: string) =>
@@ -234,11 +229,8 @@ export async function selectNativeCompilerInputs(options: {
     tests,
     references,
     descriptor,
-    provenance: {
-      studentOperation: student.operation,
+    selectedRoles: {
       exerciseId: student.exerciseId,
-      studentPlan: studentPlan.id,
-      fullPlan: fullPlan.id,
       testsets: fullPlan.testsets,
       components: fullPlan.components,
       groups: fullPlan.groups,

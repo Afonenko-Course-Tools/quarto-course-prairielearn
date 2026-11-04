@@ -1,13 +1,13 @@
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { hash } from "./source-selection.ts";
+import { isDeepStrictEqual } from "node:util";
 import { describeSubmission } from "./submission.ts";
 import { projectNativeChecks } from "./native-check-projection.ts";
 import type { CheckedNativeProjectFact } from "./native-check-projection.ts";
 import type * as CorePublic from "course-core/public.ts";
 import type {
-  ArtifactInventory,
+  ArtifactFiles,
   MaterializableCondition,
   MaterializationBindings,
   NativeAssignmentProjectPlans,
@@ -36,23 +36,15 @@ export async function publicExtension(owner: string, name: string) {
   }
   throw Error("PL.PUBLIC_API_REQUIRED: installed " + name + "/public.ts");
 }
-/** Файлы C/operator inputs: data only, hash fence без source discovery. */
+/** Обычное чтение JSON-конфигурации один раз за операцию. */
 export async function checkedJSON(path: string) {
   const canonical = await Deno.realPath(path);
   if (canonical !== resolve(path)) {
     throw Error("PL.INPUT_INVALID: aliased JSON input");
   }
-  const bytes = await Deno.readFile(canonical),
-    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)),
-    sha256 = await hash(bytes);
+  const bytes = await Deno.readFile(canonical);
   return {
-    value,
-    async assert() {
-      if (
-        await Deno.realPath(path) !== canonical ||
-        await hash(await Deno.readFile(canonical)) !== sha256
-      ) throw Error("PL.INPUT_CHANGED: JSON dependency");
-    },
+    value: JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)),
   };
 }
 export async function nativeReferenceBindings(
@@ -98,7 +90,6 @@ export async function nativeReferenceBindings(
     catalog: file.value,
     baseUrl,
     sources,
-    check: file.assert,
     references: {
       namespace,
       resolve: links.resolve,
@@ -150,7 +141,7 @@ export async function materializeNativeQuestion(
     Core: Pick<
       typeof CorePublic,
       | "materializeProject"
-      | "ArtifactInventorySchema"
+      | "ArtifactFilesSchema"
       | "ProjectPlanSchema"
       | "ArtifactFileSchema"
     >;
@@ -160,7 +151,6 @@ export async function materializeNativeQuestion(
     fact: CheckedNativeProjectFact;
     materialization?: { includeGit?: boolean };
     settings: Pick<ReturnType<typeof question>, "submission">;
-    sourceRows: readonly { source: string; sha256: string }[];
     courseId: string;
     runtime: RuntimeProfile;
     bindings: (
@@ -172,7 +162,7 @@ export async function materializeNativeQuestion(
       zip: Parameters<
         Awaited<ReturnType<typeof createNativeAdapter>>["workspaceArtifact"]
       >[0]["zip"];
-      packageArtifact: (inventory: ArtifactInventory) => Promise<Uint8Array>;
+      packageArtifact: (inventory: ArtifactFiles) => Promise<Uint8Array>;
     };
     adapter: Pick<
       Awaited<ReturnType<typeof createNativeAdapter>>,
@@ -213,6 +203,13 @@ export async function materializeNativeQuestion(
       name: f.name,
       starterPath: f.target,
     })) ?? [],
+    {
+      freeComposition: !input.fact.check ||
+        checked?.selection.descriptor.additionalJavaSources?.allowAdditional !== false &&
+          checked?.selection.descriptor.additionalJavaSources !== undefined,
+      primaryRequired: checked?.selection.descriptor.additionalJavaSources?.primaryRequired !== false,
+      archive: checked?.selection.descriptor.additionalJavaSources?.archive,
+    },
   );
   const final = await Core.materializeProject(
     pair.student,
@@ -223,8 +220,7 @@ export async function materializeNativeQuestion(
     for (const f of checked.selection.sources) {
       const actual = final.files.find((file) => file.target === f.target);
       if (
-        !actual || actual.sha256 !== f.sha256 ||
-        await hash(actual.bytes) !== f.sha256
+        !actual || !isDeepStrictEqual(actual.bytes, f.bytes)
       ) throw Error("PL.SELECTION_CHANGED: final starter");
     }
   }

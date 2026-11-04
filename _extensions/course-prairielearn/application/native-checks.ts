@@ -113,6 +113,7 @@ const fields = {
   }).optional(),
   "additional-java-sources": z.strictObject({
     "primary-required": z.boolean().optional(),
+    "allow-additional": z.boolean().optional(),
     archive: text.regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.zip$/),
     "max-files": integer.max(128),
     "max-file-bytes": integer.max(1048576),

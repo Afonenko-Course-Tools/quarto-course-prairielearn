@@ -1,12 +1,12 @@
+import type * as CorePublic from "course-core/public.ts";
 import { pathToFileURL } from "node:url";
-import { selectNativeCompilerInputs } from "../_extensions/course-prairielearn/public.ts";
-import { hash } from "../_extensions/course-prairielearn/application/source-selection.ts";
-import { nativeVerificationInventory } from "../_extensions/course-prairielearn/application/verification-inventory.ts";
-const Core = await import(
+const Core: typeof CorePublic = await import(
   pathToFileURL(Deno.args[0] + "/_extensions/course-core/public.ts").href
 );
-const operation = crypto.randomUUID(), input = "projects/example";
-const plan = (audience: string) => ({
+import type { ArtifactFile, ProjectPlan } from "course-core/public.ts";
+import { selectNativeCompilerInputs } from "../_extensions/course-prairielearn/public.ts";
+const input = "projects/example";
+const plan = (audience: "student" | "full"): ProjectPlan => ({
   id: crypto.randomUUID(),
   input,
   audience,
@@ -17,7 +17,7 @@ const plan = (audience: string) => ({
 async function file(
   target: string,
   reason: string,
-  audience: string,
+  audience: ArtifactFile["audience"],
   text = "class Example {}",
 ) {
   const bytes = new TextEncoder().encode(text);
@@ -26,13 +26,9 @@ async function file(
     reason,
     audience,
     bytes,
-    size: bytes.length,
-    sha256: await hash(bytes),
   };
 }
 const student = {
-  schema: "course-artifact-inventory-v1",
-  operation,
   exerciseId: "exr-example",
   audience: "student",
   files: [await file("src/main/java/Study.java", "starter", "student")],
@@ -93,37 +89,38 @@ const options = {
   full,
 };
 const selected = await selectNativeCompilerInputs(options);
-const verification = await nativeVerificationInventory({
-  courseId: "fixture",
-  operation,
-  selections: { "exr-example": selected },
-});
 if (
-  verification.scenarios.length !== 2 ||
-  verification.scenarios[0].scenario !== "reference:alternate"
-) throw Error("selected reference verification lost");
-if (
-  selected.references[0].files.map((x: any) => x.name).join(",") !==
+  selected.references[0].files.map((x) => x.name).join(",") !==
     "Example.java,Study.java"
 ) throw Error("reference helper not preserved");
 if (
-  selected.descriptor.apiPrecheck.files.join(",") !== "src/api/java/Api.java" ||
+  selected.descriptor.apiPrecheck?.files.join(",") !==
+    "src/api/java/Api.java" ||
   selected.descriptor.testFiles.length !== 2
 ) throw Error("API/subject selection changed");
 for (
   const [name, mutate] of [
-    ["foreign-role", (o: any) => o.full.files[4].reason = "starter"],
-    ["dishonest-size", (o: any) => o.full.files[4].size = 0],
-    ["changed-bytes", (o: any) => o.full.files[4].bytes[0] = 0],
-    ["non-source-helper", (o: any) => {
+    [
+      "api-all-tests",
+      (o: typeof options) => o.check["api-precheck"].files = ["src/**/*.java"],
+    ],
+    [
+      "api-no-match",
+      (o: typeof options) => o.check["api-precheck"].files = ["missing/*.java"],
+    ],
+    [
+      "trusted-starter",
+      (o: typeof options) => o.full.files[2].reason = "starter",
+    ],
+    ["foreign-role", (o: typeof options) => o.full.files[4].reason = "starter"],
+    ["changed-bytes", (o: typeof options) => o.full.files[4].bytes[0] = 0],
+    ["non-source-helper", (o: typeof options) => {
       o.full.files[4].target = "author/alternate/src/main/java/evil.txt";
       o.check.sourceProfile.include = ["**/*"];
     }],
-    ["oversized-helper", async (o: any) => {
+    ["oversized-helper", async (o: typeof options) => {
       const f = o.full.files[4];
       f.bytes = new Uint8Array(1048577);
-      f.size = f.bytes.length;
-      f.sha256 = await hash(f.bytes);
     }],
   ] as const
 ) {
@@ -141,8 +138,8 @@ for (
 console.log(
   JSON.stringify(
     {
-      referenceHelpers: selected.references[0].files.map((x: any) => x.name),
-      controls: 5,
+      referenceHelpers: selected.references[0].files.map((x) => x.name),
+      controls: 7,
       descriptor: selected.descriptor,
     },
     null,

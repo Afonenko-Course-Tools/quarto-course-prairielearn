@@ -975,12 +975,19 @@ export async function exportPrairieLearn(
         '<pl-file-download file-name="' + escape(f.name) +
         '"></pl-file-download>'
       ).join("\n");
-      controls = downloads + (extras?.primaryRequired === false
-        ? '\n<pl-file-upload optional-file-names="' +
-          escape([
-            ...b.files.filter((name: string) => !name.includes("/")),
-            extras.archive,
-          ].join(",")) + '"></pl-file-upload>'
+      const layout = submission.mode === "upload" ? submission.layout : undefined;
+      const zip = layout === "zip" || layout === undefined &&
+        b.files.length >= 3 && b.files.some((name: string) => name.includes("/"));
+      if (zip && !manual && !extras) {
+        questionFail("Для вложенного ответа требуется явный ZIP transport в additional-java-sources", "submission");
+      }
+      controls = downloads + (zip && extras
+        ? '\n<pl-file-upload file-names="' + escape(extras.archive) + '"></pl-file-upload>'
+        : extras && (extras.primaryRequired === false || extras.allowAdditional !== false)
+        ? '\n<pl-file-upload optional-file-patterns="*.java" optional-file-names="' +
+          escape(extras.archive) + '\"></pl-file-upload>'
+        : zip && extras
+        ? '\n<pl-file-upload file-names="' + escape(extras.archive) + '\"></pl-file-upload>'
         : manual
         ? '\n<pl-file-upload file-patterns="*" optional-file-patterns="*"></pl-file-upload>'
         : '\n<pl-file-upload file-names="' +
@@ -995,7 +1002,14 @@ export async function exportPrairieLearn(
           escape(extras.archive) + '"></pl-file-upload>';
       }
     }
-    if (extras?.primaryRequired === false) {
+    if (submission.mode === "upload" && (submission.layout === "zip" ||
+      submission.layout === undefined && extras?.primaryRequired !== false &&
+      b.files.length >= 3 && b.files.some((name: string) => name.includes("/")))) {
+      controls = "<p>Загрузите ZIP с исходниками, сохранив перечисленные относительные пути внутри архива.</p>\n" + controls;
+    }
+    if (extras && (extras.primaryRequired === false || extras.allowAdditional !== false) &&
+      submission.mode === "upload" && submission.layout !== "zip" &&
+      (submission.layout === "files-or-zip" || !(b.files.length >= 3 && b.files.some((name: string) => name.includes("/"))))) {
       controls =
         "<p>Перечисленные в поле загрузки файлы можно отправить отдельно; исходники с пакетами и остальные .java поместите в ZIP, сохранив относительные пути.</p>\n" +
         controls;

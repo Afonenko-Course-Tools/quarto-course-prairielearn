@@ -173,3 +173,16 @@ Deno.test("Отсутствующая политика отличается от
     assert.throws(() => validateNativeRaw({ config: v, declarations: [] }));
   }
 });
+
+Deno.test("Явный layout загрузки сохраняет разрешённый состав и не применяется к редактору", () => {
+  const value = raw();
+  value.config["question-defaults"].submission = { mode: "upload", layout: "files-or-zip" };
+  const local = structuredClone(input());
+  local.declarations[0].attributes = { ...local.declarations[0].attributes, "prairielearn-submission-layout": "zip" };
+  value.declarations = local.declarations;
+  const result = decodeNativeBusiness(value, local);
+  assert.deepEqual(result.questions["exr-one"].submission, { mode: "upload", layout: "zip" });
+  for (const submission of [{ mode: "editor", layout: "zip" }, { mode: "workspace", layout: "zip" }, { mode: "upload", layout: "unknown" }]) {
+    assert.throws(() => Owner.question({ topic: "Java", submission }));
+  }
+});

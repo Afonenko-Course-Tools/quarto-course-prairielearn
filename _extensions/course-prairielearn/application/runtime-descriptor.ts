@@ -4,12 +4,12 @@ import { normalizeDiscovery } from './grading-descriptor.ts';
 import { javaBuild } from './java-build.ts';
 import { safePath } from './source-selection.ts';
 import type { NativeProjectCheck } from './native-checks.ts';
-import type { LegacyDescriptorCheck } from './legacy-checks.ts';
+import type { RuntimeCheckInput } from './runtime-check.ts';
 export type RuntimeProfile = NonNullable<Parameters<typeof javaBuild>[1]>;
-export interface AdditionalJavaSources {primaryRequired?:boolean;archive:string;maxFiles:number;maxFileBytes:number;maxTotalBytes:number;maxArchiveBytes:number}
+export interface AdditionalJavaSources {primaryRequired?:boolean;allowAdditional?:boolean;archive:string;maxFiles:number;maxFileBytes:number;maxTotalBytes:number;maxArchiveBytes:number}
 export function validateAdditionalJavaSources(value:any,sources:string[],tests:string[]):AdditionalJavaSources {
   const caps={maxFiles:128,maxFileBytes:1048576,maxTotalBytes:4194304,maxArchiveBytes:2097152};
-  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['archive','primaryRequired',...Object.keys(caps)].includes(k))||('primaryRequired' in value&&typeof value.primaryRequired!=='boolean')||typeof value.archive!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.zip$/.test(value.archive)||Object.entries(caps).some(([key,cap])=>!Number.isInteger(value[key])||value[key]<1||value[key]>cap))throw new Error('PL invalid additional Java sources policy');
+  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['archive','primaryRequired','allowAdditional',...Object.keys(caps)].includes(k))||('primaryRequired' in value&&typeof value.primaryRequired!=='boolean')||('allowAdditional' in value&&typeof value.allowAdditional!=='boolean')||typeof value.archive!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.zip$/.test(value.archive)||Object.entries(caps).some(([key,cap])=>!Number.isInteger(value[key])||value[key]<1||value[key]>cap))throw new Error('PL invalid additional Java sources policy');
   if([...sources,...tests,'grading-job.json','tests/grading-job.json'].some(name=>name===value.archive||name.startsWith(value.archive+'/')||value.archive.startsWith(name+'/')))throw new Error('PL additional Java archive conflicts with primary/trusted path');
   return {...value};
 }
@@ -22,7 +22,7 @@ function publicCases(value:NonNullable<NativeProjectCheck['public-cases']>){
  });
 }
 export interface ApiPrecheck {files:string[];entry:string}
-export function runtimeDescriptor<C extends LegacyDescriptorCheck>(c: C, profile: RuntimeProfile, sources: string[], tests: string[], api?:ApiPrecheck) {
+export function runtimeDescriptor<C extends RuntimeCheckInput>(c: C, profile: RuntimeProfile, sources: string[], tests: string[], api?:ApiPrecheck) {
   const build=javaBuild(c,profile);
   const javaRuntime = profile.javaRelease !== undefined || !profile.sourceExtensions;
   if (!javaRuntime && c.java !== undefined) throw new Error('PL non-Java runtime cannot declare Java compiler settings');
@@ -32,8 +32,8 @@ export function runtimeDescriptor<C extends LegacyDescriptorCheck>(c: C, profile
   const extra=c['additional-java-sources'];
   let additionalJavaSources:AdditionalJavaSources|undefined;
   if(extra!==undefined){
-    if(!extra||typeof extra!=='object'||Array.isArray(extra)||!['java25-junit-v1','java25-gradle-junit-v1'].includes(c.runtime)||c.sourceProfile.mode!=='implementation'||Object.keys(extra).some(k=>!['archive','max-files','max-file-bytes','max-total-bytes','max-archive-bytes','primary-required'].includes(k)))throw new Error('PL additional Java sources require closed Java implementation policy');
-    additionalJavaSources=validateAdditionalJavaSources({...('primary-required' in extra?{primaryRequired:extra['primary-required']}:{}),archive:extra.archive,maxFiles:extra['max-files'],maxFileBytes:extra['max-file-bytes'],maxTotalBytes:extra['max-total-bytes'],maxArchiveBytes:extra['max-archive-bytes']},sources,tests);
+    if(!extra||typeof extra!=='object'||Array.isArray(extra)||!['java25-junit-v1','java25-gradle-junit-v1'].includes(c.runtime)||c.sourceProfile.mode!=='implementation'||Object.keys(extra).some(k=>!['archive','max-files','max-file-bytes','max-total-bytes','max-archive-bytes','primary-required','allow-additional'].includes(k)))throw new Error('PL additional Java sources require closed Java implementation policy');
+    additionalJavaSources=validateAdditionalJavaSources({...('primary-required' in extra?{primaryRequired:extra['primary-required']}:{}),...('allow-additional' in extra?{allowAdditional:extra['allow-additional']}:{}),archive:extra.archive,maxFiles:extra['max-files'],maxFileBytes:extra['max-file-bytes'],maxTotalBytes:extra['max-total-bytes'],maxArchiveBytes:extra['max-archive-bytes']},sources,tests);
   }
   const mode: C['sourceProfile']['mode'] = c.sourceProfile.mode;
   const scoring: C['scoring'] = c.scoring;

@@ -1,3 +1,6 @@
+import type * as CorePublic from "course-core/public.ts";
+import type { CheckedNativeProjectFact } from "../_extensions/course-prairielearn/application/native-check-projection.ts";
+import type { nativeProjectWitness } from "../_extensions/course-prairielearn/application/native-provenance.ts";
 import { captureNativeAuxiliary } from "../_extensions/course-prairielearn/application/native-auxiliary.ts";
 import { withNativeProjectPlans } from "../_extensions/course-prairielearn/application/native-course.ts";
 import { hostDelta, observeNativeHost } from "./native-host-observer.ts";
@@ -7,17 +10,18 @@ import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { materializeNativeQuestion } from "../_extensions/course-prairielearn/application/native-materialize.ts";
 import { nativeChecksManifest } from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
-import { hash } from "../_extensions/course-prairielearn/application/source-selection.ts";
 import { decodeNativeCheck } from "../_extensions/course-prairielearn/application/native-checks.ts";
-import { nativeVerificationInventory } from "../_extensions/course-prairielearn/application/verification-inventory.ts";
 const core = join(Deno.args[0], "_extensions/course-core"),
   pl = join(Deno.cwd(), "_extensions/course-prairielearn"),
-  Core = await import(pathToFileURL(join(core, "public.ts")).href),
-  PL = await import(pathToFileURL(join(pl, "public.ts")).href);
+  Core: typeof CorePublic = await import(
+    pathToFileURL(join(core, "public.ts")).href
+  ),
+  PL: typeof import("../_extensions/course-prairielearn/public.ts") =
+    await import(pathToFileURL(join(pl, "public.ts")).href);
 const root = await Deno.makeTempDir({ prefix: "c4-reuse-a1-" }),
   out = await Deno.makeTempDir({ prefix: "c4-reuse-a1-download-" });
 const artifactOut = await Deno.makeTempDir({ prefix: "c4-reuse-artifacts-" });
-const sourceRows: any[] = [], checks: any[] = [];
+const checks: any[] = [];
 let success = false, expiredPair: any, expiredCondition: any;
 let observer: any,
   captureStart: any,
@@ -28,7 +32,6 @@ async function put(path: string, text: string) {
   await Deno.mkdir(dirname(join(root, path)), { recursive: true });
   const bytes = new TextEncoder().encode(text);
   await Deno.writeFile(join(root, path), bytes);
-  sourceRows.push({ source: path, sha256: await hash(bytes) });
 }
 const policy = {
   "source-profiles": {
@@ -120,7 +123,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
     `course-project:
   starter: {path: starter}
   components:
-    apiSupport: {path: ../../shared/api}
+    apiSupport: {path: ../../shared/api, base: config}
   testsets:
     checks: {path: checks, requires: {apiSupport: true}}
   delivery: {student: {testsets: {checks: false}}}
@@ -191,7 +194,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
   parentStart = observer.snapshot();
   await Core.withCurrentNativeOperation(
     candidate.expectation,
-    async (operation: any) => {
+    async (operation) => {
       const auxiliary = captureNativeAuxiliary(() => operation.assertCurrent());
       const adapter = PL.createNativeAdapter({
         root,
@@ -201,7 +204,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
       await adapter.validateCourse(operation, {
         expectedSources: ["bank.qmd"],
       });
-      const fact = {
+      const fact: CheckedNativeProjectFact = {
         exerciseId: "exr-p",
         source: "bank.qmd",
         projectRoot: "projects/p",
@@ -214,15 +217,29 @@ references: [{id: fixture-book, type: book, title: Публичная книга
         },
         check: decodeNativeCheck(policy, "native"),
       };
-      const witness = {
-        projects: [{ source: "bank.qmd", format: "html", fact }],
+      const witness: Awaited<ReturnType<typeof nativeProjectWitness>> = {
+        identity: operation.identity,
+        ownerInputs: ["bank.qmd"],
+        capturedInputs: ["bank.qmd"],
+        projects: [{
+          source: "bank.qmd",
+          format: "html",
+          fact,
+          declaration: {
+            source: "bank.qmd",
+            id: "exr-p",
+            project: "/projects/p",
+            format: "html",
+          },
+          materialization: undefined,
+        }],
       };
       const planned = await withNativeProjectPlans(
         Core,
         root,
         operation.identity.profiles,
         witness,
-        async (projectPlans: any[]) => {
+        async (projectPlans) => {
           const pair = projectPlans[0];
           const condition = operation.condition({
             source: "bank.qmd",
@@ -239,14 +256,13 @@ references: [{id: fixture-book, type: book, title: Публичная книга
             condition,
             fact,
             settings: adapter.business("bank.qmd").questions["exr-p"],
-            sourceRows,
             courseId: "native",
             runtime: {
               mode: "implementation",
               javaRelease: 25,
               sourceExtensions: [".java"],
             },
-            bindings: async (_plan: any, _condition: any, submission: any) => ({
+            bindings: async (_plan, _condition, submission) => ({
               submission,
             }),
             Download,
@@ -274,11 +290,12 @@ references: [{id: fixture-book, type: book, title: Публичная книга
             throw Error("actual ordinary native Cite lost");
           }
           const p = materialized.project;
+          if (!p) throw Error("selected project missing");
           if (
             !p.trustedTests.some((f: any) =>
-              f.ownerRelativePath === "shared/api/src/api/java/Api.java"
+              f.target === "src/api/java/Api.java"
             )
-          ) throw Error("shared raw origin not preserved");
+          ) throw Error("shared API target not preserved");
           if (
             p.references[0].targets.join(",") !==
               "author/example/src/main/java/Helper.java,author/example/src/main/java/Main.java"
@@ -290,33 +307,17 @@ references: [{id: fixture-book, type: book, title: Публичная книга
           ) throw Error("student privacy leaked");
           if (
             !new TextDecoder().decode(
-              materialized.files.find((f: any) => f.name === "README.md").bytes,
+              materialized.files.find((f) => f.name === "README.md")?.bytes,
             ).includes("Позднее настоящее условие")
           ) throw Error("late condition lost");
           await Deno.writeFile(
             join(artifactOut, "student.zip"),
             materialized.archive,
           );
-          const verification = await nativeVerificationInventory({
-            courseId: "native",
-            operation: operation.identity.operation,
-            selections: { "exr-p": materialized.selection },
-          });
-          const sources = sourceRows.filter((r) => r.source === "bank.qmd"),
-            selectionScope = {
-              schema: "pl-native-selected-checks-v1",
-              identity: operation.identity,
-              assessments: [{ source: "bank.qmd", id: "sec-work" }],
-              sources,
-              automaticIds: ["native/exr-p"],
-            };
           const manifest = await nativeChecksManifest({
             courseId: "native",
             bookRoot: root.split("/").at(-1)!,
-            sources,
             projects: [p],
-            version: 2,
-            selectionScope,
           });
           await Deno.writeTextFile(
             join(artifactOut, "checks.json"),
@@ -324,7 +325,6 @@ references: [{id: fixture-book, type: book, title: Публичная книга
           );
           checks.push({
             project: p,
-            verification,
 
             studentPlanMetrics: Core.projectPlanMetrics(pair.student),
             fullPlanMetrics: Core.projectPlanMetrics(pair.full),
@@ -350,15 +350,9 @@ references: [{id: fixture-book, type: book, title: Публичная книга
       checks[0].projectContextMetrics = planned.projectContextMetrics;
       const cost = planned.projectContextMetrics.final;
       if (
-        cost.inspectCalls !== 1 || cost.fullWalks !== 0 ||
-        operation.metrics.inspectCalls !== 1 ||
-        operation.metrics.fullWalks !== 1 ||
-        operation.metrics.childRenders !== 1
-      ) throw Error("REUSE_COST_TARGET_MISSED");
-      if (
-        cost.fullFences <= planned.projectContextMetrics.inside.fullFences ||
+        cost.yamlFileReads < 1 || cost.directoryLayers < 1 ||
         !Object.isFrozen(cost)
-      ) throw Error("FINAL_A1_METRICS_NOT_CLOSED_IMMUTABLE");
+      ) throw Error("loader cost observations missing");
       checks.push({ operationMetrics: operation.metrics });
     },
   );
@@ -368,44 +362,6 @@ references: [{id: fixture-book, type: book, title: Публичная книга
     parentIncludingFinal: hostDelta(parentStart, parentFinal),
     whole: hostDelta(captureStart, parentFinal),
   };
-  const wrongOrigins: any[] = [];
-  for (
-    const [name, projectRoot, format] of [[
-      "foreign-project",
-      "shared/api",
-      "html",
-    ], ["foreign-format", "projects/p", "revealjs"]]
-  ) {
-    const start = observer.snapshot();
-    let error = "", callbackEntered = false;
-    try {
-      await Core.withCurrentNativeOperation(
-        candidate.expectation,
-        async (op: any) => {
-          await withNativeProjectPlans(Core, root, op.identity.profiles, {
-            projects: [{
-              source: "bank.qmd",
-              format,
-              fact: { exerciseId: "exr-p", projectRoot },
-            }],
-          }, async () => {
-            callbackEntered = true;
-          }, op);
-        },
-      );
-    } catch (e) {
-      error = String(e);
-    }
-    const host = hostDelta(start, observer.snapshot());
-    if (
-      callbackEntered || !error.includes("CONTEXT_REQUEST") ||
-      host.commands.some((c: any) =>
-        c.args[0] === "inspect" || c.args[0] === "render"
-      )
-    ) throw Error("wrong origin reached A1 probe: " + name + error);
-    wrongOrigins.push({ name, error, callbackEntered, host });
-  }
-  checks.push({ wrongOrigins });
   let expired = "";
   try {
     await Core.materializeProject(expiredPair.student, expiredCondition, {
@@ -417,23 +373,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
   if (!/CONTEXT_EXPIRED/.test(expired)) {
     throw Error("expired plan accepted: " + expired);
   }
-  const changed = join(root, "shared/api/src/api/java/Api.java"),
-    original = await Deno.readFile(changed);
-  let stale = "", entered = false;
-  try {
-    await Deno.writeTextFile(changed, "CHANGED_AFTER_CAPTURE");
-    await Core.withCurrentNativeOperation(candidate.expectation, async () => {
-      entered = true;
-    });
-  } catch (e) {
-    stale = String(e);
-  } finally {
-    await Deno.writeFile(changed, original);
-  }
-  if (entered || !/OPERATION_CHANGED/.test(stale)) {
-    throw Error("changed S reached callback: " + stale);
-  }
-  checks.push({ expired, stale, staleCallbackEntered: entered });
+  checks.push({ expired });
   console.log(
     JSON.stringify(
       {

@@ -45,3 +45,14 @@ Deno.test('student choice emits two visible questions in one bestQuestions zone 
  assert(completionPolicy('demo',w).requiredSlotIds.length===1,'choice counted as two required tasks');
  const assessment={uuid:'99aa8f0e-f6b2-4028-9a83-ea27f18b5abe',type:'Homework',title:'Synthetic',set:'Homework',number:'1',zones};assert(infoAssessment(assessment),'pinned native choice schema invalid');validateAssessmentSemantics(assessment,'choice/infoAssessment.json');
 });
+
+Deno.test('добровольные позиции видны отдельно и не меняют обязательную оценку',()=>{
+ const required={requirement:'required',workMode:'individual'}, optional={requirement:'optional',workMode:'individual'};
+ const w={id:'sec-lab',title:'Массивы',kind:'lab',slots:[{id:'exr-a',selection:'fixed',candidates:['exr-a'],assignment:required},{id:'exr-b',selection:'fixed',candidates:['exr-b'],assignment:optional},{id:'exr-c',selection:'fixed',candidates:['exr-c'],assignment:optional}],extensions:{prairielearn:{attempts:3,pass:{'at-least':1},'slot-overrides':{'exr-a':{'auto-points':80,'manual-points':20},'exr-b':{'auto-points':0,'manual-points':0},'exr-c':{'auto-points':0,'manual-points':0}}}}};
+ const zones=nativeSlotZones('demo',w,gradingPolicy(w));
+ assert(zones.length===2&&zones[0].title==='Массивы'&&zones[1].title==='Добровольные задания','Добровольные задания не выделены');
+ assert(zones[1].questions.length===2&&zones[1].questions.every((q:any)=>q.autoPoints===0&&q.manualPoints===0&&q.preferences.courseRequirement==='optional'),'Добровольные задачи получили зачётный вес');
+ assert(completionPolicy('demo',w).requiredSlotIds.length===1,'Добровольная позиция стала обязательной');
+ const assessment={uuid:'99aa8f0e-f6b2-4028-9a83-ea27f18b5abe',type:'Homework',title:'Массивы',set:'Homework',number:'1',zones};
+ assert(infoAssessment(assessment),'Native schema отвергает добровольный раздел');validateAssessmentSemantics(assessment,'lab/infoAssessment.json');
+});

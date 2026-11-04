@@ -437,7 +437,7 @@ Core 7.0.0 задаёт `slots` вместо прежних `items/assignments`.
 принимает только Body `course-body-package-v2`. `slot.id` в Body и delivery —
 `course/work/slot`, кандидаты — `course/exr-*`. Все кандидаты экспортируются и
 проверяются атомарно, включая неназначенные конкретному студенту. Повтор снимка
-сохраняет стабильные UUID, полный каталог и delivery hash.
+сохраняет стабильные UUID и полный каталог.
 
 Случайный Span `[@exr-a; @exr-b]{.task-alternatives #alt-x selection="random"}`
 создаёт один native блок `{numberChoose:1, points, triesPerVariant, alternatives}`.
@@ -452,7 +452,7 @@ triesPerVariant наследуются только выбранным вопр�
 имеют одинаковую максимальную цену. Completion v2 использует slotIds/requiredSlotIds,
 `mode: required-slot-completion`, `source: per-slot-results-v2`. Порог pass.at-least
 считает обязательные позиции; частичный балл и optional их не заменяют.
-Native delivery имеет schemaVersion2, work.slots и полный questions каталог.
+Native delivery имеет `schemaVersion: 5`, `work.slots` и полный каталог вопросов.
 
 ## Название, учебные метаданные и обзор работы (unreleased)
 
@@ -522,53 +522,24 @@ Platform; source candidate не доказывает archive/image/runtime/cours
 сохраняется. Mixed по-прежнему имеет native External и отдельные auto/manual
 компоненты; manual не получает фиктивных tests/runtime.
 
-Bodyv2, deliveryv3 и public resultsv2 сохранены. Exact Core-кандидат закреплён в CI.
+Body v2 и public results v2 сохранены; текущий delivery v5 требует согласованного consumer. Exact Core-кандидат закреплён в CI.
 Новый whole-course capture/export, доступ Student, Moodle учёт и публикация
 кандидата8.2.1 — отдельные последующие проверки.
 
-## Явные conditions ZIP принятой публикации
+## Файлы native-поставки
 
-Опциональный CLI-параметр `--publication-conditions /absolute/manifest.json`
-подключает целые архивы уже принятой публикации. Это отдельные внешние зависимости,
-не Core student materialization и не содержимое `starter.zip`. Без параметра
-сохраняется прежний экспорт. Core по-прежнему удаляет contextual Download links
-из публичного Body; адаптер добавляет только явно разрешённые conditions archives.
+Текущий CLI получает исходный курс, каталог результата и при необходимости
+`--checks-output`. Параметры `--staging-receipt`, `--publication-conditions` и
+переменная `PRAIRIELEARN_PUBLICATION_CONDITIONS` удалены вместе с собственными
+свидетельствами актуальности. Публичное условие, ресурсы и student-комплект
+получаются из текущей операции Core; ZIP собирает установленный Download.
 
-Неизменённый host builder Platform 2.3.0 передаёт окружение настоящему
-установленному entrypoint. Для этого маршрута вместо CLI используется один
-явный `PRAIRIELEARN_PUBLICATION_CONDITIONS=/absolute/manifest.json`.
-CLI и ENV одновременно запрещены, даже с одинаковым значением; пустой или
-относительный путь отвергается. Если оба отсутствуют, прежний экспорт сохраняется.
-Один эффективный путь определяет ту же source authority (`stagingReceipt.publicBase`
-в private stage), проверки и JSON dependency receipt в stdout. Исполнитель должен
-закрепить exact ENV, manifest, публикационный receipt и whole ZIP в собственных
-sealed inputs; неявное ambient значение не является разрешением. Другая версия
-builder/runtime assembly или новые образы для этого transport не требуются.
-
-Manifest имеет схему `pl-publication-conditions-v1` и точные поля:
-
-- `courseId` — текущий курс;
-- `source: {repository, commit, book}` — текущий public Git source; в private stage
-  это `publicBase` принятого staging receipt;
-- `publication: {repository, commit, receipt: {path, bytes, sha256}}` — источник
-  исторической публикации и внешнее принятое свидетельство;
-- `archives` — записи `{questionId, source, sourceSha256, file: {path, bytes, sha256}}`.
-  `source` задаёт owner-relative QMD текущего вопроса, `file` — полный исходный ZIP.
-
-Набор записей должен точно совпадать с conditions requests выбранных упражнений
-в исходном native AST, до публичной Core partition. Foreign/duplicate/missing
-IDs, несоответствие source/hash, symlink/hardlink/alias, небезопасный путь,
-collision client target и изменение входов до публикации означают отказ.
-Внешние зависимости читаются на границах операции, не в цикле вопросов.
-Адаптер не создаёт HTML или ZIP и не объявляет исторические архивы новым capture.
-
-Точные bytes копируются в `clientFilesQuestion/<ID>-conditions.zip`; вопрос
-получает ссылку «Скачать условие для локального просмотра» через обычный PL
-client-files URL. Файлы и HTML входят в стандартные inventory/delivery hash.
-Схемы delivery и provenance не меняются: manifest и исходная публикация связаны
-sealed caller inputs, pre/post checks и JSON dependency receipt в CLI stdout,
-сохраняемом внешним исполнителем. Само наличие manifest не доказывает допустимость
-старого Site: публикацию и её ZIP заранее принимает внешний владелец evidence.
+`delivery` v5 содержит реальные имена файлов. Закрытый checks v3 передаёт
+выбранные исходники, доверенные тесты, эталоны и материалы проверки как
+`{name, target, data}`: `data` — base64 действительных байтов. Исходные физические
+пути и собственные контрольные суммы не являются частью этих контрактов.
+`contractCases` содержит разобранные случаи, а не их отпечаток. Git refs и
+OCI digests сохраняют обычный смысл своих систем.
 
 ## Git-история в стартовом комплекте
 
@@ -579,22 +550,26 @@ Git-историю. При прямом копировании в `clientFilesQu
 весь native курс обычным Git clone без вложенных gitlinks; историю учащийся
 получает после распаковки неизменённого ZIP.
 
-### Загрузка без обязательного starter primary
+### Допустимый состав Java-ответа
 
-`additional-java-sources.primary-required: false` переносится в runtime descriptor
-как `additionalJavaSources.primaryRequired: false`. Это opt-in только для Java
-implementation с полной bounded ZIP policy. Используйте `submission.mode: upload`:
-в единственном `pl-file-upload` все известные основные имена и архив перечислены
-в `optional-file-names`; editor явно отклоняется. Runtime проверяет непустую union
-реально загруженных Java sources и сохраняет API/tests/scoring. Подстановка
-starter/reference и автоматическое переключение в ручную проверку не выполняются.
-Отсутствие поля сохраняет прежний descriptor и UI; `true` сохраняет обязательные
-основные файлы. Starter inventory остаётся непустым.
+В `submission` с `mode: upload` поле `layout` задаёт `files`, `zip` или
+`files-or-zip`. Атрибут вопроса `prairielearn-submission-layout` заменяет
+унаследованный layout; редактор и Workspace это поле не принимают.
 
-В opt-in upload отдельно перечисляются только primary без каталогов и архив.
-Nested primary передаются внутри ZIP с исходными относительными путями; полный
-`sourceFiles` и canonical binding сохраняются. Flattening, кодирование имён и
-wildcard загрузка не применяются.
+Режим выбирается по разрешённому ответу. Закрытый состав из одного или двух
+файлов использует редакторы с настоящими именами и содержимым заготовки.
+Три и более файла в одном каталоге загружаются отдельно, обязательная вложенная
+структура передаётся ZIP с относительными путями. Свободный состав принимает
+плоские `.java` или ZIP. Наличие одного файла в заготовке не закрывает состав.
+
+`additional-java-sources` задаёт имя архива и ограничения загрузки.
+`allow-additional: false` запрещает дополнительные исходники; иначе они
+разрешены. `primary-required: false` означает, что имена из заготовки сами по себе
+не обязательны; обязательный API продолжает проверяться. При `true` runtime
+проверяет основные исходники после объединения отдельных файлов и ZIP. Поле
+загрузки не требует одновременно основные файлы снаружи и внутри архива.
+Дубли имён и небезопасные пути отвергаются. Заготовка не подставляется вместо
+неполного ответа студента.
 
 ## Ранний Git Workspace: локальный кандидат
 
@@ -610,7 +585,7 @@ refs, HEAD и index; произвольная вложенная структу�
 
 `exportPrairieLearn` принимает полный student artifact от Core/Download,
 сохраняет его ZIP без изменения в `workspace/.pl-seed/starter.zip` и связывает
-manifest с SHA-256 архива и каждым member исходного inventory. При отсутствии
+manifest с действительными именами файлов комплекта. При отсутствии
 Git seed либо неполном договоре возврата публикация отвергается. Служебные
 байты `.pl-seed` принадлежат транспорту. Студент не создаёт ZIP в Workspace.
 Native вопрос содержит `pl-workspace`, `pl-file-preview` и необязательную
@@ -619,7 +594,7 @@ Native вопрос содержит `pl-workspace`, `pl-file-preview` и нео
 Назначенный image `sp-git-workspace` проверяет seed до первого использования,
 создаёт только исходный A/main и записывает identity. При restart существующие
 HEAD/index/worktree не изменяются. Существующая работа без identity, пропавшая
-работа с identity или изменённый seed дают явный отказ без автоматического сброса.
+работа с identity дают явный отказ без автоматического сброса. Обновление seed не сбрасывает существующую работу.
 Ручной разбор различает конечные свойства и свидетельства двух restore.
 
 `describeSubmission(contract, files)` возвращает нейтральный фрагмент README:

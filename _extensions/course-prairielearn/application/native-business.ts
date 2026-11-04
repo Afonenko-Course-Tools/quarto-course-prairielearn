@@ -34,7 +34,7 @@ const amount = z.number().nonnegative().finite();
 const points = z.union([amount, z.array(amount).min(1).max(4096)]);
 const questionScore = {
   "auto-points": amount.optional(),
-  "manual-points": z.number().positive().finite().optional(),
+  "manual-points": amount.optional(),
   "question-points": points.optional(),
   "question-max-points": amount.nullable().optional(),
   attempts: z.number().int().positive().optional(),
@@ -158,6 +158,7 @@ function readNativeRaw(
   const ownAttrs = new Set([
     "prairielearn-topic",
     "prairielearn-submission",
+    "prairielearn-submission-layout",
     "prairielearn-single-variant",
     "prairielearn-grading",
   ]);
@@ -252,7 +253,12 @@ function decodeBusiness<
       };
       if (submission.mode !== "editor") delete submission["ace-mode"];
       if (submission.mode !== "workspace") delete submission.workspaceOptions;
+      if (submission.mode !== "upload") delete submission.layout;
       authored.submission = submission;
+    }
+    if (attrs["prairielearn-submission-layout"] !== undefined) {
+      authored.submission = { ...(object(authored.submission) ? authored.submission : {}),
+        layout: attrs["prairielearn-submission-layout"] };
     }
     const parsed = parseQuestion(authored);
     questions[declaration.id] = {

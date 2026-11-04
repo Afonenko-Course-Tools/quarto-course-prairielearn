@@ -804,7 +804,7 @@ Deno.test("PL restricted conditions retain closed-marker and resource safety gua
       const [name, target, visibility, hash] of [
         ["private resource", "image.png", "private", "unused"],
         ["resource path traversal", "../image.png", "public", "unused"],
-        ["resource hash mismatch", "image.png", "public", "incorrect"],
+        ["invalid resource encoding", "image.png", "public", "incorrect"],
       ]
     ) {
       const candidate: any = p();
@@ -816,8 +816,7 @@ Deno.test("PL restricted conditions retain closed-marker and resource safety gua
         owner: "demo",
         target,
         visibility,
-        data: btoa("image"),
-        sha256: hash,
+        data: hash === "incorrect" ? "!!!!" : btoa("image"),
       }];
       let error: any;
       try {
@@ -1464,4 +1463,53 @@ Deno.test("publication conditions проходят normal prepared files и coll
       await Deno.remove(root, { recursive: true });
     }
   }
+});
+
+Deno.test("режим сдачи учитывает структуру полного фиксированного и свободного ответа", async () => {
+  const root = await Deno.makeTempDir();
+  const policy = { archive: "solution.zip", maxFiles: 128, maxFileBytes: 1048576,
+    maxTotalBytes: 4194304, maxArchiveBytes: 2097152 };
+  try {
+    const cases = [
+      { names: ["grade/Main.java", "model/Value.java"], mode: "editor", type: "editors" },
+      { names: ["A.java", "B.java", "C.java"], mode: "upload", type: "files" },
+      { names: ["grade/Main.java", "grade/Value.java", "model/Key.java"], mode: "upload", type: "zip" },
+      { names: ["Example.java"], mode: "upload", type: "free" },
+      { names: ["Circle.java", "TwoDShape.java"], mode: "upload", type: "helpers" },
+      { names: ["Audit.java", "CodeKey.java", "grade/Student.java"], mode: "upload", type: "nested-example" },
+    ];
+    for (const [index, test] of cases.entries()) {
+      const project = "/project-" + index;
+      for (const name of test.names) {
+        const path = root + project + "/student/" + name;
+        await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
+        await Deno.writeTextFile(path, "// STARTER " + name);
+      }
+      await Deno.mkdir(root + project + "/tests", { recursive: true });
+      await Deno.writeTextFile(root + project + "/tests/grade.sh", "PRIVATE_TEST");
+      const b = structuredClone(binding) as any;
+      Object.assign(b.questions["exr-clamp"], { files: test.names, submission: { mode: test.mode, ...(test.type === "nested-example" ? { layout: "files-or-zip" } : test.type === "zip" ? { layout: "zip" } : {}) } });
+      if (test.type === "zip" || test.type === "free" || test.type === "helpers" || test.type === "nested-example") {
+        b.questions["exr-clamp"].additionalJavaSources = { ...policy,
+          primaryRequired: test.type !== "free", allowAdditional: test.type !== "zip" };
+      }
+      const out = root + "/out-" + index;
+      await exportPrairieLearn(p(), { projectRoot: root, projects: { "exr-clamp": project } }, b, out);
+      const html = await Deno.readTextFile(out + "/questions/demo/exr-clamp/question.html");
+      if (test.type === "editors") {
+        assert((html.match(/<pl-file-editor /g) ?? []).length === 2 &&
+          test.names.every((name) => html.includes('file-name="' + name + '"') && html.includes("STARTER " + name)),
+          "Два fixed файла в разных папках потеряли редакторы или starter");
+      } else if (test.type === "files") {
+        assert(html.includes('file-names="A.java,B.java,C.java"'), "Плоский fixed ответ не принимает отдельные файлы");
+      } else if (test.type === "zip") {
+        assert(html.includes('<pl-file-upload file-names="solution.zip"') &&
+          !html.includes('<pl-file-upload file-names="grade/'), "Вложенный fixed ответ требует недоступный path в обычной загрузке");
+      } else {
+        assert(html.includes('optional-file-patterns="*.java"') && html.includes('optional-file-names="solution.zip"'),
+          "Свободный ответ не принимает произвольные плоские Java-файлы и ZIP");
+      }
+      assert(!html.includes("PRIVATE_TEST"), "Закрытые проверки оказались в ответе");
+    }
+  } finally { await Deno.remove(root, { recursive: true }); }
 });

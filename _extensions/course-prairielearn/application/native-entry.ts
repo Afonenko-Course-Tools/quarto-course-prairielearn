@@ -168,8 +168,6 @@ export type NativeEntryOptions = {
   checksOutput?: string;
   runtimeRegistry?: string;
   candidateImage?: string;
-  stagingReceipt?: string;
-  publicationConditions?: string;
   bindingPath?: string;
   instance?: string;
   work?: string;

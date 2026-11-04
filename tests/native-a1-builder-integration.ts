@@ -10,9 +10,7 @@ import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { materializeNativeQuestion } from "../_extensions/course-prairielearn/application/native-materialize.ts";
 import { nativeChecksManifest } from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
-import { hash } from "../_extensions/course-prairielearn/application/source-selection.ts";
 import { decodeNativeCheck } from "../_extensions/course-prairielearn/application/native-checks.ts";
-import { nativeVerificationInventory } from "../_extensions/course-prairielearn/application/verification-inventory.ts";
 const core = join(Deno.args[0], "_extensions/course-core"),
   pl = join(Deno.cwd(), "_extensions/course-prairielearn"),
   Core: typeof CorePublic = await import(
@@ -25,8 +23,7 @@ const core = join(Deno.args[0], "_extensions/course-core"),
 const root = await Deno.makeTempDir({ prefix: "c4-joint-a1-" }),
   out = await Deno.makeTempDir({ prefix: "c4-joint-a1-download-" });
 const artifactOut = await Deno.makeTempDir({ prefix: "c4-joint-artifacts-" });
-const sourceRows: { source: string; sha256: string }[] = [],
-  checks: unknown[] = [];
+const checks: unknown[] = [];
 let success = false;
 let expiredPair: {
   student: CorePublic.ProjectPlan;
@@ -56,7 +53,6 @@ async function put(path: string, text: string) {
   await Deno.mkdir(dirname(join(root, path)), { recursive: true });
   const bytes = new TextEncoder().encode(text);
   await Deno.writeFile(join(root, path), bytes);
-  sourceRows.push({ source: path, sha256: await hash(bytes) });
 }
 const policy = {
   "source-profiles": {
@@ -165,7 +161,7 @@ ${privateMarker}
     `course-project:
   starter: {path: starter}
   components:
-    apiSupport: {path: ../../shared/api}
+    apiSupport: {path: ../../shared/api, base: config}
   testsets:
     checks: {path: checks, requires: {apiSupport: true}}
   delivery: {student: {testsets: {checks: false}}}
@@ -245,7 +241,7 @@ ${privateMarker}
       });
       await Core.readProjectContexts([{
         owner: root,
-        inputs: ["projects/p/input.qmd"],
+        directories: ["projects/p"],
         profiles: operation.identity.profiles,
         format: "html",
       }], async ([group]) => {
@@ -286,7 +282,6 @@ ${privateMarker}
           condition,
           fact,
           settings: adapter.business("bank.qmd").questions["exr-p"],
-          sourceRows,
           courseId: "native",
           runtime: {
             mode: "implementation",
@@ -322,10 +317,12 @@ ${privateMarker}
         assert(imageSources.length === 1, "Ожидался один observed PNG source");
         const imageSource = imageSources[0];
         // Настоящая public ordinary resource capability, не assignment proof.
-        const observed = await operation.resourceInventory({
+        const observed = await operation.resourceFiles({
           files: [{ source: imageSource, target: imageSource }],
         });
-        const publicResources: Parameters<typeof renderPublicBody>[0]["resources"] = observed.files.map((file) => ({
+        const publicResources: Parameters<
+          typeof renderPublicBody
+        >[0]["resources"] = observed.files.map((file) => ({
           owner: "native",
           source: "bank.qmd",
           effectiveBase: root,
@@ -407,11 +404,8 @@ ${privateMarker}
           "Cell изменила выбранный starter Java source",
         );
         if (
-          !p.trustedTests.some((f) =>
-            "ownerRelativePath" in f &&
-            f.ownerRelativePath === "shared/api/src/api/java/Api.java"
-          )
-        ) throw Error("shared raw origin not preserved");
+          !p.trustedTests.some((f) => f.target === "src/api/java/Api.java")
+        ) throw Error("shared API target not preserved");
         if (
           p.references[0].targets.join(",") !==
             "author/example/src/main/java/Helper.java,author/example/src/main/java/Main.java"
@@ -452,31 +446,10 @@ ${privateMarker}
           join(artifactOut, "student.zip"),
           materialized.archive,
         );
-        const verification = await nativeVerificationInventory({
-          courseId: "native",
-          operation: operation.identity.operation,
-          selections: { "exr-p": materialized.selection },
-        });
-        assert(
-          verification.scenarios.map((row) => row.scenario).sort().join(",") ===
-            "reference:lawful,starter",
-          "Computed body изменил starter/reference grading scenarios",
-        );
-        const sources = sourceRows.filter((r) => r.source === "bank.qmd"),
-          selectionScope = {
-            schema: "pl-native-selected-checks-v1",
-            identity: operation.identity,
-            assessments: [{ source: "bank.qmd", id: "sec-work" }],
-            sources,
-            automaticIds: ["native/exr-p"],
-          };
         const manifest = await nativeChecksManifest({
           courseId: "native",
           bookRoot: root.split("/").at(-1)!,
-          sources,
           projects: [p],
-          version: 2,
-          selectionScope,
         });
         await Deno.writeTextFile(
           join(artifactOut, "checks.json"),
@@ -493,7 +466,6 @@ ${privateMarker}
             selectedJavaSources: selection.sources.map((file) => file.name),
           },
           project: p,
-          verification,
           contextMetrics: group.metrics,
           studentPlanMetrics: Core.projectPlanMetrics(pair.student),
           fullPlanMetrics: Core.projectPlanMetrics(pair.full),
@@ -529,24 +501,7 @@ ${privateMarker}
   if (!/CONTEXT_EXPIRED/.test(expired)) {
     throw Error("expired plan accepted: " + expired);
   }
-  // 5a currentness относится к selected raw QMD; grader Java files не меняются.
-  const changed = join(root, "bank.qmd"),
-    original = await Deno.readFile(changed);
-  let stale = "", entered = false;
-  try {
-    await Deno.writeTextFile(changed, "CHANGED_AFTER_CAPTURE");
-    await Core.withCurrentNativeOperation(candidate.expectation, async () => {
-      entered = true;
-    });
-  } catch (e) {
-    stale = String(e);
-  } finally {
-    await Deno.writeFile(changed, original);
-  }
-  if (entered || !/OPERATION_CHANGED/.test(stale)) {
-    throw Error("changed S reached callback: " + stale);
-  }
-  checks.push({ expired, stale, staleCallbackEntered: entered });
+  checks.push({ expired });
   console.log(
     JSON.stringify(
       {

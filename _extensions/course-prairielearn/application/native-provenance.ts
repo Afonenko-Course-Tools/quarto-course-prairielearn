@@ -1,12 +1,24 @@
+import type * as CorePublic from "course-core/public.ts";
+import type {
+  NativeAssignmentProvenance,
+  NativeOperationIdentity,
+  NativeProjectFact,
+} from "course-core/public.ts";
+import type { NativeProjectCheck } from "./native-checks.ts";
 import { decodeNativeCheck } from "./native-checks.ts";
 import { isDeepStrictEqual } from "node:util";
 import { safePath } from "./source-selection.ts";
 /** PL policy принадлежит C. Core передаёт selector и raw plane из той же
  * preprojection capture, включая скрытые/non-PL проекты. Никакого IO/authority. */
-export function normalizeNativeProjectFact(value: any, projectChecks: unknown) {
-  const { projectCheck, ...fact } = structuredClone(value);
+export function normalizeNativeProjectFact(
+  value: NativeProjectFact,
+  projectChecks: unknown,
+): Omit<NativeProjectFact, "check" | "projectCheck"> & {
+  check?: NativeProjectCheck;
+} {
+  const { projectCheck, check: legacyCheck, ...fact } = structuredClone(value);
   if (projectCheck === undefined) {
-    if (fact.check !== undefined) {
+    if (legacyCheck !== undefined) {
       throw Error(
         "PL.CHECKS_CHANGED: normalized check without authentic selector",
       );
@@ -17,16 +29,16 @@ export function normalizeNativeProjectFact(value: any, projectChecks: unknown) {
     throw Error("PL.CHECKS_CHANGED: invalid check selector");
   }
   const check = decodeNativeCheck(projectChecks, projectCheck);
-  if (fact.check !== undefined && !isDeepStrictEqual(fact.check, check)) {
+  if (legacyCheck !== undefined && !isDeepStrictEqual(legacyCheck, check)) {
     throw Error("PL.CHECKS_CHANGED: selector/plane normalized policy mismatch");
   }
   return { ...fact, check };
 }
 /** Чистая C-проекция public DTO. Не создаёт operation/A1 authority, не читает S. */
 export async function nativeProjectWitness(
-  Core: any,
+  Core: Pick<typeof CorePublic, "NativeAssignmentProvenanceSchema">,
   value: unknown,
-  expected: { identity: unknown; sources: readonly string[] },
+  expected: { identity: NativeOperationIdentity; sources: readonly string[] },
 ) {
   const p = Core.NativeAssignmentProvenanceSchema.parse(value);
   const unique = (xs: string[]) => new Set(xs).size === xs.length;
@@ -37,24 +49,21 @@ export async function nativeProjectWitness(
     !isDeepStrictEqual(p.identity, expected.identity) ||
     !unique([...expected.sources]) || !coverage(p.ownerInputs) ||
     !coverage(p.capturedInputs) ||
-    !coverage(p.documents.map((d: any) => d.source))
+    !coverage(p.documents.map((d) => d.source))
   ) throw Error("PL.PROVENANCE_CHANGED: owner/captured identity");
-  const rows = new Map<string, string>();
-  for (const row of p.sourceRows) {
-    if (!safePath(row.source) || rows.has(row.source)) {
-      throw Error("PL.PROVENANCE_CHANGED: source row");
-    }
-    rows.set(row.source, row.sha256);
-  }
-  if (expected.sources.some((s) => !rows.has(s))) {
-    throw Error("PL.PROVENANCE_CHANGED: authored source binding");
-  }
-  const keys = new Set<string>(), projects: any[] = [];
+  const keys = new Set<string>(),
+    projects: {
+      source: string;
+      format: NativeAssignmentProvenance["documents"][number]["format"];
+      declaration: NativeAssignmentProvenance["projects"][number];
+      fact: ReturnType<typeof normalizeNativeProjectFact>;
+      materialization: NativeProjectFact["materialization"];
+    }[] = [];
   for (const doc of p.documents) {
     for (const generic of doc.projects) {
       const fact = normalizeNativeProjectFact(generic, doc.projectChecks);
       const key = doc.source + "\0" + fact.exerciseId;
-      const declared = p.projects.filter((row: any) =>
+      const declared = p.projects.filter((row) =>
         row.source === doc.source && row.id === fact.exerciseId
       );
       if (
@@ -70,7 +79,6 @@ export async function nativeProjectWitness(
       keys.add(key);
       projects.push({
         source: doc.source,
-        sourceSha256: rows.get(doc.source),
         format: doc.format,
         declaration: declared[0],
         fact,
@@ -83,17 +91,9 @@ export async function nativeProjectWitness(
     throw Error("PL.PROVENANCE_CHANGED: omitted hidden/nonbank project");
   }
   return {
-    schema: "pl-native-project-witness-v1",
     identity: p.identity,
     ownerInputs: p.ownerInputs,
     capturedInputs: p.capturedInputs,
-    sourceRows: p.sourceRows,
     projects,
   };
-}
-/** Старые v3 hash names не принимают native witness другой области. */
-export function requireNativeChecksContract(): never {
-  throw Error(
-    "PL.NATIVE_CHECKS_CONTRACT_UNQUALIFIED: strict v3 requires physical-source selection parity or an explicitly accepted native contract revision; publish refused",
-  );
 }

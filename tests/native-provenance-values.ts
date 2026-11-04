@@ -1,13 +1,14 @@
 // Только public DTO/value controls: не operation/lease/A1/profile positive.
+import type * as CorePublic from "course-core/public.ts";
 import { pathToFileURL } from "node:url";
-import {
-  nativeProjectWitness,
-  requireNativeChecksContract,
-} from "../_extensions/course-prairielearn/application/native-provenance.ts";
-const Core = await import(
+const Core: typeof CorePublic = await import(
   pathToFileURL(Deno.args[0] + "/_extensions/course-core/public.ts").href
 );
-const identity = {
+import type { NativeOperationIdentity } from "course-core/public.ts";
+import {
+  nativeProjectWitness,
+} from "../_extensions/course-prairielearn/application/native-provenance.ts";
+const identity: NativeOperationIdentity = {
   operation: "22222222-2222-4222-8222-222222222222",
   profiles: ["full"],
   projection: "author",
@@ -24,7 +25,7 @@ const fact = (source: string, id: string, bankMember: boolean) => ({
   materialization: {
     commonFiles: [{
       source: "shared/File.java",
-      target: "src/File.java",
+      target: "tests/File.java",
       audience: "grading",
     }],
     includeGit: true,
@@ -37,10 +38,6 @@ const value = {
   identity,
   ownerInputs: inputs,
   capturedInputs: inputs,
-  sourceRows: [
-    ...inputs.map((source) => ({ source, sha256: "a".repeat(64) })),
-    { source: "shared/File.java", sha256: "b".repeat(64) },
-  ],
   projects: [{
     source: a.source,
     id: a.exerciseId,
@@ -69,21 +66,20 @@ const witness = await nativeProjectWitness(Core, value, expected);
 if (
   witness.projects.length !== 2 || witness.projects[1].fact.bankMember ||
   witness.projects[1].format !== "revealjs" ||
-  witness.projects[0].materialization.includeGit !== true ||
-  witness.sourceRows.length !== 3 || "sourceSnapshotHash" in witness ||
+  witness.projects[0].materialization?.includeGit !== true ||
+  "sourceSnapshotHash" in witness ||
   "inventoryHash" in witness
 ) throw Error("native scope/trace/materialization lost or aliased");
 let controls = 0;
 for (
   const mutate of [
-    (p: any) => p.identity.operation = "33333333-3333-4333-8333-333333333333",
-    (p: any) => p.capturedInputs.pop(),
-    (p: any) => p.documents.pop(),
-    (p: any) => p.sourceRows.shift(),
-    (p: any) => p.projects.pop(),
-    (p: any) => p.documents[1].projects = [],
-    (p: any) => p.projects[1].format = "html",
-    (p: any) => p.sourceRows.push(p.sourceRows[0]),
+    (p: typeof value) =>
+      p.identity.operation = "33333333-3333-4333-8333-333333333333",
+    (p: typeof value) => p.capturedInputs.pop(),
+    (p: typeof value) => p.documents.pop(),
+    (p: typeof value) => p.projects.pop(),
+    (p: typeof value) => p.documents[1].projects = [],
+    (p: typeof value) => p.projects[1].format = "html",
   ]
 ) {
   const bad = structuredClone(value);
@@ -97,13 +93,6 @@ for (
   if (!refused) throw Error("invalid public DTO accepted");
   controls++;
 }
-let closed = false;
-try {
-  requireNativeChecksContract();
-} catch (error) {
-  closed = String(error).includes("PL.NATIVE_CHECKS_CONTRACT_UNQUALIFIED");
-}
-if (!closed) throw Error("strict v3 barrier opened");
 console.log(JSON.stringify(
   {
     status: "PUBLIC_DTO_ONLY_NOT_NATIVE_POSITIVE",
@@ -111,7 +100,6 @@ console.log(JSON.stringify(
     projects: 2,
     hiddenNonbankRetained: true,
     formats: ["html", "revealjs"],
-    strictV3Refused: true,
   },
   null,
   2,

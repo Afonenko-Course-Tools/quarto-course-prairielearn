@@ -3,10 +3,6 @@ import {
   NativeProjectCheckSchema,
 } from "../_extensions/course-prairielearn/application/native-checks.ts";
 import { runtimeDescriptor } from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
-import {
-  hash,
-  selectedSources,
-} from "../_extensions/course-prairielearn/application/source-selection.ts";
 const assert = (v: unknown, m: string) => {
   if (!v) throw Error(m);
 };
@@ -180,67 +176,6 @@ Deno.test("native Gradle descriptors fail closed on absent records unknown recip
     "fish acquired Java build",
   );
 });
-Deno.test("native Gradle selection rejects scripts artifacts public tests and invalid coupling before payload", async () => {
-  const root = await Deno.makeTempDir({ prefix: "pl-native-gradle-" });
-  try {
-    const name = "student/src/main/java/grade/Main.java",
-      bytes = new TextEncoder().encode("package grade; class Main {}");
-    await Deno.mkdir(root + "/student/src/main/java/grade", {
-      recursive: true,
-    });
-    await Deno.writeFile(root + "/" + name, bytes);
-    const source = {
-      projectRelativePath: name,
-      submissionRelativePath: "grade/Main.java",
-      sha256: await hash(bytes),
-    };
-    const fact = { check, sources: [source] };
-    const selected = await selectedSources(root, fact, profile);
-    assert(
-      selected.length === 1 && selected[0].name === "grade/Main.java",
-      "native selected source lost",
-    );
-    for (
-      const bad of [
-        { ...fact, check: { ...check, "java-build": undefined } },
-        { ...fact, check: { ...check, runtime: "java25-junit-v1" } },
-        {
-          ...fact,
-          sources: [{ ...source, submissionRelativePath: "build.gradle" }],
-        },
-        {
-          ...fact,
-          sources: [{ ...source, submissionRelativePath: "gradeapp.jar" }],
-        },
-        {
-          ...fact,
-          check: {
-            ...check,
-            sourceProfile: {
-              mode: "implementation",
-              root: "student/src/test/java",
-            },
-          },
-          sources: [{
-            ...source,
-            projectRelativePath: "student/src/test/java/Main.java",
-            submissionRelativePath: "Main.java",
-          }],
-        },
-      ]
-    ) {
-      let denied = false;
-      try {
-        await selectedSources(root, bad, profile);
-      } catch {
-        denied = true;
-      }
-      assert(denied, "native payload admitted invalid source/coupling");
-    }
-  } finally {
-    await Deno.remove(root, { recursive: true });
-  }
-});
 Deno.test("Java API capability accepts only the two explicit implementation runtimes", () => {
   const api = { files: ["Api.java"], entry: "Api" };
   const c = {
@@ -347,4 +282,17 @@ Deno.test("native library Gradle descriptor omits mainClass and rejects bad pres
       ]);
     });
   }
+});
+
+Deno.test("ZIP фиксированного проекта сохраняет закрытый состав исходников", () => {
+  const parsed = NativeProjectCheckSchema.parse({ ...check,
+    "additional-java-sources": { "primary-required": true, "allow-additional": false,
+      archive: "solution.zip", "max-files": 128, "max-file-bytes": 1048576,
+      "max-total-bytes": 4194304, "max-archive-bytes": 2097152 },
+  });
+  const descriptor = runtimeDescriptor(parsed, profile,
+    ["grade/Main.java", "grade/Student.java", "grade/Reports.java"], ["Check.java"]);
+  assert(descriptor.additionalJavaSources?.allowAdditional === false &&
+    descriptor.additionalJavaSources.primaryRequired === true,
+    "ZIP расширил допустимый состав ответа");
 });

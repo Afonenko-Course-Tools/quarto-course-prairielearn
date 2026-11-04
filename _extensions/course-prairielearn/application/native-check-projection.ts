@@ -1,12 +1,13 @@
 import { matchesGlob } from "node:path";
 import { NativeProjectCheckSchema } from "./native-checks.ts";
 import { selectNativeCompilerInputs } from "./native-selection.ts";
-import { prepareNativeRawSourceSelection } from "./native-check-inventory.ts";
+import { selectedCheckFile } from "./native-check-inventory.ts";
+import type { SelectedCheckFile } from "./native-check-inventory.ts";
 import { safePath } from "./source-selection.ts";
 import type * as Core from "course-core/public.ts";
 import type {
   ArtifactFile,
-  ArtifactInventory,
+  ArtifactFiles,
   NativeProjectFact,
   ProjectPlan,
 } from "course-core/public.ts";
@@ -22,12 +23,11 @@ export async function projectNativeChecks(
   input: {
     Core: Pick<
       typeof Core,
-      "ArtifactInventorySchema" | "ProjectPlanSchema" | "ArtifactFileSchema"
+      "ArtifactFilesSchema" | "ProjectPlanSchema" | "ArtifactFileSchema"
     >;
     fact: CheckedNativeProjectFact;
-    sourceRows: readonly { source: string; sha256: string }[];
-    student: ArtifactInventory;
-    full: ArtifactInventory | undefined;
+    student: ArtifactFiles;
+    full: ArtifactFiles | undefined;
     studentPlan: ProjectPlan;
     fullPlan: ProjectPlan;
     runtime: RuntimeProfile;
@@ -35,45 +35,17 @@ export async function projectNativeChecks(
   },
 ) {
   const check = NativeProjectCheckSchema.parse(input.fact.check),
-    student = input.Core.ArtifactInventorySchema.parse(input.student),
-    full = input.Core.ArtifactInventorySchema.parse(input.full);
+    student = input.Core.ArtifactFilesSchema.parse(input.student),
+    full = input.Core.ArtifactFilesSchema.parse(input.full);
   const selection = await selectNativeCompilerInputs({
     ...input,
     core: input.Core,
     check,
     runtimeProfile: input.runtime,
   });
-  const selectOrigin = prepareNativeRawSourceSelection({
-    Core: input.Core,
-    projectRoot: input.fact.projectRoot,
-    sourceRows: input.sourceRows,
-    version: 2,
-  });
-  const origin = (
-    f: Omit<ArtifactFile, "audience"> & { audience?: ArtifactFile["audience"] },
-    name: string,
-  ) =>
-    selectOrigin({
-      file: {
-        target: f.target,
-        rawSource: f.rawSource,
-        bytes: f.bytes,
-        sha256: f.sha256,
-        size: f.size,
-        audience: f.audience ?? "full",
-        reason: f.reason,
-      },
-      submissionRelativePath: name,
-    });
-  const sources = await Promise.all(
-    selection.sources.map((f) => origin({ ...f, audience: "student" }, f.name)),
-  );
-  // Public delivery3 не умеет owner-relative student binding.
-  if (sources.some((s) => "ownerRelativePath" in s)) {
-    throw Error(
-      "PL.NATIVE_PUBLIC_ORIGIN_UNSUPPORTED: external student source requires public contract revision",
-    );
-  }
+  const origin = (file: { target: string; bytes: Uint8Array }, name: string) =>
+    selectedCheckFile(file, name);
+  const sources = selection.sources.map((file) => origin(file, file.name));
   const trustedTests = await Promise.all(
     selection.tests.map((f) => origin(f, f.name)),
   );
@@ -166,17 +138,12 @@ export async function projectNativeChecks(
     }
     return files[0];
   };
-  type Origin = Awaited<ReturnType<typeof origin>>;
-  let contractCasesHash:
-    | (Omit<Origin, "submissionRelativePath"> & { logicalTarget: string })
-    | undefined;
+  let contractCaseFile: SelectedCheckFile | undefined;
   let contractCases: (ArtifactFile & { name: string }) | undefined;
-  const contractFixtures: (Origin & { logicalTarget: string })[] = [];
+  const contractFixtures: SelectedCheckFile[] = [];
   if (check["contract-cases"]) {
     const name = check["contract-cases"], file = target(name);
-    const selected = await origin(file, name);
-    const { submissionRelativePath: _ignored, ...hashRecord } = selected;
-    contractCasesHash = { ...hashRecord, logicalTarget: name };
+    contractCaseFile = origin(file, name);
     contractCases = { ...file, name };
     const raw: unknown = JSON.parse(
       new TextDecoder("utf-8", { fatal: true }).decode(file.bytes),
@@ -201,18 +168,14 @@ export async function projectNativeChecks(
           !safePath(item.submission)
         ) throw Error("PL.VERIFICATION_INVALID: fixture mapping");
         const file = target(item.fixture);
-        contractFixtures.push({
-          ...await origin(file, item.submission),
-          logicalTarget: item.fixture,
-        });
+        contractFixtures.push(origin(file, item.submission));
       }
     }
   }
   const project = {
     ...input.fact,
+    check,
     qualifiedId: input.courseId + "/" + input.fact.exerciseId,
-    selectionOriginVersion: 2,
-    nativePlanGroups: [...input.fullPlan.groups],
     sources,
     trustedTests,
     verificationTests,
@@ -223,7 +186,7 @@ export async function projectNativeChecks(
       ? { apiPrecheck: selection.descriptor.apiPrecheck }
       : {}),
     ...(verificationApiPrecheck ? { verificationApiPrecheck } : {}),
-    ...(contractCasesHash ? { contractCasesHash } : {}),
+    ...(contractCaseFile ? { contractCases: contractCaseFile } : {}),
   };
   return {
     project,

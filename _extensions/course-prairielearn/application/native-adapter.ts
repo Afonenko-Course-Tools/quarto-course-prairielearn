@@ -21,7 +21,7 @@ import { nativeWorkspaceArtifact } from "./native-workspace.ts";
 import { readNativeEntryCandidate } from "./native-entry.ts";
 import { decodeNativeCheck } from "./native-checks.ts";
 import { decodeNativeBusiness } from "./native-business.ts";
-import { hash, safePath } from "./source-selection.ts";
+import { safePath } from "./source-selection.ts";
 
 // Типы берутся из того же публичного Core, который выбирает composition.
 // При проверке course-core/ разрешается import map; runtime import отсутствует.
@@ -29,7 +29,7 @@ export type PublicCore = Pick<
   typeof CorePublic,
   | "withPendingNativeOperation"
   | "NativeAdapterValidationInputSchema"
-  | "ArtifactInventorySchema"
+  | "ArtifactFilesSchema"
   | "NativeOperationIdentitySchema"
   | "NativePreparedOperationSchema"
 >;
@@ -393,11 +393,6 @@ export function createNativeAdapter(
           }
         }
         await operation.assertCurrent();
-        if (!isDeepStrictEqual(await requestFor(root), validatingRequest)) {
-          throw Error(
-            "PL.CAPTURE_CHANGED: correlation changed during validation",
-          );
-        }
         validatedCourse = {
           operation,
           identity: structuredClone(operation.identity),
@@ -518,22 +513,13 @@ export function createNativeAdapter(
         !business || !declaration ||
         request.operation.identity.operation !== input?.origin.operation
       ) throw Error("PL.CAPTURE_CHANGED: Workspace operation");
-      const inventory = options.core.ArtifactInventorySchema.parse(
+      const inventory = options.core.ArtifactFilesSchema.parse(
         request.inventory,
       );
       if (
-        inventory.operation !== input?.origin.operation ||
         inventory.exerciseId !== request.exerciseId ||
         inventory.audience !== "student"
       ) throw Error("PL.WORKSPACE_SEED: inventory identity");
-      for (const file of inventory.files) {
-        if (
-          file.bytes.byteLength !== file.size ||
-          await hash(file.bytes) !== file.sha256
-        ) {
-          throw Error("PL.WORKSPACE_SEED: inventory bytes changed");
-        }
-      }
       return await nativeWorkspaceArtifact({
         root: options.root,
         project: declaration.attributes.project.replace(/^\//, ""),

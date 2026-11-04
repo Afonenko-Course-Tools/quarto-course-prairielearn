@@ -238,3 +238,37 @@ Deno.test("Native UUID запрещён в defaults и неверный лока
   } catch (error) { message = String(error); }
   assert(message.includes("uuid"), "Один UUID допускается для всех работ через defaults");
 });
+
+import { validateGradingComponents } from "../_extensions/course-prairielearn/application/grading-policy.ts";
+Deno.test("добровольные mixed и manual сохраняют проверку без зачётного веса", () => {
+  const w = work();
+  w.extensions.prairielearn["question-points"] = undefined;
+  delete w.extensions.prairielearn["question-points"];
+  delete w.extensions.prairielearn["question-max-points"];
+  w.extensions.prairielearn["slot-overrides"] = {
+    "exr-a": { "auto-points": 0, "manual-points": 0 },
+    "exr-b": { "auto-points": 80, "manual-points": 20 },
+  };
+  for (const method of ["mixed", "manual", "external"] as const) {
+    const policy = validateGradingComponents(w, { "exr-a": method, "exr-b": "mixed" });
+    assert(policy.slots["exr-a"].autoPoints === 0 && policy.slots["exr-a"].manualPoints === 0,
+      "Добровольная задача изменила обязательный вес");
+    assert(policy.slots["exr-b"].autoPoints === 80 && policy.slots["exr-b"].manualPoints === 20,
+      "Обязательные 80/20 изменены");
+  }
+  w.slots[0].assignment.requirement = "required";
+  let rejected = false;
+  try { gradingPolicy(w); } catch { rejected = true; }
+  assert(rejected, "Обязательная позиция потеряла положительный вес");
+});
+
+Deno.test("настоящая native business граница принимает добровольные нулевые компоненты", () => {
+  const assessment=work();
+  const policy={attempts:3,pass:{"at-least":1},assignment:{mode:"assessment-id"},
+    "slot-overrides":{"exr-a":{"auto-points":0,"manual-points":0},"exr-b":{"auto-points":80,"manual-points":20}}};
+  const decoded=decodeNativeBusiness({assessment:policy,declarations:[]},
+    {course:{id:"demo"},assessment,declarations:[]},{deferComposition:true});
+  const native=gradingPolicy({...assessment,extensions:{prairielearn:decoded.assessment}});
+  assert(native.slots['exr-a'].autoPoints===0&&native.slots['exr-b'].manualPoints===20,
+    "Native decoder изменил обязательные или добровольные компоненты");
+});

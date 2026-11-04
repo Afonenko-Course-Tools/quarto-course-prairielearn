@@ -1,81 +1,73 @@
-import * as Inventory from "../_extensions/course-prairielearn/application/verification-inventory.ts";
-import { hash } from "../_extensions/course-prairielearn/application/source-selection.ts";
-
-Deno.test("native verification проверяет selected bytes и сохраняет scenarios без sourcePath IO", async () => {
-  const file = async (name: string, text: string) => ({
-    name,
-    bytes: new TextEncoder().encode(text),
-    sha256: await hash(text),
-  });
-  const selection = {
-    sources: [await file("Main.java", "class Main {}")],
-    tests: [await file("src/test/java/Check.java", "class Check {}")],
-    references: [{
-      name: "reference",
-      optional: false,
-      files: [await file("Main.java", "class Main {int value=1;}")],
-    }],
-    descriptor: {
-      schemaVersion: 1,
-      sourceFiles: ["Main.java"],
-      testFiles: ["src/test/java/Check.java"],
-    },
-    provenance: {
-      studentOperation: "11111111-1111-4111-8111-111111111111",
-      exerciseId: "exr-one",
-      studentPlan: "22222222-2222-4222-8222-222222222222",
-      fullPlan: "33333333-3333-4333-8333-333333333333",
-    },
-    contractCases: await file(
-      "author/cases.json",
-      JSON.stringify({
-        schemaVersion: 1,
-        cases: [{ id: "empty" }, { id: "edge" }],
-      }),
-    ),
-  };
-  const input = {
+import {
+  nativeChecksManifest,
+  selectedCheckFile,
+} from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
+import type { NativeCheckProject } from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
+import { NativeProjectCheckSchema } from "../_extensions/course-prairielearn/application/native-checks.ts";
+const check = NativeProjectCheckSchema.parse({
+  profile: "java",
+  "source-profile": "main",
+  runtime: "java25-junit-v1",
+  sourceProfile: {
+    mode: "implementation",
+    root: "src",
+    include: ["**/*.java"],
+  },
+  tests: ["tests/**"],
+  scoring: { mode: "weighted" },
+});
+const project = (id: string): NativeCheckProject => ({
+  exerciseId: id,
+  qualifiedId: "course/" + id,
+  source: "work.qmd",
+  projectRoot: "projects/" + id,
+  bankMember: true,
+  check,
+  sources: [
+    selectedCheckFile({
+      target: "src/Study.java",
+      bytes: new TextEncoder().encode("class Study {}"),
+    }, "Study.java"),
+  ],
+  trustedTests: [
+    selectedCheckFile({
+      target: "tests/Check.java",
+      bytes: new TextEncoder().encode("class Check {}"),
+    }, "tests/Check.java"),
+  ],
+  verificationTests: [],
+  references: [],
+  contractFixtures: [],
+  readiness: { ready: true, missing: [] },
+});
+Deno.test("selected v3 сохраняет содержимое и детерминированный порядок проектов", () => {
+  const a = project("exr-a"), b = project("exr-b");
+  const result = nativeChecksManifest({
     courseId: "course",
-    operation: "44444444-4444-4444-8444-444444444444",
-    selections: { "exr-one": selection },
-  };
-  const result = await (Inventory as any).nativeVerificationInventory(input);
-  const scenarios = result.scenarios.map((r: any) => r.scenario).sort();
+    bookRoot: "tasks",
+    projects: [b, a],
+  });
   if (
-    JSON.stringify(scenarios) !==
-      JSON.stringify([
-        "contract:edge",
-        "contract:empty",
-        "reference:reference",
-        "starter",
-      ])
-  ) throw Error("verification scenarios lost or phantom API/demo points");
-  for (
-    const mutate of [
-      (v: any) => v.selections["exr-one"].sources[0].bytes[0]++,
-      (v: any) => v.selections["exr-one"].provenance.exerciseId = "exr-foreign",
-      (v: any) =>
-        v.selections["exr-one"].references.push(
-          v.selections["exr-one"].references[0],
-        ),
-      async (v: any) =>
-        v.selections["exr-one"].contractCases = await file(
-          "cases.json",
-          JSON.stringify({
-            schemaVersion: 1,
-            cases: [{ id: "same" }, { id: "same" }],
-          }),
-        ),
-    ]
-  ) {
-    const bad = structuredClone(input);
-    await mutate(bad);
-    let refused = false;
-    try {
-      await (Inventory as any).nativeVerificationInventory(bad);
-    } catch {
-      refused = true;
-    }
-    if (!refused) throw Error("forged native verification accepted");
+    result.schemaVersion !== 3 || result.projects[0] !== a ||
+    result.projects[1] !== b ||
+    result.projects[0].sources[0].name !== "Study.java" ||
+    !result.projects[0].trustedTests[0].data
+  ) throw Error("functional selected data lost");
+  if (
+    Object.keys(result).sort().join(",") !==
+      "bookRoot,courseId,projects,schemaVersion"
+  ) throw Error("selected contract includes obsolete proof fields");
+});
+Deno.test("selected v3 отклоняет неоднозначный ID вопроса", () => {
+  let denied = false;
+  try {
+    nativeChecksManifest({
+      courseId: "course",
+      bookRoot: "tasks",
+      projects: [project("exr-a"), project("exr-a")],
+    });
+  } catch {
+    denied = true;
   }
+  if (!denied) throw Error("duplicate question accepted");
 });

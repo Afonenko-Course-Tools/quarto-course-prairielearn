@@ -3,13 +3,11 @@ import { runtimeDescriptor } from "../_extensions/course-prairielearn/applicatio
 import { nativeChecksManifest } from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
 import type { NativeProjectCheck } from "../_extensions/course-prairielearn/application/native-checks.ts";
 import type { projectNativeChecks } from "../_extensions/course-prairielearn/application/native-check-projection.ts";
+import type { RuntimeCheckInput } from "../_extensions/course-prairielearn/application/runtime-check.ts";
 import type {
-  CheckSourceOrigin,
-  ExportChecks,
-  LegacyDescriptorCheck,
-  LegacyPhysicalSelection,
-  NativeSourceOrigin,
-} from "../_extensions/course-prairielearn/application/legacy-checks.ts";
+  NativeCourseChecks,
+  SelectedCheckFile,
+} from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
 
 type IsAny<T> = 0 extends (1 & T) ? true : false;
 type Exact<A, B> = IsAny<A> extends true ? false
@@ -32,7 +30,7 @@ const legacy = {
   scoring: { mode: "weighted" },
   discovery: { "min-executed": 1, "allow-skipped": false },
 };
-const accepted: LegacyDescriptorCheck = legacy;
+const accepted: RuntimeCheckInput = legacy;
 const legacyDescriptor = runtimeDescriptor(legacy, { javaRelease: 25 }, [
   "Main.java",
 ], ["Checks.java"]);
@@ -51,19 +49,14 @@ type _NativeScoring = Require<
   Exact<typeof nativeDescriptor["scoring"], NativeProjectCheck["scoring"]>
 >;
 type Project = Awaited<ReturnType<typeof projectNativeChecks>>["project"];
-type Manifest = Awaited<ReturnType<typeof nativeChecksManifest<Project>>>;
-type _Project = Require<Exact<Manifest["projects"][number], Project>>;
-declare const manifest: Manifest;
-const checks: ExportChecks = manifest;
-void checks;
-
-declare const nativeOrigin: NativeSourceOrigin;
-declare const physical: LegacyPhysicalSelection;
-const nativeFile: CheckSourceOrigin = nativeOrigin;
-const legacyFile: CheckSourceOrigin = physical;
-void nativeFile;
-void legacyFile;
-type _OriginHash = Require<Exact<CheckSourceOrigin["sha256"], string>>;
-type _PhysicalPath = Require<
-  Exact<LegacyPhysicalSelection["projectRelativePath"], string>
+declare const project: Project;
+const manifest: NativeCourseChecks = nativeChecksManifest({
+  courseId: "fixture",
+  bookRoot: "tasks",
+  projects: [project],
+});
+void manifest;
+type _SelectedBytes = Require<Exact<SelectedCheckFile["data"], string>>;
+type _SelectedFields = Require<
+  Exact<keyof SelectedCheckFile, "name" | "target" | "data">
 >;
