@@ -99,7 +99,7 @@ export function describeSubmission(
       : selected.layout === "zip" || selected.layout === undefined && options.primaryRequired && parsed.length >= 3 && parsed.some((file) => file.name.includes("/"))
       ? "Загрузите ZIP с перечисленными исходниками, сохранив относительные пути от корня исходников внутри архива. Имя архива: " +
         (options.archive ?? "указано в поле загрузки PrairieLearn") + ". Вспомогательные исходники разрешены в пределах условия."
-      : options.freeComposition
+      : options.freeComposition && selected.layout !== "files"
       ? "Состав исходников определяется условием. Загрузите отдельные Java-файлы при плоской структуре; для вложенных каталогов загрузите ZIP, сохранив относительные пути от корня исходников. " +
         (options.primaryRequired
           ? "Перечисленные исходники обязательны; вспомогательные классы и пакеты разрешены в пределах условия."

@@ -1473,6 +1473,7 @@ Deno.test("режим сдачи учитывает структуру полн�
     const cases = [
       { names: ["grade/Main.java", "model/Value.java"], mode: "editor", type: "editors" },
       { names: ["A.java", "B.java", "C.java"], mode: "upload", type: "files" },
+      { names: ["A.java", "B.java", "C.java"], mode: "upload", type: "fixed-explicit" },
       { names: ["grade/Main.java", "grade/Value.java", "model/Key.java"], mode: "upload", type: "zip" },
       { names: ["Example.java"], mode: "upload", type: "free" },
       { names: ["Circle.java", "TwoDShape.java"], mode: "upload", type: "helpers" },
@@ -1488,8 +1489,8 @@ Deno.test("режим сдачи учитывает структуру полн�
       await Deno.mkdir(root + project + "/tests", { recursive: true });
       await Deno.writeTextFile(root + project + "/tests/grade.sh", "PRIVATE_TEST");
       const b = structuredClone(binding) as any;
-      Object.assign(b.questions["exr-clamp"], { files: test.names, submission: { mode: test.mode, ...(test.type === "nested-example" ? { layout: "files-or-zip" } : test.type === "zip" ? { layout: "zip" } : {}) } });
-      if (test.type === "zip" || test.type === "free" || test.type === "helpers" || test.type === "nested-example") {
+      Object.assign(b.questions["exr-clamp"], { files: test.names, submission: { mode: test.mode, ...(test.type === "fixed-explicit" ? { layout: "files" } : test.type === "nested-example" ? { layout: "files-or-zip" } : test.type === "zip" ? { layout: "zip" } : {}) } });
+      if (test.type === "zip" || test.type === "free" || test.type === "helpers" || test.type === "nested-example" || test.type === "fixed-explicit") {
         b.questions["exr-clamp"].additionalJavaSources = { ...policy,
           primaryRequired: test.type !== "free", allowAdditional: test.type !== "zip" };
       }
@@ -1500,8 +1501,9 @@ Deno.test("режим сдачи учитывает структуру полн�
         assert((html.match(/<pl-file-editor /g) ?? []).length === 2 &&
           test.names.every((name) => html.includes('file-name="' + name + '"') && html.includes("STARTER " + name)),
           "Два fixed файла в разных папках потеряли редакторы или starter");
-      } else if (test.type === "files") {
+      } else if (test.type === "files" || test.type === "fixed-explicit") {
         assert(html.includes('file-names="A.java,B.java,C.java"'), "Плоский fixed ответ не принимает отдельные файлы");
+        if (test.type === "fixed-explicit") assert(!html.includes("optional-file") && !html.includes('file-names="solution.zip"'), "Явный files добавил другой транспорт");
       } else if (test.type === "zip") {
         assert(html.includes('<pl-file-upload file-names="solution.zip"') &&
           !html.includes('<pl-file-upload file-names="grade/'), "Вложенный fixed ответ требует недоступный path в обычной загрузке");

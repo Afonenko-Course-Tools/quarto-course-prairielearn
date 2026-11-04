@@ -983,6 +983,8 @@ export async function exportPrairieLearn(
       }
       controls = downloads + (zip && extras
         ? '\n<pl-file-upload file-names="' + escape(extras.archive) + '"></pl-file-upload>'
+        : layout === "files"
+        ? '\n<pl-file-upload file-names="' + escape(b.files.join(",")) + '"></pl-file-upload>'
         : extras && (extras.primaryRequired === false || extras.allowAdditional !== false)
         ? '\n<pl-file-upload optional-file-patterns="*.java" optional-file-names="' +
           escape(extras.archive) + '\"></pl-file-upload>'
@@ -1008,7 +1010,7 @@ export async function exportPrairieLearn(
       controls = "<p>Загрузите ZIP с исходниками, сохранив перечисленные относительные пути внутри архива.</p>\n" + controls;
     }
     if (extras && (extras.primaryRequired === false || extras.allowAdditional !== false) &&
-      submission.mode === "upload" && submission.layout !== "zip" &&
+      submission.mode === "upload" && submission.layout !== "zip" && submission.layout !== "files" &&
       (submission.layout === "files-or-zip" || !(b.files.length >= 3 && b.files.some((name: string) => name.includes("/"))))) {
       controls =
         "<p>Перечисленные в поле загрузки файлы можно отправить отдельно; исходники с пакетами и остальные .java поместите в ZIP, сохранив относительные пути.</p>\n" +
