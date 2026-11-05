@@ -179,15 +179,14 @@ prairielearn:
         "plain DTO: 0 IO and no business/cache/publication authority",
       );
       for (
-        const readSet of [[], ["configuration"], [
-          "configuration",
-          "assessment",
-          "projectChecks",
-          "projectChecks",
-        ]]
+        const nativeMetadata of [
+          undefined,
+          { foreign: {} },
+          { readSet: ["configuration"], values: {} },
+        ]
       ) {
         const bad = structuredClone(input);
-        bad.nativeMetadata.readSet = readSet;
+        bad.nativeMetadata = nativeMetadata;
         await assert.rejects(() => plain.validate(bad));
       }
       const missing = structuredClone(input);
