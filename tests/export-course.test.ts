@@ -1059,3 +1059,47 @@ Deno.test("inventory: fresh output повторно проверяется пе�
     );
   });
 });
+
+Deno.test("inventory: одинаковые Unicode имена не зависят от порядка обхода", async () => {
+  await inventoryCourseFixture(async (input) => {
+    const artifact = input.studentArtifact;
+    input.studentArtifact = async (fact) => {
+      const value = await artifact(fact);
+      return {
+        ...value,
+        files: [
+          ...value.files,
+          { name: "é.txt", bytes: new Uint8Array([1]) },
+          { name: "e\u0301.txt", bytes: new Uint8Array([2]) },
+        ],
+      };
+    };
+    const readDir = Deno.readDir;
+    Deno.readDir = async function* (path) {
+      const entries = await Array.fromAsync(readDir(path));
+      entries.sort((left, right) =>
+        left.name < right.name ? -1 : left.name > right.name ? 1 : 0
+      );
+      yield* String(path).includes("/.pl-course-")
+        ? entries.reverse()
+        : entries;
+    };
+    try {
+      const result = await exportCourse(input);
+      assert(
+        result.files.includes(
+          "questions/demo/exr-a/clientFilesQuestion/starter/é.txt",
+        ),
+        "Имя NFC потеряно",
+      );
+      assert(
+        result.files.includes(
+          "questions/demo/exr-a/clientFilesQuestion/starter/e\u0301.txt",
+        ),
+        "Имя NFD потеряно",
+      );
+    } finally {
+      Deno.readDir = readDir;
+    }
+  });
+});

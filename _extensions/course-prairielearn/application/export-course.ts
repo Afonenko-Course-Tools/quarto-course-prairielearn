@@ -109,7 +109,7 @@ async function inventoryNames(root: string) {
     }
   }
   await walk(root);
-  return files;
+  return files.sort();
 }
 async function sameQuestionFiles(
   left: string,
