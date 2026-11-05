@@ -40,13 +40,13 @@ jobs:
         with:
           repository: Afonenko-Course-Tools/quarto-course
           # Core 9: независимо проверенный исходный код; полный hosted CI и выпуск отдельно.
-          ref: 90b353369cda808f7dd7e7602c9d70d9246663e6
+          ref: c950a962a76a26dc61378fdc16bb80533800596e
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "90b353369cda808f7dd7e7602c9d70d9246663e6"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "c950a962a76a26dc61378fdc16bb80533800596e"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -110,13 +110,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: 90b353369cda808f7dd7e7602c9d70d9246663e6
+          ref: c950a962a76a26dc61378fdc16bb80533800596e
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "90b353369cda808f7dd7e7602c9d70d9246663e6"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "c950a962a76a26dc61378fdc16bb80533800596e"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5
