@@ -394,6 +394,8 @@ Deno.test("staged filesystem failure removes partial delivery and retains unknow
     const candidate = p();
     candidate.resources.push({
       owner: "demo",
+      source: "tasks.qmd",
+      effectiveBase: ".",
       target: "Clamp.java/image.png",
       visibility: "public",
       data: btoa("resource"),
@@ -545,6 +547,8 @@ Deno.test("ADAPTER invalid resource encoding keeps original cause and resource f
     const candidate = p();
     candidate.resources = [{
       owner: "demo",
+      source: "tasks.qmd",
+      effectiveBase: ".",
       target: "image.png",
       visibility: "public",
       data: "!",
