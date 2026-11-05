@@ -3,7 +3,6 @@ const __metrics=__createMetrics("course-prairielearn");
 import { normalizeDiscovery } from './grading-descriptor.ts';
 import { javaBuild } from './java-build.ts';
 import { safePath } from './source-selection.ts';
-import type { NativeProjectCheck } from './native-checks.ts';
 import type { RuntimeCheckInput } from './runtime-check.ts';
 export type RuntimeProfile = NonNullable<Parameters<typeof javaBuild>[1]>;
 export interface AdditionalJavaSources {primaryRequired?:boolean;allowAdditional?:boolean;archive:string;maxFiles:number;maxFileBytes:number;maxTotalBytes:number;maxArchiveBytes:number}
@@ -12,14 +11,6 @@ export function validateAdditionalJavaSources(value:any,sources:string[],tests:s
   if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['archive','primaryRequired','allowAdditional',...Object.keys(caps)].includes(k))||('primaryRequired' in value&&typeof value.primaryRequired!=='boolean')||('allowAdditional' in value&&typeof value.allowAdditional!=='boolean')||typeof value.archive!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.zip$/.test(value.archive)||Object.entries(caps).some(([key,cap])=>!Number.isInteger(value[key])||value[key]<1||value[key]>cap))throw new Error('PL invalid additional Java sources policy');
   if([...sources,...tests,'grading-job.json','tests/grading-job.json'].some(name=>name===value.archive||name.startsWith(value.archive+'/')||value.archive.startsWith(name+'/')))throw new Error('PL additional Java archive conflicts with primary/trusted path');
   return {...value};
-}
-function publicCases(value:NonNullable<NativeProjectCheck['public-cases']>){
- if(!Array.isArray(value)||value.length>32)throw Error('PL public-cases requires a bounded list');
- const ids=new Set<string>();
- return value.map(c=>{
-  if(!c||typeof c!=='object'||Array.isArray(c)||Object.keys(c).some(k=>!['id','name','test','input','state','action','expected'].includes(k))||!['id','name','test','expected'].every(k=>k in c)||!['input','state','action'].some(k=>k in c)||Object.values(c).some(v=>typeof v!=='string'||v.length>8192)||!c.id||!c.test||!c.name.trim()||c.name.length>256||ids.has(c.id))throw Error('PL invalid/ambiguous explicit public case');
-  ids.add(c.id);return {...c};
- });
 }
 export interface ApiPrecheck {files:string[];entry:string}
 export function runtimeDescriptor<C extends RuntimeCheckInput>(c: C, profile: RuntimeProfile, sources: string[], tests: string[], api?:ApiPrecheck) {
@@ -44,7 +35,6 @@ export function runtimeDescriptor<C extends RuntimeCheckInput>(c: C, profile: Ru
     limits:{'outer-seconds':30,'compile-seconds':15,'run-seconds':10,networking:false,'max-output-bytes':65536,...c.limits},
     scoring:scoring ?? ({mode:'weighted'} satisfies {mode:'weighted'}), discovery:normalizeDiscovery(c.discovery),
     ...(c.feedback?{feedback:{requirement:c.feedback.requirement,whatCheck:c.feedback['what-check']}}:{}),
-    ...(c['public-cases']!==undefined?{publicCases:publicCases(c['public-cases'])}:{}),
     ...(c.variants ? {variants:c.variants} : {}),
     ...(additionalJavaSources?{additionalJavaSources}:{}),
     ...(build?{javaBuild:build}:{}),

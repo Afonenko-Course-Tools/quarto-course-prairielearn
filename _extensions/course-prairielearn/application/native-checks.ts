@@ -52,22 +52,6 @@ const fields = {
   }).optional(),
   feedback: z.strictObject({ requirement: text, "what-check": text })
     .optional(),
-  "public-cases": z.array(
-    z.strictObject({
-      id: text,
-      name: text,
-      test: text,
-      input: text.optional(),
-      state: text.optional(),
-      action: text.optional(),
-      expected: text,
-    }).refine(
-      (c) =>
-        c.input !== undefined || c.state !== undefined ||
-        c.action !== undefined,
-      "public case requires input/state/action",
-    ),
-  ).max(32).optional(),
   scoring: z.discriminatedUnion("mode", [
     z.strictObject({ mode: z.literal("weighted") }),
     z.strictObject({ mode: z.literal("all-pass") }),
@@ -142,10 +126,6 @@ export const NativeProjectCheckSchema = z.strictObject({
         "Java Gradle/API/extra sources require explicit implementation policy",
     });
   }
-  if (
-    new Set(c["public-cases"]?.map((x) => x.id)).size !==
-      c["public-cases"]?.length && c["public-cases"]
-  ) ctx.addIssue({ code: "custom", message: "Duplicate public case" });
 });
 export const NativeProjectChecksSchema = z.strictObject({
   defaults: z.strictObject(fields).partial().default({}),

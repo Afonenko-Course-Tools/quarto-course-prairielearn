@@ -1510,3 +1510,70 @@ Deno.test("Java формы взаимоисключающие по точным 
     }
   } finally { await Deno.remove(root, { recursive: true }); }
 });
+
+Deno.test("ordinary public-tests Div reaches question HTML and preserves supplied README and public JUnit", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const markdown = `::: {.public-tests}
+### Открытые проверки
+
+Сравните **пустую строку** и \`null\`. См. [JUnit](https://junit.org/).
+
+| Вызов | Результат |
+|---|---|
+| \`value()\` | \`42\` |
+
+\`\`\`java
+assertEquals(42, Clamp.value());
+\`\`\`
+:::
+`;
+    await Deno.writeTextFile(root + "/condition.md", markdown);
+    const pandoc = async (format: string) => {
+      const result = await new Deno.Command(Deno.env.get("QUARTO") || "quarto", {
+        args: ["pandoc", root + "/condition.md", "--from=markdown", "--to=" + format],
+        stdout: "piped", stderr: "piped",
+      }).output();
+      assert(result.success, "ordinary Pandoc conversion failed");
+      return new TextDecoder().decode(result.stdout);
+    };
+    const ast = JSON.parse(await pandoc("json"));
+    assert(ast.blocks[0].t === "Div" && ast.blocks[0].c[0][1].includes("public-tests"),
+      "fixture must use a real ordinary Pandoc Div");
+    const readme = await pandoc("gfm");
+    const publicJUnit = "import org.junit.jupiter.api.Test;\nimport static org.junit.jupiter.api.Assertions.assertEquals;\nclass PublicChecks { @Test void result() { assertEquals(42, Clamp.value()); } }\n";
+    const starter = "public class Clamp { public static int value() { return 0; } }\n";
+    const artifactFiles = [{name: "README.md", bytes: new TextEncoder().encode(readme)},
+      {name: "src/test/java/PublicChecks.java", bytes: new TextEncoder().encode(publicJUnit)},
+      {name: "Clamp.java", bytes: new TextEncoder().encode(starter)}];
+    await Deno.mkdir(root + "/project/student", { recursive: true });
+    await Deno.mkdir(root + "/project/tests", { recursive: true });
+    await Deno.writeTextFile(root + "/project/student/Clamp.java", starter);
+    await Deno.writeTextFile(root + "/project/tests/grade.sh", "PRIVATE_CHECKS");
+    const body = p();
+    body.apiVersion = ast["pandoc-api-version"];
+    body.questions[0].condition = ast.blocks;
+    const original = JSON.stringify(body.questions[0].condition);
+    const b = structuredClone(binding) as any;
+    b.questions["exr-clamp"].submission = {mode: "editor", aceMode: "ace/mode/java"};
+    await exportPrairieLearn(body, {
+      nativeBody: true, projectRoot: root, projects: {"exr-clamp": "/project"},
+      // Packaging belongs to Download; this test checks the supplied file boundary.
+      studentArtifacts: {"exr-clamp": {files: artifactFiles, archive: new Uint8Array([80, 75, 3, 4])}},
+    }, b, root + "/out");
+    const base = root + "/out/questions/demo/exr-clamp";
+    const html = await Deno.readTextFile(base + "/question.html");
+    for (const content of ['class="public-tests"', "Открытые проверки", "<table>", "<strong>", "assertEquals", 'href="https://junit.org/"']) {
+      assert(html.includes(content), "ordinary Markdown lost: " + content);
+    }
+    assert(!html.includes("PRIVATE_CHECKS") && !html.includes("pl-file-upload"),
+      "private files or mixed submission controls leaked");
+    assert(JSON.stringify(body.questions[0].condition) === original, "Body was mutated");
+    assert(await Deno.readTextFile(base + "/clientFilesQuestion/starter/README.md") === readme,
+      "supplied ordinary README changed");
+    assert(await Deno.readTextFile(base + "/clientFilesQuestion/starter/src/test/java/PublicChecks.java") === publicJUnit,
+      "real public JUnit file lost or rewritten");
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
