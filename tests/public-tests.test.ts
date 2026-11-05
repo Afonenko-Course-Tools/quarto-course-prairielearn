@@ -40,3 +40,33 @@ Deno.test("public descriptions belong to ordinary Body, not project-check DSL", 
     "runtime still exports a second public description format",
   );
 });
+
+Deno.test("author feedback descriptions are rejected and never projected into runtime metadata", () => {
+  const policy = {
+    profile: "fixture",
+    "source-profile": "main",
+    tests: ["tests/**"],
+    scoring: { mode: "weighted" },
+    runtime: "java25-junit-v1",
+    sourceProfile: {
+      mode: "implementation",
+      root: "student",
+      include: ["**/*.java"],
+    },
+    feedback: {
+      requirement: "Открытое требование",
+      "what-check": "Обычное описание проверки",
+    },
+  };
+  assert(
+    !NativeProjectCheckSchema.safeParse(policy).success,
+    "removed author feedback DSL still accepted",
+  );
+  const result = runtimeDescriptor(policy, { javaRelease: 25 }, [
+    "Calculator.java",
+  ], ["Checks.java"]);
+  assert(
+    !("feedback" in result) && !("publicCases" in result),
+    "author descriptions still projected into runtime metadata",
+  );
+});

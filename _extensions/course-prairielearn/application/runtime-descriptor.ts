@@ -19,7 +19,6 @@ export function runtimeDescriptor<C extends RuntimeCheckInput>(c: C, profile: Ru
   if (!javaRuntime && c.java !== undefined) throw new Error('PL non-Java runtime cannot declare Java compiler settings');
   if(Boolean(c['api-precheck'])!==Boolean(api))throw new Error('PL API precheck selection missing or undeclared');
   if(api&&(!['java25-junit-v1','java25-gradle-junit-v1'].includes(c.runtime)||!javaRuntime||c.sourceProfile.mode!=='implementation'||!Array.isArray(api.files)||!api.files.length||new Set(api.files).size!==api.files.length||api.files.length>=tests.length||api.files.some(x=>!safePath(x)||!x.endsWith('.java')||!tests.includes(x))||!/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(api.entry)||api.entry!==c['api-precheck']!.entry))throw new Error('PL API precheck must be a proper trusted Java subset');
-  if(c.feedback!==undefined&&(!c.feedback||typeof c.feedback!=='object'||Array.isArray(c.feedback)||Object.keys(c.feedback).sort().join(',')!=='requirement,what-check'||Object.values(c.feedback).some(v=>typeof v!=='string'||!v||v.length>8192)))throw Error('PL feedback requires explicit public requirement/what-check');
   const extra=c['additional-java-sources'];
   let additionalJavaSources:AdditionalJavaSources|undefined;
   if(extra!==undefined){
@@ -34,7 +33,6 @@ export function runtimeDescriptor<C extends RuntimeCheckInput>(c: C, profile: Ru
     ...(javaRuntime ? {java:{release:25,encoding:'UTF-8','compiler-options':['-proc:none','-Xmaxerrs','5'],...c.java}} : {}),
     limits:{'outer-seconds':30,'compile-seconds':15,'run-seconds':10,networking:false,'max-output-bytes':65536,...c.limits},
     scoring:scoring ?? ({mode:'weighted'} satisfies {mode:'weighted'}), discovery:normalizeDiscovery(c.discovery),
-    ...(c.feedback?{feedback:{requirement:c.feedback.requirement,whatCheck:c.feedback['what-check']}}:{}),
     ...(c.variants ? {variants:c.variants} : {}),
     ...(additionalJavaSources?{additionalJavaSources}:{}),
     ...(build?{javaBuild:build}:{}),

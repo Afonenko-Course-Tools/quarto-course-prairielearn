@@ -50,8 +50,6 @@ const fields = {
     networking: z.literal(false).optional(),
     "max-output-bytes": integer.optional(),
   }).optional(),
-  feedback: z.strictObject({ requirement: text, "what-check": text })
-    .optional(),
   scoring: z.discriminatedUnion("mode", [
     z.strictObject({ mode: z.literal("weighted") }),
     z.strictObject({ mode: z.literal("all-pass") }),
