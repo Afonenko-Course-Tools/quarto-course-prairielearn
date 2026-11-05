@@ -155,8 +155,10 @@ Deno.test("реальный exporter создаёт native Manual Workspace и �
     );
     assert(
       manifest.schema === "pl-git-workspace-seed-v1" &&
-        manifest.sha256.length === 64,
-      "Нет seed identity",
+        Array.isArray(manifest.files) &&
+        JSON.stringify([...manifest.files].sort()) === JSON.stringify(artifact.files.map(file => file.name).sort()) &&
+        Object.keys(manifest).sort().join(",") === "files,schema",
+      "Seed manifest потерял действительные имена файлов либо вернул собственное доказательство",
     );
     const info = JSON.parse(await Deno.readTextFile(join(base, "info.json")));
     const html = await Deno.readTextFile(join(base, "question.html"));

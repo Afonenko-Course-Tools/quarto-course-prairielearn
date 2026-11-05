@@ -391,17 +391,12 @@ Deno.test("Pandoc command failure preserves tool exit stdout stderr and cause wi
 Deno.test("staged filesystem failure removes partial delivery and retains unknown error", async () => {
   const root = await Deno.makeTempDir();
   try {
-    const candidate: any = p(), bytes = new TextEncoder().encode("resource");
-    const sha256 = Array.from(
-      new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
-      (x) => x.toString(16).padStart(2, "0"),
-    ).join("");
+    const candidate = p();
     candidate.resources.push({
       owner: "demo",
       target: "Clamp.java/image.png",
       visibility: "public",
       data: btoa("resource"),
-      sha256,
     });
     candidate.questions[0].condition = [{
       t: "Para",
@@ -547,13 +542,12 @@ Deno.test("CLI preserves foreign Core diagnostic and unknown stack", async () =>
 Deno.test("ADAPTER invalid resource encoding keeps original cause and resource field", async () => {
   const root = await Deno.makeTempDir();
   try {
-    const candidate: any = p();
+    const candidate = p();
     candidate.resources = [{
       owner: "demo",
       target: "image.png",
       visibility: "public",
       data: "!",
-      sha256: "unused",
     }];
     candidate.questions[0].condition = [{
       t: "Para",
