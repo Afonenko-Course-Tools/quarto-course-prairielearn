@@ -2,7 +2,7 @@ import type { BodyResource, PublicBodyPackage } from "course-core/body-export/mo
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { renderNativeAnswer } from "./native-answer.ts";
 import { workspaceSeed } from "./workspace-seed.ts";
-import { submission as parseSubmission } from "./submission.ts";
+import { fileSubmission, submission as parseSubmission } from "./submission.ts";
 import {
   type PublicationCondition,
   publicationConditionFile,
@@ -31,7 +31,7 @@ const fields = (v: any, required: string[], optional: string[] = []) =>
   record(v) && required.every((k) => Object.hasOwn(v, k)) &&
   Object.keys(v).every((k) => [...required, ...optional].includes(k));
 export interface StudentArtifact {
-  files: { name: string; bytes: Uint8Array }[];
+  files: { name: string; bytes: Uint8Array; reason?: string }[];
   archive: Uint8Array;
 }
 export interface ProjectContext {
@@ -747,11 +747,11 @@ export async function exportPrairieLearn(
       : undefined;
     if (
       manual &&
-      (submission.mode === "editor" || b.additionalJavaSources !== undefined ||
-        b.externalGradingOptions !== undefined)
+      (b.additionalJavaSources !== undefined || b.externalGradingOptions !== undefined ||
+        submission.mode === "editor" && (!b.files.length || b.files.some((name: string) => !name.endsWith(".java"))))
     ) {
       questionFail(
-        "Manual требует upload или Workspace без автоматического runtime",
+        "Manual требует настоящие Java starter-файлы для editor и не допускает автоматический runtime",
         "submission",
       );
     }
@@ -930,11 +930,15 @@ export async function exportPrairieLearn(
         b.files,
         tests.map((f) => f.name),
       );
-    if (extras?.primaryRequired === false && submission.mode !== "upload") {
-      questionFail(
-        "Необязательные primary Java sources требуют submission.mode: upload",
-        "submission",
-      );
+    if (!workspace && b.files.length && b.files.every((name: string) => name.endsWith(".java")) && (extras || manual)) {
+      submission = fileSubmission(b.files, submission.mode === "editor" ? submission.aceMode : undefined);
+    }
+    if (manual && b.files.length && b.files.every((name: string) => name.endsWith(".java"))) {
+      for (const name of b.files) {
+        const starter = student.find(file => file.name === name);
+        if (!starter) questionFail("Нет настоящего starter для Manual Java", "project.student." + name);
+        prepared.push({ name: base + "/serverFilesQuestion/starter/" + name, data: starter!.data });
+      }
     }
     let controls: string;
     if (workspace) {
@@ -981,40 +985,16 @@ export async function exportPrairieLearn(
       if (zip && !manual && !extras) {
         questionFail("Для вложенного ответа требуется явный ZIP transport в additional-java-sources", "submission");
       }
-      controls = downloads + (zip && extras
-        ? '\n<pl-file-upload file-names="' + escape(extras.archive) + '"></pl-file-upload>'
+      controls = downloads + (zip
+        ? '\n<pl-file-upload file-names="' + escape(extras?.archive ?? "solution.zip") + '"></pl-file-upload>'
         : layout === "files"
         ? '\n<pl-file-upload file-names="' + escape(b.files.join(",")) + '"></pl-file-upload>'
-        : extras && (extras.primaryRequired === false || extras.allowAdditional !== false)
-        ? '\n<pl-file-upload optional-file-patterns="*.java" optional-file-names="' +
-          escape(extras.archive) + '\"></pl-file-upload>'
-        : zip && extras
-        ? '\n<pl-file-upload file-names="' + escape(extras.archive) + '\"></pl-file-upload>'
         : manual
         ? '\n<pl-file-upload file-patterns="*" optional-file-patterns="*"></pl-file-upload>'
-        : '\n<pl-file-upload file-names="' +
-          escape(b.files.join(",")) + '"' + (extras
-            ? ' optional-file-names="' + escape(extras.archive) + '"'
-            : "") +
-          "></pl-file-upload>");
+        : '\n<pl-file-upload file-names="' + escape(b.files.join(",")) + '"></pl-file-upload>');
     }
-    if (extras) {
-      if (submission.mode === "editor") {
-        controls += '\n<pl-file-upload optional-file-names="' +
-          escape(extras.archive) + '"></pl-file-upload>';
-      }
-    }
-    if (submission.mode === "upload" && (submission.layout === "zip" ||
-      submission.layout === undefined && extras?.primaryRequired !== false &&
-      b.files.length >= 3 && b.files.some((name: string) => name.includes("/")))) {
-      controls = "<p>Загрузите ZIP с исходниками, сохранив перечисленные относительные пути внутри архива.</p>\n" + controls;
-    }
-    if (extras && (extras.primaryRequired === false || extras.allowAdditional !== false) &&
-      submission.mode === "upload" && submission.layout !== "zip" && submission.layout !== "files" &&
-      (submission.layout === "files-or-zip" || !(b.files.length >= 3 && b.files.some((name: string) => name.includes("/"))))) {
-      controls =
-        "<p>Перечисленные в поле загрузки файлы можно отправить отдельно; исходники с пакетами и остальные .java поместите в ZIP, сохранив относительные пути.</p>\n" +
-        controls;
+    if (submission.mode === "upload" && submission.layout === "zip") {
+      controls = "<p>Загрузите один ZIP со всеми исходниками, сохранив перечисленные относительные пути внутри архива.</p>\n" + controls;
     }
     if (artifact) {
       controls =

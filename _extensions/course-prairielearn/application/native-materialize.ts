@@ -2,7 +2,7 @@ import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
-import { describeSubmission } from "./submission.ts";
+import { applicationJavaTarget, describeSubmission, fileSubmission } from "./submission.ts";
 import { projectNativeChecks } from "./native-check-projection.ts";
 import type { CheckedNativeProjectFact } from "./native-check-projection.ts";
 import type * as CorePublic from "course-core/public.ts";
@@ -197,20 +197,16 @@ export async function materializeNativeQuestion(
       fullPlan: pair.full,
     });
   }
-  const submission = describeSubmission(
-    input.settings.submission,
-    checked?.selection.sources.map((f) => ({
-      name: f.name,
-      starterPath: f.target,
-    })) ?? [],
-    {
-      freeComposition: !input.fact.check ||
-        checked?.selection.descriptor.additionalJavaSources?.allowAdditional !== false &&
-          checked?.selection.descriptor.additionalJavaSources !== undefined,
-      primaryRequired: checked?.selection.descriptor.additionalJavaSources?.primaryRequired !== false,
-      archive: checked?.selection.descriptor.additionalJavaSources?.archive,
-    },
-  );
+  const sourceMappings = checked?.selection.sources.map(file => ({ name: file.name, starterPath: file.target })) ??
+    student.files.filter(file => input.settings.submission.mode !== "workspace" && file.reason === "starter" && applicationJavaTarget(file.target)).map(file => ({ name: file.target, starterPath: file.target }));
+  const javaFiles = sourceMappings.length && sourceMappings.every(file => file.name.endsWith(".java"));
+  const selectedSubmission = input.settings.submission.mode !== "workspace" && javaFiles
+    ? fileSubmission(sourceMappings.map(file => file.name), input.settings.submission.mode === "editor" ? input.settings.submission.aceMode : undefined)
+    : input.settings.submission;
+  const submission = describeSubmission(selectedSubmission, sourceMappings, {
+    archive: checked?.selection.descriptor.additionalJavaSources?.archive ??
+      (javaFiles && selectedSubmission.mode === "upload" && selectedSubmission.layout === "zip" ? "solution.zip" : undefined),
+  });
   const final = await Core.materializeProject(
     pair.student,
     condition,
@@ -248,6 +244,7 @@ export async function materializeNativeQuestion(
   const files = final.files.map((f) => ({
     name: f.target,
     bytes: f.bytes,
+    reason: f.reason,
   }));
   const archive = await input.Download.packageArtifact(final);
   await (input.checkpoint

@@ -67,25 +67,19 @@ Deno.test("Workspace summary описывает native сдачу без вым�
 });
 
 import { describeSubmission } from "../_extensions/course-prairielearn/application/submission.ts";
-Deno.test("README различает фиксированные вложенные пути и свободный ответ", () => {
-  const nested = ["grade/Main.java", "grade/Student.java", "model/Key.java"].map((name) => ({ name, starterPath: "src/main/java/" + name }));
-  const zip = describeSubmission({ mode: "upload" }, nested, { archive: "solution.zip" });
-  assert(zip.instructions.includes("ZIP") && zip.instructions.includes("относительные пути"), "README предлагает невозможную загрузку путей по одному");
-  const free = describeSubmission({ mode: "upload" }, [{ name: "Example.java" }], { freeComposition: true, archive: "additional-sources.zip" });
-  assert(free.instructions.includes("свободен") && free.instructions.includes("отдельные") && free.instructions.includes("ZIP"), "README превратил пример стартера в обязательный ответ");
-});
 
-Deno.test("README сохраняет обязательные исходники при разрешённых вспомогательных классах", () => {
-  const value = describeSubmission({ mode: "upload" }, [{ name: "Book.java" }], {
-    freeComposition: true, primaryRequired: true, archive: "solution.zip",
-  });
-  assert(value.instructions.includes("обязательны") && !value.instructions.includes("не становятся обязательными"),
-    "README объявляет обязательный API лишь примером");
-  assert(value.instructions.includes("отдельные") && value.instructions.includes("ZIP"), "README запретил helpers");
-});
-
-Deno.test("README сохраняет обязательный ZIP при дополнительных исходниках", () => {
-  const files = ["qpack/ICharQ.java", "qpack/FixedQueue.java", "qpack/Test.java"].map(name => ({ name }));
-  const value = describeSubmission({ mode: "upload", layout: "zip" }, files, { freeComposition: true, primaryRequired: true, archive: "solution.zip" });
-  assert(value.instructions.startsWith("Загрузите ZIP") && !value.instructions.includes("отдельные"), "README разрешил плоскую загрузку обязательной структуры");
+Deno.test("README Java описывает один способ ответа по выбранным исходникам", () => {
+  for (const primaryRequired of [false, true]) {
+    for (const test of [
+      { names: ["Example.java"], wanted: "редакторы", forbidden: "ZIP" },
+      { names: ["a/Study.java", "b/Value.java"], wanted: "редакторы", forbidden: "ZIP" },
+      { names: ["A.java", "B.java", "C.java"], wanted: "исходные файлы", forbidden: "ZIP" },
+      { names: ["a/Study.java", "a/Value.java", "b/Key.java"], wanted: "ZIP", forbidden: "отдельные" },
+    ]) {
+      const result = describeSubmission({ mode: "upload", layout: "files-or-zip" },
+        test.names.map(name => ({ name })), { freeComposition: true, primaryRequired, archive: "solution.zip" });
+      assert(result.instructions.includes(test.wanted) && !result.instructions.includes(test.forbidden), "README предлагает другой или смешанный способ ответа");
+      assert(!result.instructions.includes("очистите"), "README требует очистку для ZIP");
+    }
+  }
 });

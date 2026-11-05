@@ -1,3 +1,4 @@
+import { applicationJavaTarget, fileSubmission } from "./submission.ts";
 import type {
   BodyResource,
   PublicBodyPackage,
@@ -431,11 +432,15 @@ export async function exportCourse(
             await Deno.mkdir(dirname(path), { recursive: true });
             await Deno.writeFile(path, file.data);
           }
-          binding.questions[q.id] = { ...settings, files: [] };
+          const javaSources = studentArtifacts[q.id].files.filter(file => file.reason === "starter" && applicationJavaTarget(file.name));
+          const selectedSubmission = settings.submission.mode !== "workspace" && javaSources.length
+            ? fileSubmission(javaSources.map(file => file.name), settings.submission.mode === "editor" ? settings.submission.aceMode : undefined)
+            : settings.submission;
+          binding.questions[q.id] = { ...settings, submission: selectedSubmission, files: javaSources.map(file => file.name) };
           questions[input.courseId + "/" + q.id] = {
             uuid: await uuid(input.courseId + "/" + q.id),
             grading: { method: "manual" },
-            submission: { ...settings.submission },
+            submission: { ...selectedSubmission },
             sourceRoot: fact.projectRoot,
           };
           continue;
@@ -504,12 +509,16 @@ export async function exportCourse(
           await Deno.writeFile(target, file.bytes);
         }
         const c = fact.check, descriptor = nativeSelection.descriptor;
+        const selectedSubmission = ["java25-junit-v1", "java25-gradle-junit-v1"].includes(c.runtime)
+          ? fileSubmission(sources.map(source => source.name), settings.submission.mode === "editor" ? settings.submission.aceMode : undefined)
+          : settings.submission;
         await Deno.writeTextFile(
           join(project, "tests/grading-job.json"),
           JSON.stringify(descriptor, null, 2) + "\n",
         );
         binding.questions[q.id] = {
           ...settings,
+          submission: selectedSubmission,
           files: sources.map((s: any) => s.name),
           ...(descriptor.additionalJavaSources
             ? { additionalJavaSources: descriptor.additionalJavaSources }
@@ -524,7 +533,7 @@ export async function exportCourse(
         questions[key] = {
           uuid: await uuid(key),
           grading: { method },
-          submission: { ...settings.submission },
+          submission: { ...selectedSubmission },
           projectCheck: c.profile,
           runtime: c.runtime,
           sources: fact.sources.map((file) => ({

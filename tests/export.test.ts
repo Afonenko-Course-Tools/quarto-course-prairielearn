@@ -1463,53 +1463,50 @@ Deno.test("publication conditions проходят normal prepared files и coll
   }
 });
 
-Deno.test("режим сдачи учитывает структуру полного фиксированного и свободного ответа", async () => {
+
+Deno.test("Java формы взаимоисключающие по точным выбранным исходникам", async () => {
   const root = await Deno.makeTempDir();
   const policy = { archive: "solution.zip", maxFiles: 128, maxFileBytes: 1048576,
     maxTotalBytes: 4194304, maxArchiveBytes: 2097152 };
+  const cases = [
+    { names: ["Расчёт.java"], form: "editor" },
+    { names: ["grade/Study.java", "model/Value.java"], form: "editor" },
+    { names: ["A.java", "B.java", "C.java"], form: "files" },
+    { names: ["grade/Study.java", "grade/Value.java", "model/Key.java"], form: "zip" },
+  ];
   try {
-    const cases = [
-      { names: ["grade/Main.java", "model/Value.java"], mode: "editor", type: "editors" },
-      { names: ["A.java", "B.java", "C.java"], mode: "upload", type: "files" },
-      { names: ["A.java", "B.java", "C.java"], mode: "upload", type: "fixed-explicit" },
-      { names: ["grade/Main.java", "grade/Value.java", "model/Key.java"], mode: "upload", type: "zip" },
-      { names: ["Example.java"], mode: "upload", type: "free" },
-      { names: ["Circle.java", "TwoDShape.java"], mode: "upload", type: "helpers" },
-      { names: ["Audit.java", "CodeKey.java", "grade/Student.java"], mode: "upload", type: "nested-example" },
-    ];
     for (const [index, test] of cases.entries()) {
       const project = "/project-" + index;
-      for (const name of test.names) {
+      for (const name of [...test.names, "Unselected.java"]) {
         const path = root + project + "/student/" + name;
         await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
-        await Deno.writeTextFile(path, "// STARTER " + name);
+        await Deno.writeTextFile(path, "// STARTER ёж & <x> {{x}} " + name);
       }
       await Deno.mkdir(root + project + "/tests", { recursive: true });
       await Deno.writeTextFile(root + project + "/tests/grade.sh", "PRIVATE_TEST");
-      const b = structuredClone(binding) as any;
-      Object.assign(b.questions["exr-clamp"], { files: test.names, submission: { mode: test.mode, ...(test.type === "fixed-explicit" ? { layout: "files" } : test.type === "nested-example" ? { layout: "files-or-zip" } : test.type === "zip" ? { layout: "zip" } : {}) } });
-      if (test.type === "zip" || test.type === "free" || test.type === "helpers" || test.type === "nested-example" || test.type === "fixed-explicit") {
-        b.questions["exr-clamp"].additionalJavaSources = { ...policy,
-          primaryRequired: test.type !== "free", allowAdditional: test.type !== "zip" };
+      for (const primaryRequired of [false, true]) {
+        const b = structuredClone(binding) as any;
+        Object.assign(b.questions["exr-clamp"], { files: test.names,
+          submission: { mode: "upload", layout: "files-or-zip" },
+          additionalJavaSources: { ...policy, primaryRequired, allowAdditional: true } });
+        const out = root + "/out-" + index + "-" + primaryRequired;
+        await exportPrairieLearn(p(), { projectRoot: root, projects: { "exr-clamp": project } }, b, out);
+        const html = await Deno.readTextFile(out + "/questions/demo/exr-clamp/question.html");
+        const editors = (html.match(/<pl-file-editor /g) ?? []).length;
+        const uploads = (html.match(/<pl-file-upload /g) ?? []).length;
+        if (test.form === "editor") {
+          assert(editors === test.names.length && uploads === 0, "Один/два выбранных файла требуют только редакторы");
+          assert(test.names.every(name => html.includes('file-name="' + name + '"')), "Настоящие имена потеряны");
+          assert(html.includes("STARTER ёж &amp; &lt;x&gt; &#123;&#123;x&#125;&#125;"), "UTF-8 starter не сохранён");
+          assert(!html.includes('allow-blank="true"'), "Сохранился обход пустого editor для ZIP");
+        } else if (test.form === "files") {
+          assert(editors === 0 && uploads === 1 && html.includes('file-names="A.java,B.java,C.java"'), "Плоские 3+ требуют только файловый диалог");
+        } else {
+          assert(editors === 0 && uploads === 1 && html.includes('file-names="solution.zip"'), "Дерево 3+ требует только ZIP");
+        }
+        assert(!html.includes("optional-file-") && !html.includes("очистите"), "Смешанные пути ответа остались в форме");
+        assert(!html.includes("PRIVATE_TEST"), "Закрытые проверки раскрыты");
       }
-      const out = root + "/out-" + index;
-      await exportPrairieLearn(p(), { projectRoot: root, projects: { "exr-clamp": project } }, b, out);
-      const html = await Deno.readTextFile(out + "/questions/demo/exr-clamp/question.html");
-      if (test.type === "editors") {
-        assert((html.match(/<pl-file-editor /g) ?? []).length === 2 &&
-          test.names.every((name) => html.includes('file-name="' + name + '"') && html.includes("STARTER " + name)),
-          "Два fixed файла в разных папках потеряли редакторы или starter");
-      } else if (test.type === "files" || test.type === "fixed-explicit") {
-        assert(html.includes('file-names="A.java,B.java,C.java"'), "Плоский fixed ответ не принимает отдельные файлы");
-        if (test.type === "fixed-explicit") assert(!html.includes("optional-file") && !html.includes('file-names="solution.zip"'), "Явный files добавил другой транспорт");
-      } else if (test.type === "zip") {
-        assert(html.includes('<pl-file-upload file-names="solution.zip"') &&
-          !html.includes('<pl-file-upload file-names="grade/'), "Вложенный fixed ответ требует недоступный path в обычной загрузке");
-      } else {
-        assert(html.includes('optional-file-patterns="*.java"') && html.includes('optional-file-names="solution.zip"'),
-          "Свободный ответ не принимает произвольные плоские Java-файлы и ZIP");
-      }
-      assert(!html.includes("PRIVATE_TEST"), "Закрытые проверки оказались в ответе");
     }
   } finally { await Deno.remove(root, { recursive: true }); }
 });

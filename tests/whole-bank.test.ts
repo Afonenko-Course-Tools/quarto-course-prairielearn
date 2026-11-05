@@ -635,3 +635,43 @@ Deno.test("whole-bank: internally valid public Body cannot substitute another un
     };
     await refuses(input);
   }));
+
+for (const test of [
+  { name: "editor", names: ["src/main/java/Решение.java"] },
+  { name: "tree ZIP", names: ["programs/one/src/main/java/Study.java", "programs/two/src/main/java/Value.java", "programs/three/src/main/java/Key.java"] },
+]) {
+  Deno.test("Manual Java " + test.name + " использует только реальные starter targets без автопроверки", async () =>
+    fixture(async (input, root) => {
+      const source = "// Настоящий UTF-8 starter: ёж & <x> {{x}}\n";
+      input.studentArtifact = async () => ({
+        files: [
+          ...test.names.map(name => ({ name, bytes: new TextEncoder().encode(source + name), reason: "starter" })),
+          { name: "src/main/java/Foreign.java", bytes: new TextEncoder().encode("PUBLIC_CHECK"), reason: "testset:public" },
+          { name: "src/test/java/PublicChecks.java", bytes: new TextEncoder().encode("PUBLIC_CHECK"), reason: "starter" },
+          { name: "examples/compile/Bad.java", bytes: new TextEncoder().encode("COMPILE_EXAMPLE"), reason: "starter" },
+        ], archive: new Uint8Array([80, 75, 3, 4]),
+      });
+      await exportCourse(input);
+      const base = root + "/out/questions/fixture/exr-a";
+      const info = JSON.parse(await Deno.readTextFile(base + "/info.json"));
+      const html = await Deno.readTextFile(base + "/question.html");
+      assert(info.gradingMethod === "Manual" && !info.externalGradingOptions && !html.includes("pl-external-grader-results"), "Manual получил автоматический runtime");
+      assert(!html.includes("optional-file-") && !html.includes('allow-blank="true"'), "Manual формы смешаны");
+      if (test.name === "editor") {
+        assert((html.match(/<pl-file-editor /g) ?? []).length === 1 && !html.includes("<pl-file-upload"), "Manual1 требует один редактор");
+        assert(html.includes('file-name="src/main/java/Решение.java"') && html.includes("ёж &amp; &lt;x&gt; &#123;&#123;x&#125;&#125;"), "Manual имя/UTF-8 потеряны");
+        assert(await Deno.readTextFile(base + "/serverFilesQuestion/starter/" + test.names[0]) === source + test.names[0], "Manual mirror отличается от Core starter bytes");
+      } else {
+        assert(!html.includes("<pl-file-editor") && (html.match(/<pl-file-upload /g) ?? []).length === 1 && html.includes('file-names="solution.zip"'), "Manual3tree требует только ZIP");
+      }
+      assert(!html.includes('<pl-file-editor file-name="src/main/java/Foreign.java"'), "Публичный testset стал исходником ответа");
+      let foreignMirror = false;
+      try { await Deno.stat(base + "/serverFilesQuestion/starter/src/main/java/Foreign.java"); foreignMirror = true; } catch (error) { if (!(error instanceof Deno.errors.NotFound)) throw error; }
+      assert(!foreignMirror, "Публичный testset стал canonical starter");
+    }));
+}
+Deno.test("Manual Java editor отказывает при нетекстовом starter до публикации", async () =>
+  fixture(async input => {
+    input.studentArtifact = async () => ({ files: [{ name: "src/main/java/Решение.java", bytes: new Uint8Array([255]), reason: "starter" }], archive: new Uint8Array([80, 75, 3, 4]) });
+    await refuses(input);
+  }));
