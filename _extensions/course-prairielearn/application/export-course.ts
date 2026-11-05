@@ -93,8 +93,8 @@ async function absent(path: string) {
     if (!(e instanceof Deno.errors.NotFound)) throw e;
   }
 }
-async function inventory(root: string) {
-  const files: Record<string, Uint8Array> = {};
+async function inventoryNames(root: string) {
+  const files: string[] = [];
   async function walk(dir: string) {
     for (
       const e of [...await Array.fromAsync(Deno.readDir(dir))].sort((a, b) =>
@@ -104,14 +104,29 @@ async function inventory(root: string) {
       const path = join(dir, e.name);
       if (e.isDirectory) await walk(path);
       else if (e.isFile) {
-        files[relative(root, path).replaceAll("\\", "/")] = await Deno.readFile(
-          path,
-        );
+        files.push(relative(root, path).replaceAll("\\", "/"));
       } else throw new Error("PL unexpected artifact");
     }
   }
   await walk(root);
   return files;
+}
+async function sameQuestionFiles(
+  left: string,
+  right: string,
+  rightNames: string[],
+) {
+  if (!isDeepStrictEqual(await inventoryNames(left), rightNames)) return false;
+  // При коллизии проверяем все реальные готовые файлы обоих вопросов.
+  for (const name of rightNames) {
+    if (
+      !isDeepStrictEqual(
+        await Deno.readFile(join(left, name)),
+        await Deno.readFile(join(right, name)),
+      )
+    ) return false;
+  }
+  return true;
 }
 export interface ExportCourseContent {
   assessments: any[];
@@ -600,12 +615,11 @@ export async function exportCourse(
             await Deno.writeFile(path, s.data);
           }
         }
-        const nativeFiles = await inventory(join(partial, base));
+        const nativeFiles = await inventoryNames(join(partial, base));
         const resourceBindings = [...new Map<string, BodyResource>(
           p.resources
             .filter((resource) =>
-              Object.hasOwn(
-                nativeFiles,
+              nativeFiles.includes(
                 "clientFilesQuestion/" + resource.target,
               )
             )
@@ -621,7 +635,11 @@ export async function exportCourse(
         if (await exists(join(stage, base))) {
           if (
             questionSnapshots.get(q.key) !== snapshot ||
-            !isDeepStrictEqual(await inventory(join(stage, base)), nativeFiles)
+            !await sameQuestionFiles(
+              join(stage, base),
+              join(partial, base),
+              nativeFiles,
+            )
           ) {
             throw Error("PL конфликт повторного вопроса: " + q.key);
           }
@@ -680,7 +698,7 @@ export async function exportCourse(
         },
       );
     }
-    const files = await inventory(stage);
+    const files = await inventoryNames(stage);
     const version = 5;
     {
       for (const [key, value] of Object.entries(questions) as [string, any][]) {
@@ -688,7 +706,8 @@ export async function exportCourse(
         if (value.submission.mode === "workspace") {
           const prefix = "questions/" + key + "/workspace/.pl-seed/";
           if (
-            !files[prefix + "starter.zip"] || !files[prefix + "manifest.json"]
+            !files.includes(prefix + "starter.zip") ||
+            !files.includes(prefix + "manifest.json")
           ) throw Error("PL.WORKSPACE_SEED_REQUIRED");
           questions[key] = {
             ...value,
@@ -727,7 +746,7 @@ export async function exportCourse(
           selfEnrollment: d.instance["self-enrollment"],
         },
       },
-      files: Object.keys(files).sort(),
+      files: files.sort(),
       ...(input.candidateImage ? { candidate: true } : {}),
     };
     await write("delivery.json", delivery);
