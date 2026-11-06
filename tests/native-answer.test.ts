@@ -40,7 +40,10 @@ async function copyTree(from: string, to: string) {
     else await Deno.copyFile(from + "/" + e.name, to + "/" + e.name);
   }
 }
-import { exportCourse } from "../_extensions/course-prairielearn/application/export-course.ts";
+import {
+  exportCourse,
+  type ExportCourseContent,
+} from "../_extensions/course-prairielearn/application/export-course.ts";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 import { infoQuestion } from "../_extensions/course-prairielearn/application/native-validators.js";
 const forms: NonNullable<
@@ -143,7 +146,7 @@ for (const answer of forms) {
           : answer.type === "multipart"
           ? { "auto-points": 80, "manual-points": 20 }
           : { "question-points": 1 };
-        const work = {
+        const work: ExportCourseContent["assessments"][number] = {
           id: "sec-work",
           source: "work.qmd",
           kind: "lab",

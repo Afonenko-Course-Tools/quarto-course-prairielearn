@@ -24,7 +24,7 @@ import type { CheckedNativeProjectFact } from "./native-check-projection.ts";
 import type { materializeNativeQuestion } from "./native-materialize.ts";
 import type { StudentArtifact } from "./export.ts";
 import type {
-  AnswerSpec,
+  AnswerFacts,
   NativeAdapterValidationInput,
   NativeProjectFact,
   NativeResponseSlot,
@@ -207,7 +207,7 @@ export async function exportCourse(
     nativeBody?: boolean;
     nativeAuxiliary?: NativeAuxiliary;
     nativeInputs: Record<string, NativeCompilerInput>;
-    nativeAnswers?: Record<string, AnswerSpec>;
+    nativeAnswers?: Record<string, AnswerFacts>;
     nativeResponseSlots?: Record<string, NativeResponseSlot[]>;
     studentArtifact: (
       fact: Pick<NativeProjectFact, "exerciseId">,

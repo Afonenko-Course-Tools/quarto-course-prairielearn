@@ -1,3 +1,4 @@
+import type { AnswerSpec } from "course-core/public.ts";
 import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 // Ограниченный lifecycle harness; scope callbacks здесь НЕ genuine Core operation/prior P.
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
@@ -24,8 +25,11 @@ async function fixture(course: boolean) {
     out = root + "/out",
     privateOut = root + "/checks.json",
     events: string[] = [];
-  const answer = { type: "manual", submission: "text" },
-    id = "exr-answer",
+  const answer: Extract<AnswerSpec, { type: "manual" }> = {
+    type: "manual",
+    submission: "text",
+  };
+  const id = "exr-answer",
     key = "fixture/" + id;
   const kind: PublicBodyPackage["works"][number]["kind"] = "lab";
   const selection:

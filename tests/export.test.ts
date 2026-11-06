@@ -187,7 +187,10 @@ Deno.test("PL refuses questions outside selected work and protects literal templ
     }
     assert(rejected, "unassigned question exported");
     const literal = p();
-    literal.questions[0].condition[0].c[0].c = "Literal {{closed_answer}}";
+    literal.questions[0].condition[0] = {
+      t: "Para",
+      c: [{ t: "Str", c: "Literal {{closed_answer}}" }],
+    };
     await exportPrairieLearn(literal, context, binding, root + "/literal");
     const html = await Deno.readTextFile(
       root + "/literal/questions/demo/exr-clamp/question.html",
