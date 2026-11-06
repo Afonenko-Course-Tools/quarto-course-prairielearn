@@ -766,6 +766,92 @@ async function inventoryCourseFixture(
   }
 }
 
+for (
+  const [kind, defense] of [
+    ["lab", false],
+    ["lab", true],
+    ["seminar", false],
+    ["test", false],
+    ["practical", false],
+  ] as const
+) {
+  Deno.test(
+    "closed assessment policy: " + kind +
+      (defense ? " label override" : " ordinary"),
+    async () => {
+      await inventoryCourseFixture(async (input, root) => {
+        const work = input.content.assessments[0];
+        work.kind = kind;
+        if (defense) {
+          work.relatedExercise = "exr-a";
+          work.extensions.prairielearn.assignment = {
+            "student-label": "defense",
+          };
+        }
+        input.config.delivery.instances.pilot.works = [work.id];
+        const body = input.body;
+        input.body = async (id) => {
+          const pkg = await body(id);
+          pkg.works[0].kind = kind;
+          if (kind === "test" || kind === "practical") {
+            pkg.questions[0].statementVisibility = "restricted";
+          }
+          return pkg;
+        };
+        await exportCourse(input);
+        const info = JSON.parse(
+          await Deno.readTextFile(
+            root + "/out/courseInstances/pilot/assessments/" + work.id +
+              "/infoAssessment.json",
+          ),
+        );
+        const afterComplete = {
+          questions: { hidden: false },
+          score: { hidden: false },
+        };
+        const expectedRules = defense
+          ? [{
+            beforeRelease: { listed: false },
+            dateControl: {
+              release: { date: "9999-12-31T00:00:00" },
+              due: { date: null },
+            },
+          }, {
+            uuid: await identity(
+              "access/pilot/" + work.id,
+              await identity("course/demo"),
+            ),
+            labels: ["defense"],
+            dateControl: {
+              release: { date: "1970-01-01T00:00:00" },
+              due: { date: null },
+            },
+          }]
+          : [{
+            dateControl: {
+              release: { date: "1970-01-01T00:00:00" },
+              due: { date: null },
+            },
+          }];
+        assert(
+          JSON.stringify(info.accessControl) ===
+            JSON.stringify(
+              expectedRules.map((rule) =>
+                kind === "lab" ? { ...rule, afterComplete } : rule
+              ),
+            ),
+          "Native access rules, dates, labels или видимость закрытой лабораторной изменены неверно",
+        );
+        assert(
+          info.type ===
+            (kind === "test" || kind === "practical" ? "Exam" : "Homework"),
+          "Вид assessment изменён политикой просмотра",
+        );
+      });
+    },
+  );
+}
+
 Deno.test("inventory: уникальный вопрос не перечитывается ради списка имён", async () => {
   await inventoryCourseFixture(async (input) => {
     input.config.delivery.instances.pilot.works = ["sec-first"];

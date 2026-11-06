@@ -719,7 +719,7 @@ export async function exportCourse(
           ...grading.assessment,
           text: overview.html +
             `<p>Выполните не менее ${completion.atLeast} обязательных позиций полностью. Частичный результат и необязательные позиции не заменяют обязательные.</p>`,
-          accessControl: work.relatedExercise
+          accessControl: (work.relatedExercise
             ? [{
               beforeRelease: { listed: false },
               dateControl: {
@@ -746,7 +746,17 @@ export async function exportCourse(
                 release: { date: "1970-01-01T00:00:00" },
                 due: { date: null },
               },
-            }],
+            }]).map((rule) =>
+              work.kind === "lab"
+                ? {
+                  ...rule,
+                  afterComplete: {
+                    questions: { hidden: false },
+                    score: { hidden: false },
+                  },
+                }
+                : rule
+            ),
           zones: nativeSlotZones(input.courseId, work, grading),
         },
       );
