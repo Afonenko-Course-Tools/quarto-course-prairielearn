@@ -702,7 +702,6 @@ export async function exportCourse(
         await write(base + "/info.json", info);
       }
       const policy = work.extensions.prairielearn;
-      const completion = completionPolicy(input.courseId, work);
       const grading = gradingPolicy(work);
       const assessmentType = ["test", "practical"].includes(work.kind)
         ? "Exam"
@@ -717,8 +716,7 @@ export async function exportCourse(
           set: assessmentType,
           number: String(index + 1),
           ...grading.assessment,
-          text: overview.html +
-            `<p>Выполните не менее ${completion.atLeast} обязательных позиций полностью. Частичный результат и необязательные позиции не заменяют обязательные.</p>`,
+          text: overview.html,
           accessControl: (work.relatedExercise
             ? [{
               beforeRelease: { listed: false },
