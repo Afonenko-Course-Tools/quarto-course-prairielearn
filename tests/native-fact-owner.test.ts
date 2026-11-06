@@ -9,7 +9,6 @@ import {
 import type { NativeCheckProject } from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
 import type {
   NativeAssignmentProvenance,
-  NativeOperationIdentity,
   NativeProjectFact,
 } from "course-core/public.ts";
 const policy = {
@@ -68,30 +67,12 @@ Deno.test("Selector/raw-plane mismatch and unknown fields refuse before projecti
   ) assert.throws(() => Reflect.apply(normalize, undefined, [f, p]));
 });
 Deno.test("typed project rows сохраняют hidden/non-PL normalization и safe project paths", async () => {
-  const identity: NativeOperationIdentity = {
-    operation: crypto.randomUUID(),
-    profiles: [],
-    projection: "author",
-    runtime: "quarto-1.11.5",
-  };
   const value: NativeAssignmentProvenance = {
-    schema: "course-native-assignment-provenance-v1",
-    identity,
-    ownerInputs: ["hidden.qmd"],
-    capturedInputs: ["hidden.qmd"],
-    projects: [{
-      source: "hidden.qmd",
-      id: "exr-hidden",
-      project: "/projects/p",
-      format: "revealjs",
-      target: "manual",
-    }],
     documents: [{
       source: "hidden.qmd",
       format: "revealjs",
       projects: [fact],
       projectChecks: policy,
-      projectMaterializations: {},
     }],
   };
   const rows = Provenance.nativeProjectRows(value);

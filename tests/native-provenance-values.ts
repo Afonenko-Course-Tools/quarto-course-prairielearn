@@ -1,17 +1,9 @@
 // Только public DTO/value controls: не operation/lease/A1/profile positive.
 import type {
   NativeAssignmentProvenance,
-  NativeOperationIdentity,
   NativeProjectFact,
 } from "course-core/public.ts";
 import { nativeProjectRows } from "../_extensions/course-prairielearn/application/native-provenance.ts";
-const identity: NativeOperationIdentity = {
-  operation: "22222222-2222-4222-8222-222222222222",
-  profiles: ["full"],
-  projection: "author",
-  runtime: "quarto-1.11.5",
-};
-const inputs = ["work.qmd", "hidden.qmd"];
 const fact = (
   source: string,
   id: string,
@@ -35,31 +27,14 @@ const fact = (
 const a = fact("work.qmd", "exr-visible", true),
   b = fact("hidden.qmd", "exr-hidden", false);
 const value: NativeAssignmentProvenance = {
-  schema: "course-native-assignment-provenance-v1",
-  identity,
-  ownerInputs: inputs,
-  capturedInputs: inputs,
-  projects: [{
-    source: a.source,
-    id: a.exerciseId,
-    project: "/" + a.projectRoot,
-    format: "html",
-  }, {
-    source: b.source,
-    id: b.exerciseId,
-    project: "/" + b.projectRoot,
-    format: "revealjs",
-  }],
   documents: [{
     source: a.source,
     format: "html",
     projects: [a],
-    projectMaterializations: {},
   }, {
     source: b.source,
     format: "revealjs",
     projects: [b],
-    projectMaterializations: {},
   }],
 };
 const rows = nativeProjectRows(value);
