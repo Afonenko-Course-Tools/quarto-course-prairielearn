@@ -1,12 +1,12 @@
+import type { AnswerSpec } from "course-core/public.ts";
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 // Ограниченный lifecycle harness; scope callbacks здесь НЕ genuine Core operation/prior P.
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 import { exportCourse } from "../_extensions/course-prairielearn/application/export-course.ts";
 import {
-  bindNativePublication,
   withNativeStagedOutput,
 } from "../_extensions/course-prairielearn/application/native-course.ts";
 import { publishNativePrepared } from "../_extensions/course-prairielearn/application/native-entry.ts";
-import { checkedJSON } from "../_extensions/course-prairielearn/application/native-materialize.ts";
 import { captureNativeAuxiliary } from "../_extensions/course-prairielearn/application/native-auxiliary.ts";
 function assert(v: unknown, m: string): asserts v {
   if (!v) throw Error(m);
@@ -25,19 +25,30 @@ async function fixture(course: boolean) {
     out = root + "/out",
     privateOut = root + "/checks.json",
     events: string[] = [];
-  const answer = { type: "manual", submission: "text" },
-    id = "exr-answer",
+  const answer: Extract<AnswerSpec, { type: "manual" }> = {
+    type: "manual",
+    submission: "text",
+  };
+  const id = "exr-answer",
     key = "fixture/" + id;
+  const kind: PublicBodyPackage["works"][number]["kind"] = "lab";
+  const selection:
+    PublicBodyPackage["works"][number]["slots"][number]["selection"] = "fixed";
+  const assignment:
+    PublicBodyPackage["works"][number]["slots"][number]["assignment"] = {
+      requirement: "required",
+      workMode: "individual",
+    };
   const work = {
     id: "sec-work",
     source: "work.qmd",
-    kind: "lab",
+    kind,
     title: "Работа",
     slots: [{
       id,
-      selection: "fixed",
+      selection,
       candidates: [id],
-      assignment: { requirement: "required", workMode: "individual" },
+      assignment,
     }],
     extensions: {
       prairielearn: {
@@ -49,7 +60,7 @@ async function fixture(course: boolean) {
       },
     },
   };
-  const pkg = {
+  const pkg: PublicBodyPackage = {
     schema: "course-body-package-v2",
     owner: "fixture",
     release: "native",
@@ -105,12 +116,6 @@ async function fixture(course: boolean) {
     },
     "question-defaults": { topic: "Java", submission: { mode: "upload" } },
   };
-  const dependencies: { path: string; assert: () => Promise<void> }[] = [];
-  for (const name of ["binding", "catalog", "registry"]) {
-    const path = root + "/" + name + ".json";
-    await Deno.writeTextFile(path, '{"fixture":"initial"}');
-    dependencies.push({ path, ...await checkedJSON(path) });
-  }
   let live = true;
   const auxiliary = captureNativeAuxiliary(async () => {
     assert(live, "OPERATION_EXPIRED");
@@ -131,13 +136,13 @@ async function fixture(course: boolean) {
           projects: [],
         },
         checks: {
-          schemaVersion: 1,
+          schemaVersion: 3,
           courseId: "fixture",
           bookRoot: "tasks",
-          sourceSnapshotHash: "a".repeat(64),
-          inventoryHash: "b".repeat(64),
           projects: [],
         },
+        nativeInputs: {},
+        studentArtifact: async () => ({ files: [], archive: new Uint8Array() }),
         registry: { schemaVersion: 1, profiles: {} },
         config,
         instance: "test",
@@ -174,7 +179,7 @@ async function fixture(course: boolean) {
     assert(value, "prepared handle missing");
     events.push("builder");
     const actualPublish = value.publish, actualDiscard = value.discard;
-    return bindNativePublication({
+    return {
       ...value,
       publish: async () => {
         events.push("publish");
@@ -184,11 +189,7 @@ async function fixture(course: boolean) {
         events.push("discard");
         await actualDiscard();
       },
-    }, async () => {
-      assert(!live, "publish before Core closing");
-      events.push("bindings");
-      for (const d of dependencies) await d.assert();
-    });
+    };
   };
   const scope = async (use: (v: any) => Promise<any>) => {
     const result = await use({ harness: "not-authority" });
@@ -211,7 +212,6 @@ async function fixture(course: boolean) {
     out,
     privateOut,
     events,
-    dependencies,
     build,
     scope,
     close: () => {
@@ -240,7 +240,6 @@ for (const course of [false, true]) {
               "builder",
               "A1-close",
               "Core-close",
-              "bindings",
               "publish",
             ]),
           "Неверный порядок " + tail,
@@ -274,30 +273,6 @@ for (const course of [false, true]) {
         );
       } finally {
         await Deno.remove(f.root, { recursive: true });
-      }
-    },
-  );
-  Deno.test(
-    label +
-      ": post-callback binding/catalog/registry drift отказывает и удаляет stages",
-    async () => {
-      for (let index = 0; index < 3; index++) {
-        const f = await fixture(course);
-        try {
-          await reject(() =>
-            publishNativePrepared(async (use) => {
-              const value = await f.scope(use);
-              await Deno.writeTextFile(
-                f.dependencies[index].path,
-                '{"fixture":"DRIFT"}',
-              );
-              return value;
-            }, f.build), "PL.INPUT_CHANGED");
-          await f.clean();
-          assert(!f.events.includes("publish"), "Rename после drift");
-        } finally {
-          await Deno.remove(f.root, { recursive: true });
-        }
       }
     },
   );

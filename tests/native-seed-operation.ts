@@ -1,3 +1,4 @@
+import type * as CorePublic from "course-core/public.ts";
 // Настоящий ordinary Core/A1 → два seed artifacts одной операции. Не assignment/P.
 import { strict as assert } from "node:assert";
 import { dirname, join, resolve } from "node:path";
@@ -106,11 +107,16 @@ project-materialization:
   );
   await quarto(["add", source, "--no-prompt"]);
   await quarto(["add", repo, "--no-prompt"]);
-  const Core = await import(pathToFileURL(join(core, "public.ts")).href),
-    PL = await import(pathToFileURL(join(pl, "public.ts")).href);
-  const Entry = await import(
-    pathToFileURL(join(pl, "application/native-adapter.ts")).href
-  );
+  const Core: typeof CorePublic = await import(
+      pathToFileURL(join(core, "public.ts")).href
+    ),
+    PL: typeof import("../_extensions/course-prairielearn/public.ts") =
+      await import(pathToFileURL(join(pl, "public.ts")).href);
+  const Entry:
+    typeof import("../_extensions/course-prairielearn/application/native-adapter.ts") =
+      await import(
+        pathToFileURL(join(pl, "application/native-adapter.ts")).href
+      );
   const zip = Deno.args[1]
     ? (await import(
       pathToFileURL(
@@ -124,7 +130,7 @@ project-materialization:
   await Core.withNativeCaptureScope(
     { root, projection: "student", outputDirectory: root + "/_site" },
     { expectedSources: ["index.qmd"] },
-    async (scope: any) =>
+    async (scope) =>
       scope.captureInputs(
         ["index.qmd"],
         (token: string) =>
@@ -137,11 +143,11 @@ project-materialization:
   const candidate = await Entry.readNativeAdapterExpectation(Core, root);
   await Core.withCurrentNativeOperation(
     candidate.expectation,
-    async (op: any) => {
+    async (op) => {
       let validations = 0, currents = 0, zips = 0;
       const observed = {
         ...op,
-        validateRelease: (...args: any[]) => {
+        validateRelease: (...args: Parameters<typeof op.validateRelease>) => {
           validations++;
           return op.validateRelease(...args);
         },
@@ -159,15 +165,15 @@ project-materialization:
       await adapter.validateCourse(observed, request);
       const artifacts: any[] = [];
       let batchFinal: any;
-      await op.withProjectContexts([{
+      await op.withProjectContracts([{
         owner: root,
         profiles: op.identity.profiles,
         format: "html",
-        inputs: [
-          "projects/github-ssh/native-input.qmd",
-          "projects/restore-selected-state/native-input.qmd",
+        directories: [
+          "projects/github-ssh",
+          "projects/restore-selected-state",
         ],
-      }], async (batch: any) => {
+      }], async (batch) => {
         batchFinal = batch;
         for (
           const [i, id, target, expected] of [[
@@ -237,29 +243,6 @@ project-materialization:
         2,
       ));
     },
-  );
-  await assert.rejects(() =>
-    Core.withCurrentNativeOperation(candidate.expectation, async (op: any) => {
-      const adapter = PL.createNativeAdapter({
-        root,
-        core: Core,
-        preparedIdentity: candidate.identity,
-      });
-      const request = { expectedSources: ["index.qmd"] };
-      await adapter.validateCourse(op, request);
-      const file = join(root, "projects/github-ssh/seed_recipe.py"),
-        bytes = await Deno.readFile(file);
-      await Deno.writeTextFile(file, "CHANGED");
-      try {
-        await assert.rejects(() => adapter.validateCourse(op, request));
-        assert.throws(() => adapter.business("index.qmd"));
-      } finally {
-        await Deno.writeFile(file, bytes);
-      }
-    })
-  );
-  console.log(
-    "PASS changed source clears operation proof; outer Core currentness also refuses restored identity drift",
   );
 } finally {
   if (Deno.env.get("C35_KEEP_FIXTURE")) console.log("RETAINED", root);

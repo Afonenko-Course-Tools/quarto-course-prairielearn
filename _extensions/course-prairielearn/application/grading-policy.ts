@@ -1,6 +1,9 @@
 import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
 import { closed } from "./declarations.ts";
+// Форма UUID совпадает с закреплённой native infoAssessment schema.
+export const assessmentUuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const scalar = (v: any) =>
   typeof v === "number" && Number.isFinite(v) && v >= 0;
 const attempts = (v: any) => Number.isSafeInteger(v) && v >= 1;
@@ -22,6 +25,7 @@ export function gradingPolicy(work: any) {
   };
   closed(policy, ["attempts", "pass"], [
     "assignment",
+    "uuid",
     "question-points",
     "question-max-points",
     "slot-overrides",
@@ -32,6 +36,14 @@ export function gradingPolicy(work: any) {
     "auto-points",
     "manual-points",
   ]);
+  if (
+    Object.hasOwn(policy, "uuid") &&
+    (typeof policy.uuid !== "string" || !assessmentUuidPattern.test(policy.uuid))
+  ) {
+    throw Error(
+      `PL.ASSESSMENT_INVALID: ${source} uuid: ожидается native UUID контрольной работы`,
+    );
+  }
   if (!attempts(policy.attempts)) {
     fail("attempts", "expected positive integer (native triesPerVariant)");
   }
@@ -74,7 +86,8 @@ export function gradingPolicy(work: any) {
     if(components){
       if(Object.hasOwn(effective,'question-points')||effective['question-max-points']!=null)fail(`points (${id})`,'Не смешивайте question-points/ceiling с auto-points/manual-points');
       const auto=effective['auto-points']??0,manual=effective['manual-points'];
-      if(!scalar(auto)||!scalar(manual)||manual<=0)fail(`manual-points (${id})`,'Нужны неотрицательные auto-points и положительные manual-points');
+      const unweighted = slot.assignment.requirement === 'optional' && auto === 0 && manual === 0;
+      if(!scalar(auto)||!scalar(manual)||manual<=0&&!unweighted)fail(`manual-points (${id})`,'Нужны неотрицательные auto-points и положительные manual-points; нулевые компоненты допустимы только для добровольной практики');
       if(!attempts(effective.attempts))fail(`attempts (${id})`,'Требуется положительное число попыток');
       const advance=effective['advance-score-perc'];
       if(advance!==undefined&&(!scalar(advance)||advance>100))fail(`advance-score-perc (${id})`,'Требуется число от 0 до 100');
@@ -162,9 +175,10 @@ export function validateGradingComponents(work:any,methods:Record<string,'extern
  const policy=gradingPolicy(work);
  for(const slot of work.slots)for(const id of slot.candidates){
   const method=methods[id],points=policy.slots[slot.id];
-  const valid=method==='manual'?points.autoPoints===0&&points.manualPoints>0:
+  const unweighted = slot.assignment.requirement === 'optional' && points.autoPoints === 0 && points.manualPoints === 0;
+  const valid=unweighted && ['external','manual','mixed'].includes(method) || (method==='manual'?points.autoPoints===0&&points.manualPoints>0:
     method==='mixed'?points.autoPoints>0&&points.manualPoints>0:
-    method==='external'?points.manualPoints===undefined:false;
+    method==='external'?points.manualPoints===undefined:false);
   if(!valid)throw Error('PL.GRADING_INVALID: '+id+' — native компоненты оценки не соответствуют grading.method');
  }
  return policy;

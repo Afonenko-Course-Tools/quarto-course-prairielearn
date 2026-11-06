@@ -8,7 +8,12 @@ const assert = (v: unknown, m: string) => {
 };
 const work = {
   id: "sec-lab",
-  slots: ['exr-a','exr-b','exr-c'].map(id=>({id,selection:'fixed',candidates:[id],assignment:{requirement:'required',workMode:'individual'}})),
+  slots: ["exr-a", "exr-b", "exr-c"].map((id) => ({
+    id,
+    selection: "fixed",
+    candidates: [id],
+    assignment: { requirement: "required", workMode: "individual" },
+  })),
   extensions: { prairielearn: { pass: { "at-least": 2 } } },
 };
 function results(scores: number[]) {
@@ -17,7 +22,7 @@ function results(scores: number[]) {
     source: "per-slot-results-v2",
     slots: scores.map((score, i) => ({
       slotId: "demo/sec-lab/" + work.slots[i].id,
-      qualifiedId: "demo/"+work.slots[i].id,
+      qualifiedId: "demo/" + work.slots[i].id,
       score,
       status: "complete",
     })),
@@ -92,63 +97,4 @@ Deno.test("partial discovery defaults are identical for each single key and empt
       JSON.stringify({ "min-executed": 1, "allow-skipped": false }),
     "empty",
   );
-});
-import { verificationInventoryHash } from "../_extensions/course-prairielearn/application/verification-inventory.ts";
-import {
-  canonical,
-  hash,
-} from "../_extensions/course-prairielearn/application/source-selection.ts";
-Deno.test("verification inventory seals every declared scenario without private payload", async () => {
-  const root = await Deno.makeTempDir();
-  try {
-    await Deno.mkdir(root + "/project/tests", { recursive: true });
-    const doc = JSON.stringify({
-      schemaVersion: 1,
-      cases: [{ id: "overflow" }],
-    });
-    await Deno.writeTextFile(root + "/project/tests/cases.json", doc);
-    const checks = {
-      courseId: "demo",
-      projects: [{
-        exerciseId: "exr-a",
-        projectRoot: "project",
-        references: [{ name: "default", optional: false }, {
-          name: "extra",
-          optional: true,
-        }],
-        contractCasesHash: {
-          projectRelativePath: "tests/cases.json",
-          sha256: await hash(doc),
-        },
-      }],
-    };
-    const expected = [{
-      qualifiedId: "demo/exr-a",
-      scenario: "contract:overflow",
-      optional: false,
-    }, {
-      qualifiedId: "demo/exr-a",
-      scenario: "reference:default",
-      optional: false,
-    }, {
-      qualifiedId: "demo/exr-a",
-      scenario: "reference:extra",
-      optional: true,
-    }, { qualifiedId: "demo/exr-a", scenario: "starter", optional: false }];
-    assert(
-      await verificationInventoryHash(checks, root, ["demo/exr-a"]) ===
-        await hash(canonical(expected)),
-      "scenario hash differs",
-    );
-    checks.projects[0].references.push({ name: "default", optional: false });
-    let rejected = false;
-    try {
-      await verificationInventoryHash(checks, root, ["demo/exr-a"]);
-    } catch {
-      rejected = true;
-    }
-    assert(rejected, "duplicate scenario accepted");
-  } finally {
-    await Deno.remove(root, { recursive: true });
-  }
 });

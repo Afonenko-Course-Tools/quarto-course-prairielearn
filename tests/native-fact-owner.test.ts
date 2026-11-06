@@ -2,7 +2,15 @@
 import { strict as assert } from "node:assert";
 import * as Provenance from "../_extensions/course-prairielearn/application/native-provenance.ts";
 import { decodeNativeCheck } from "../_extensions/course-prairielearn/application/native-checks.ts";
-import { checksCanonical } from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
+import {
+  assertNativeChecksCoverage,
+  withNativeProjectPlans,
+} from "../_extensions/course-prairielearn/application/native-course.ts";
+import type { NativeCheckProject } from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
+import type {
+  NativeAssignmentProvenance,
+  NativeProjectFact,
+} from "course-core/public.ts";
 const policy = {
   defaults: {
     runtime: "java25-junit-v1",
@@ -18,7 +26,7 @@ const policy = {
   },
   profiles: { native: { "source-profile": "main" } },
 };
-const fact = {
+const fact: NativeProjectFact = {
   exerciseId: "exr-hidden",
   source: "hidden.qmd",
   projectRoot: "projects/p",
@@ -27,29 +35,26 @@ const fact = {
   artifactPolicy: { full: "full", conditions: false },
   projectCheck: "native",
 };
-const normalize = (f: any, p: any) =>
-  (Provenance as any).normalizeNativeProjectFact(f, p);
+const normalize = Provenance.normalizeNativeProjectFact;
 Deno.test("C alone resolves complete hidden/non-PL generic fact with existing typed check canon", () => {
   assert.equal(
-    typeof (Provenance as any).normalizeNativeProjectFact,
+    typeof Provenance.normalizeNativeProjectFact,
     "function",
   );
-  const old = { ...fact, check: decodeNativeCheck(policy, "native") };
-  delete (old as any).projectCheck;
+  const { projectCheck: _selector, ...generic } = fact;
+  const expected = { ...generic, check: decodeNativeCheck(policy, "native") };
   const result = normalize(fact, policy);
-  assert.deepEqual(result, old);
-  assert.equal(checksCanonical(result), checksCanonical(old));
+  assert.deepEqual(result, expected);
   assert.equal(result.bankMember, false);
   assert(!("projectCheck" in result));
   assert.equal(fact.projectCheck, "native");
 });
 Deno.test("No-check generic fact is unchanged and raw config is not business authority", () => {
-  const generic = { ...fact };
-  delete (generic as any).projectCheck;
+  const { projectCheck: _selector, ...generic } = fact;
   assert.deepEqual(normalize(generic, undefined), generic);
   assert.deepEqual(normalize(generic, { unrelated: "data" }), generic);
 });
-Deno.test("Selector/plane/old-normalization mismatch and unknown fields refuse before projection", () => {
+Deno.test("Selector/raw-plane mismatch and unknown fields refuse before projection", () => {
   for (
     const [f, p] of [
       [fact, undefined],
@@ -58,54 +63,76 @@ Deno.test("Selector/plane/old-normalization mismatch and unknown fields refuse b
       [{ ...fact, projectCheck: "" }, policy],
       [{ ...fact, projectCheck: "missing" }, policy],
       [fact, { ...policy, extra: true }],
-      [{ ...fact, check: { profile: "foreign" } }, policy],
-      [{
-        ...fact,
-        projectCheck: undefined,
-        check: decodeNativeCheck(policy, "native"),
-      }, policy],
     ]
-  ) assert.throws(() => normalize(f, p));
+  ) assert.throws(() => Reflect.apply(normalize, undefined, [f, p]));
 });
-Deno.test("nativeProjectWitness applies typed owner normalization before its complete fact hash", async () => {
-  const identity = { operation: "data-only" },
-    expected = { identity, sources: ["hidden.qmd"] };
-  const value = {
-    identity,
-    ownerInputs: ["hidden.qmd"],
-    capturedInputs: ["hidden.qmd"],
-    sourceRows: [{ source: "hidden.qmd", sha256: "a".repeat(64) }],
-    projects: [{
-      source: "hidden.qmd",
-      id: "exr-hidden",
-      project: "/projects/p",
-      format: "revealjs",
-      target: "manual",
-    }],
+Deno.test("typed project rows сохраняют hidden/non-PL normalization и safe project paths", async () => {
+  const value: NativeAssignmentProvenance = {
     documents: [{
       source: "hidden.qmd",
       format: "revealjs",
       projects: [fact],
       projectChecks: policy,
-      projectMaterializations: {},
     }],
   };
-  const Core = {
-    NativeAssignmentProvenanceSchema: { parse: (v: any) => structuredClone(v) },
-  }; // inert DTO fixture, no live authority
-  const w = await Provenance.nativeProjectWitness(Core, value, expected);
+  const rows = Provenance.nativeProjectRows(value);
   assert.deepEqual(
-    w.projects[0].fact.check,
+    rows[0].fact.check,
     decodeNativeCheck(policy, "native"),
   );
-  assert.equal(w.projects[0].declaration.target, "manual");
-  const changed = structuredClone(value);
-  changed.documents[0].projectChecks.defaults.scoring = { mode: "all-pass" };
-  const w2 = await Provenance.nativeProjectWitness(Core, changed, expected);
-  assert.notEqual(w.nativeProjectWitnessHash, w2.nativeProjectWitnessHash);
-  const bad = structuredClone(value);
-  bad.documents[0].projects[0].source = "foreign.qmd";
-  await assert.rejects(() =>
-    Provenance.nativeProjectWitness(Core, bad, expected)
+  assert.equal(rows[0].format, "revealjs");
+  assert.equal(rows[0].fact.bankMember, false);
+  const checked: NativeCheckProject = {
+    ...fact,
+    qualifiedId: "course/exr-hidden",
+    check: decodeNativeCheck(policy, "native"),
+    sources: [],
+    trustedTests: [],
+    verificationTests: [],
+    references: [],
+    contractFixtures: [],
+    readiness: { ready: true, missing: [] },
+  };
+  // Чистая проверка покрытия: не утверждает наличие проверенных native bytes.
+  assertNativeChecksCoverage(rows, [checked]);
+  assert.throws(
+    () => assertNativeChecksCoverage(rows, []),
+    /PL.NATIVE_CHECKS_SCOPE_INCOMPLETE/,
   );
+  assert.throws(
+    () => assertNativeChecksCoverage(rows, [checked, checked]),
+    /PL.NATIVE_CHECKS_SCOPE_INCOMPLETE/,
+  );
+  const bad = structuredClone(value);
+  bad.documents[0].projects[0].projectRoot = "../private";
+  assert.throws(() => Provenance.nativeProjectRows(bad), /PL.PROJECT_INVALID/);
+  // Synthetic malformed callback data проверяют реальные отказы до acquisition;
+  // такой объект не считается genuine operation/A1 положительным случаем.
+  for (
+    const [groups, code] of [
+      [[], "A1 group coverage"],
+      [[{ contexts: [] }], "A1 context coverage"],
+      [[{ contexts: [{ input: "/foreign" }] }], "A1 input order"],
+    ] as const
+  ) {
+    await assert.rejects(
+      () =>
+        Reflect.apply(withNativeProjectPlans, undefined, [
+          {},
+          "/owner",
+          [],
+          rows,
+          () => {
+            throw Error("Unexpected plan callback");
+          },
+          {
+            withProjectContracts: (
+              _requests: unknown,
+              use: (batch: unknown) => unknown,
+            ) => use({ groups }),
+          },
+        ]),
+      new RegExp(code),
+    );
+  }
 });

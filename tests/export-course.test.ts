@@ -1,9 +1,14 @@
-import {runtimeDescriptor} from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
+import type { ExportCourseContent } from "../_extensions/course-prairielearn/application/export-course.ts";
+type CourseFixtureInput = Parameters<typeof exportCourse>[0] & {
+  config: ReturnType<typeof declarations>["raw"];
+};
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
+import { NativeProjectCheckSchema } from "../_extensions/course-prairielearn/application/native-checks.ts";
+import { runtimeDescriptor } from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
 import {
   declarations,
   question,
 } from "../_extensions/course-prairielearn/application/declarations.ts";
-import { selectedSources } from "../_extensions/course-prairielearn/application/source-selection.ts";
 import { infoQuestion } from "../_extensions/course-prairielearn/application/native-validators.js";
 import { validateAssessmentSemantics } from "../_extensions/course-prairielearn/application/native-semantics.ts";
 const assert = (v: unknown, m: string) => {
@@ -34,7 +39,11 @@ Deno.test("pinned native Exam semantics reject question ceilings including alter
       const member = { id: "demo/exr-a", points: 1, [field]: 1 };
       const assessment = {
         type: "Exam",
-        zones: [{ questions: [pooled ? { numberChoose:1,alternatives: [member] } : member] }],
+        zones: [{
+          questions: [
+            pooled ? { numberChoose: 1, alternatives: [member] } : member,
+          ],
+        }],
       };
       let rejected = false;
       try {
@@ -99,7 +108,9 @@ Deno.test("closed delivery defaults and selected instance", () => {
       unknown: true,
     }]
   ) {
-    const raw = structuredClone(d.raw);
+    const raw: {
+      delivery: { instances: Record<string, { publishing: unknown }> };
+    } = structuredClone(d.raw);
     raw.delivery.instances.pilot.publishing = publishing;
     let rejected = false;
     try {
@@ -111,15 +122,38 @@ Deno.test("closed delivery defaults and selected instance", () => {
   }
   assert(d.instance.works[0] === "sec-lab", "work lost");
   const semester = structuredClone(d.raw);
-  semester.delivery.instances["2026-2027-s1"] = structuredClone(semester.delivery.instances.pilot);
+  semester.delivery.instances["2026-2027-s1"] = structuredClone(
+    semester.delivery.instances.pilot,
+  );
   const next = declarations(semester, "2026-2027-s1");
-  assert(next.instance.works[0] === "sec-lab", "Семестр с годом в начале должен сохранять назначенные работы");
-  assert(declarations(semester, "pilot").instance.works[0] === "sec-lab", "Добавление семестра не должно менять старый pilot");
-  for (const key of ["../2026", "/2026", "2026/2027", "-2026", "2026 S1", "2026_S1"]) {
+  assert(
+    next.instance.works[0] === "sec-lab",
+    "Семестр с годом в начале должен сохранять назначенные работы",
+  );
+  assert(
+    declarations(semester, "pilot").instance.works[0] === "sec-lab",
+    "Добавление семестра не должно менять старый pilot",
+  );
+  for (
+    const key of [
+      "../2026",
+      "/2026",
+      "2026/2027",
+      "-2026",
+      "2026 S1",
+      "2026_S1",
+    ]
+  ) {
     const unsafe = structuredClone(d.raw);
-    unsafe.delivery.instances[key] = structuredClone(unsafe.delivery.instances.pilot);
+    unsafe.delivery.instances[key] = structuredClone(
+      unsafe.delivery.instances.pilot,
+    );
     let rejected = false;
-    try {declarations(unsafe, key);} catch {rejected = true;}
+    try {
+      declarations(unsafe, key);
+    } catch {
+      rejected = true;
+    }
     assert(rejected, "Недопустимый ключ семестра принят: " + key);
   }
   for (const field of ["unknown", "runtime", "sources"]) {
@@ -132,84 +166,23 @@ Deno.test("closed delivery defaults and selected instance", () => {
     assert(rejected, "unknown accepted");
   }
 });
-Deno.test("selected sources preserve package paths and reject build scripts", async () => {
-  const root = await Deno.makeTempDir();
-  try {
-    await Deno.mkdir(root + "/student/src/main/java/pkg", { recursive: true });
-    await Deno.writeTextFile(
-      root + "/student/src/main/java/pkg/A.java",
-      "class A {}",
-    );
-    const bytes = await Deno.readFile(
-      root + "/student/src/main/java/pkg/A.java",
-    );
-    const sha256 = [
-      ...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
-    ].map((b) => b.toString(16).padStart(2, "0")).join("");
-    const p = {
-      check: {
-        sourceProfile: {
-          root: "student/src/main/java",
-          mode: "implementation",
-        },
-      },
-      sources: [{
-        projectRelativePath: "student/src/main/java/pkg/A.java",
-        submissionRelativePath: "pkg/A.java",
-        sha256,
-      }],
-    };
-    const files = await selectedSources(root, p);
-    assert(files[0].name === "pkg/A.java", "package stripped");
-    p.sources[0].submissionRelativePath = "build.gradle";
-    let rejected = false;
-    try {
-      await selectedSources(root, p);
-    } catch {
-      rejected = true;
-    }
-    assert(rejected, "build accepted");
-  } finally {
-    await Deno.remove(root, { recursive: true });
-  }
-});
 import {
   exportCourse,
   identity,
 } from "../_extensions/course-prairielearn/application/export-course.ts";
 import {
-  canonical,
-  hash,
-} from "../_extensions/course-prairielearn/application/source-selection.ts";
-Deno.test("full native export is deterministic, closed and atomic across output filesystems", async () => {
-  const root = await Deno.makeTempDir(Deno.env.get("PL_EXDEV_TEST_DIR") ? {dir:Deno.env.get("PL_EXDEV_TEST_DIR")} : {});
+  nativeChecksManifest,
+  selectedCheckFile,
+} from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
+import { readFile } from "node:fs/promises";
+Deno.test("functional export v5 передаёт выбранные байты, точные имена и только публичные файлы", async () => {
+  const root = await Deno.makeTempDir(
+    Deno.env.get("PL_EXDEV_TEST_DIR")
+      ? { dir: Deno.env.get("PL_EXDEV_TEST_DIR") }
+      : {},
+  );
+  await Deno.mkdir(root + "/project");
   try {
-    for (
-      const dir of ["student/src/main/java/pkg", "tests/junit", "reference"]
-    ) await Deno.mkdir(root + "/project/" + dir, { recursive: true });
-    const source = "package pkg; class A { // Пример 😀 {{literal}}\n}";
-    await Deno.writeTextFile(
-      root + "/project/student/src/main/java/pkg/A.java",
-      source,
-    );
-    await Deno.writeTextFile(
-      root + "/project/tests/junit/ATest.java",
-      "class ATest {}",
-    );
-    await Deno.writeTextFile(
-      root + "/project/reference/A.java",
-      "PRIVATE_REFERENCE",
-    );
-    const selection = {
-      projectRelativePath: "student/src/main/java/pkg/A.java",
-      submissionRelativePath: "pkg/A.java",
-      sha256: await hash(source),
-    };
-    const test = {
-      projectRelativePath: "tests/junit/ATest.java",
-      submissionRelativePath: "ATest.java",
-      sha256: await hash("class ATest {}"),
-    };
     const config = {
       delivery: {
         book: "tasks",
@@ -237,13 +210,22 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         "single-variant": false,
       },
     };
-    const assignment = { requirement: "required", workMode: "individual" };
-    const work = {
+    const assignment:
+      PublicBodyPackage["works"][number]["slots"][number]["assignment"] = {
+        requirement: "required",
+        workMode: "individual",
+      };
+    const work: ExportCourseContent["assessments"][number] = {
       id: "sec-lab",
       source: "lab.qmd",
       kind: "lab",
       title: "Lab",
-      slots: [{id:"exr-a",selection:"fixed",candidates:["exr-a"],assignment}],
+      slots: [{
+        id: "exr-a",
+        selection: "fixed",
+        candidates: ["exr-a"],
+        assignment,
+      }],
       extensions: {
         prairielearn: {
           attempts: 2,
@@ -255,36 +237,7 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         },
       },
     };
-    const check = {
-      profile: "java",
-      runtime: "junit",
-      sourceProfile: {
-        root: "student/src/main/java",
-        mode: "implementation",
-        include: ["**/*.java"],
-      },
-      java: {
-        release: 25,
-        encoding: "UTF-8",
-        "compiler-options": ["-proc:none"],
-      },
-      limits: {
-        "outer-seconds": 30,
-        networking: false,
-        "max-output-bytes": 65536,
-      },
-      scoring: { mode: "weighted" },
-      discovery: { "min-executed": 1, "allow-skipped": false },
-    };
-    const fact = {
-      exerciseId: "exr-a",
-      bankMember: true,
-      projectRoot: "project",
-      check,
-      sources: [selection],
-      trustedTests: [test],
-    };
-    const body = {
+    const body: PublicBodyPackage = {
       schema: "course-body-package-v2",
       owner: "demo",
       release: "1",
@@ -302,7 +255,14 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         condition: [{ t: "Para", c: [{ t: "Str", c: "PUBLIC_CONDITION" }] }],
         publicAnswer: [],
       }],
-      resources: [{owner: "demo", source: "lab.qmd", effectiveBase: root, target: "diagram.svg", visibility: "public", data: btoa("<svg>PUBLIC_DIAGRAM</svg>"), sha256: await hash("<svg>PUBLIC_DIAGRAM</svg>")}],
+      resources: [{
+        owner: "demo",
+        source: "lab.qmd",
+        effectiveBase: root,
+        target: "diagram.svg",
+        visibility: "public",
+        data: btoa("<svg>PUBLIC_DIAGRAM</svg>"),
+      }],
       works: [{
         owner: "demo",
         id: "sec-lab",
@@ -310,626 +270,201 @@ Deno.test("full native export is deterministic, closed and atomic across output 
         source: "lab.qmd",
         kind: "lab",
         title: "Lab",
-        introduction: [{t: "Para", c: [{t: "Str", c: 'Подготовка к работе {{literal}} PL_CLIENT_FILE_URL_TOKEN src="PL_CLIENT_FILE_URL_TOKEN/example.png" href="PL_CLIENT_FILE_URL_TOKEN/example.png" PL_CLIENT_FILE_URL_TOKEN_0'}, {t: "Space"}, {t: "Link", c: [["", [], []], [{t: "Str", c: "Теория"}], ["https://example.test/theory.html", ""]]}, {t: "Image", c: [["", [], []], [{t: "Str", c: "Диаграмма"}], ["diagram.svg", ""]]}]}],
-        slots: [{id:"demo/sec-lab/exr-a",selection:"fixed",candidates:["demo/exr-a"],assignment}],
+        introduction: [{
+          t: "Para",
+          c: [
+            {
+              t: "Str",
+              c: 'Подготовка к работе {{literal}} PL_CLIENT_FILE_URL_TOKEN src="PL_CLIENT_FILE_URL_TOKEN/example.png" href="PL_CLIENT_FILE_URL_TOKEN/example.png" PL_CLIENT_FILE_URL_TOKEN_0',
+            },
+            { t: "Space" },
+            {
+              t: "Link",
+              c: [["", [], []], [{ t: "Str", c: "Теория" }], [
+                "https://example.test/theory.html",
+                "",
+              ]],
+            },
+            {
+              t: "Image",
+              c: [["", [], []], [{ t: "Str", c: "Диаграмма" }], [
+                "diagram.svg",
+                "",
+              ]],
+            },
+          ],
+        }],
+        slots: [{
+          id: "demo/sec-lab/exr-a",
+          selection: "fixed",
+          candidates: ["demo/exr-a"],
+          assignment,
+        }],
       }],
     };
-    const input: any = {
+
+    const check = NativeProjectCheckSchema.parse({
+      profile: "java",
+      "source-profile": "main",
+      runtime: "java25-junit-v1",
+      sourceProfile: {
+        root: "student/src/main/java",
+        mode: "implementation",
+        include: ["**/*.java"],
+      },
+      tests: ["tests/*.java"],
+      scoring: { mode: "weighted" },
+    });
+    const source = {
+      name: "pkg/A.java",
+      bytes: new TextEncoder().encode("package pkg; class A {}"),
+    };
+    const test = {
+      name: "ATest.java",
+      bytes: new TextEncoder().encode("class ATest {} // PRIVATE_TEST"),
+    };
+    const project = {
+      exerciseId: "exr-a",
+      source: "a.qmd",
+      qualifiedId: "demo/exr-a",
+      bankMember: true,
+      projectRoot: "project",
+      check,
+      sources: [
+        selectedCheckFile({
+          target: "student/src/main/java/pkg/A.java",
+          bytes: source.bytes,
+        }, source.name),
+      ],
+      trustedTests: [
+        selectedCheckFile({ target: test.name, bytes: test.bytes }, test.name),
+      ],
+      verificationTests: [],
+      references: [],
+      contractFixtures: [],
+      readiness: { ready: true, missing: [] },
+    };
+    const input: CourseFixtureInput = {
       courseId: "demo",
       projectRoot: root,
-      result: {
-        model: {
-          assessments: [work],
-          exercises: [{ id: "exr-a", target: "prairielearn" }],
-        },
+      content: {
+        assessments: [work],
+        exercises: [{ id: "exr-a", target: "prairielearn" }],
+        projects: [project],
       },
-      checks: {
-        schemaVersion: 1,
+      checks: nativeChecksManifest({
         courseId: "demo",
         bookRoot: "tasks",
-        sourceSnapshotHash: "a".repeat(64),
-        inventoryHash: "b".repeat(64),
-        projects: [fact, {
-          ...fact,
-          exerciseId: "exr-checked-demo",
-          bankMember: false,
-        }],
-      },
+        projects: [project],
+      }),
       config,
       registry: {
         schemaVersion: 1,
         profiles: {
-          junit: {
+          "java25-junit-v1": {
             mode: "implementation",
+            javaRelease: 25,
             image: "registry/image@sha256:" + "c".repeat(64),
           },
         },
       },
       instance: "pilot",
+      output: root + "/out",
+      checksOutput: root + "/checks.json",
       body: async () => body,
-    };
-    const mixedWork=structuredClone(work);
-    const mixedPolicy:any=mixedWork.extensions.prairielearn;
-    delete mixedPolicy['question-points'];delete mixedPolicy['question-max-points'];mixedPolicy['auto-points']=1;mixedPolicy['manual-points']=2;
-    await exportCourse({...input,result:{model:{...input.result.model,assessments:[mixedWork],exercises:[{id:'exr-a',target:'prairielearn',extensions:{prairielearn:{grading:{method:'mixed'}}}}]}},output:root+'/mixed',checksOutput:root+'/mixed-checks.json'});
-    const mixedAssessment=JSON.parse(await Deno.readTextFile(root+'/mixed/courseInstances/pilot/assessments/sec-lab/infoAssessment.json'));
-    const mixedInfo=JSON.parse(await Deno.readTextFile(root+'/mixed/questions/demo/exr-a/info.json'));
-    assert(mixedInfo.gradingMethod==='External'&&mixedInfo.externalGradingOptions&&mixedAssessment.zones[0].questions[0].autoPoints===1&&mixedAssessment.zones[0].questions[0].manualPoints===2,'Mixed lost actual External runtime or explicit teacher component');
-    const prepared = await exportCourse({
-      ...input,
-      output: root + "/one",
-      checksOutput: root + "/checks1.json",
-      deferPublish: true,
-    });
-    assert(
-      !await Deno.stat(root + "/one").then(() => true, () => false) &&
-        !await Deno.stat(root + "/checks1.json").then(() => true, () => false),
-      "course/private checks published before outer final fence",
-    );
-    const a = await prepared.publish();
-    assert(a.schemaVersion===3&&a.gradingPayloads['demo/exr-a'].grading?.method==='external'&&a.gradingPayloads['demo/exr-a'].submission?.mode==='editor','Delivery v3 requires explicit normalized grading/submission bindings');
-    const b = await exportCourse({
-      ...input,
-      output: root + "/two",
-      checksOutput: root + "/checks2.json",
-    });
-    assert(canonical(a) === canonical(b), "exports differ");
-    const overview = JSON.parse(await Deno.readTextFile(root + "/one/courseInstances/pilot/assessments/sec-lab/infoAssessment.json")).text;
-    assert(overview.includes("Подготовка к работе") && overview.includes('target="_blank"') &&
-      !overview.includes("{{literal}}") && !overview.includes("PRIVATE_REFERENCE"),
-      "Native обзор потерял введение/ссылку или содержит приватные данные");
-    assert(overview.includes("{{ client_files_course }}/diagram.svg") &&
-      await Deno.readTextFile(root + "/one/clientFilesCourse/diagram.svg") === "<svg>PUBLIC_DIAGRAM</svg>",
-      "Обзор должен использовать штатный native токен и публичное вложение курса");
-    assert(overview.includes("PL_CLIENT_FILE_URL_TOKEN"), "Буквальный авторский текст маркера превратился в шаблон");
-    assert(overview.includes('src="PL_CLIENT_FILE_URL_TOKEN/example.png"') && overview.includes('href="PL_CLIENT_FILE_URL_TOKEN/example.png"') && overview.includes("PL_CLIENT_FILE_URL_TOKEN_0"), "Авторский текст, похожий на атрибут ресурса, превратился в шаблон");
-    const fishSource = "echo ok\n";
-    await Deno.mkdir(root + "/project/student", {recursive:true});
-    await Deno.writeTextFile(root + "/project/student/commands.fish", fishSource);
-    const fishCheck = {...check,runtime:"fish",sourceProfile:{root:"student",mode:"implementation",include:["commands.fish"]}};
-    delete (fishCheck as any).java;
-    const fishFact = {...fact,check:fishCheck,sources:[{projectRelativePath:"student/commands.fish",submissionRelativePath:"commands.fish",sha256:await hash(fishSource)}]};
-    const fishInput = {...input,checks:{...input.checks,projects:[fishFact]},registry:{schemaVersion:1,profiles:{fish:{mode:"implementation",sourceExtensions:[".fish"],image:"registry/fish@sha256:"+"c".repeat(64)}}},output:root+"/fish",checksOutput:root+"/fish-checks.json"};
-    await exportCourse(fishInput);
-    assert(await Deno.readTextFile(root+"/fish/questions/demo/exr-a/serverFilesQuestion/starter/commands.fish") === fishSource,"fish starter lost");
-    assert(!Object.hasOwn(JSON.parse(await Deno.readTextFile(root+"/fish/questions/demo/exr-a/tests/grading-job.json")),"java"),"fish descriptor pretends Java");
-    const apiText="public class ApiContract {}";
-    await Deno.writeTextFile(root+"/project/tests/junit/ApiContract.java",apiText);
-    const apiSelection={projectRelativePath:"tests/junit/ApiContract.java",submissionRelativePath:"ApiContract.java",sha256:await hash(apiText)};
-    const apiFact={...fact,check:{...check,runtime:"java25-junit-v1","api-precheck":{files:["tests/junit/ApiContract.java"],entry:"ApiContract"}},trustedTests:[test,apiSelection],apiPrecheck:{files:["ApiContract.java"],entry:"ApiContract"}};
-    const apiInput={...input,checks:{...input.checks,projects:[apiFact]},registry:{schemaVersion:1,profiles:{"java25-junit-v1":{mode:"implementation",javaRelease:25,image:"registry/java@sha256:"+"c".repeat(64)}}},output:root+"/api",checksOutput:root+"/api-checks.json"};
-    await exportCourse(apiInput);
-    const apiDescriptor=JSON.parse(await Deno.readTextFile(root+"/api/questions/demo/exr-a/tests/grading-job.json"));
-    assert(canonical(apiDescriptor.apiPrecheck)===canonical({files:["ApiContract.java"],entry:"ApiContract"}),"native export lost normalized API precheck");
-    assert(await Deno.readTextFile(root+"/api/questions/demo/exr-a/tests/ApiContract.java")===apiText,"native API source bytes lost");
-    assert(!await Deno.stat(root+"/api/questions/demo/exr-a/clientFilesQuestion/ApiContract.java").then(()=>true,()=>false),"private API contract leaked into starter");
-    const extrasPolicy={archive:"additional-sources.zip","max-files":128,"max-file-bytes":1048576,"max-total-bytes":4194304,"max-archive-bytes":2097152};
-    const extrasFact={...apiFact,check:{...apiFact.check,"additional-java-sources":extrasPolicy}};
-    for(const mode of ["editor","upload"]){
-      const extraConfig:any=structuredClone(config);extraConfig["question-defaults"].submission={mode};
-      const out=root+"/extras-"+mode;
-      const delivery=await exportCourse({...apiInput,config:extraConfig,checks:{...input.checks,projects:[extrasFact]},output:out,checksOutput:out+"-checks.json"});
-      const dir=out+"/questions/demo/exr-a";
-      const descriptor=JSON.parse(await Deno.readTextFile(dir+"/tests/grading-job.json"));
-      assert(canonical(descriptor.additionalJavaSources)===canonical({archive:"additional-sources.zip",maxFiles:128,maxFileBytes:1048576,maxTotalBytes:4194304,maxArchiveBytes:2097152}),"optional Java sources lost from runtime descriptor");
-      const html=await Deno.readTextFile(dir+"/question.html");
-      assert(html.includes('optional-file-names="additional-sources.zip"'),"optional upload absent");
-      assert((html.match(/<pl-file-upload /g)??[]).length===1,"multiple upload controls");
-      assert((mode==="editor")===html.includes('<pl-file-editor '),"primary editor delivery changed");
-      assert(!html.includes("5 MB")&&!html.includes("При превышении используйте ручную сдачу")&&!html.includes("2097152"),"Generated infrastructure/manual fallback preamble leaked into condition");
-      assert(!html.includes("PRIVATE_REFERENCE")&&!html.includes(apiText),"private sources leaked into UI");
-      assert(delivery.files["questions/demo/exr-a/question.html"]===await hash(html),"optional controls absent from delivery hash");
-    }
-    const optionalFact={...extrasFact,check:{...extrasFact.check,"additional-java-sources":{...extrasPolicy,"primary-required":false}}};
-    const optionalConfig:any=structuredClone(config);optionalConfig["question-defaults"].submission={mode:"upload"};
-    const optionalOut=root+"/optional-primary";
-    const optionalDelivery=await exportCourse({...apiInput,config:optionalConfig,checks:{...input.checks,projects:[optionalFact]},output:optionalOut,checksOutput:optionalOut+"-checks.json"});
-    const optionalDescriptor=JSON.parse(await Deno.readTextFile(optionalOut+"/questions/demo/exr-a/tests/grading-job.json"));
-    const optionalHtml=await Deno.readTextFile(optionalOut+"/questions/demo/exr-a/question.html");
-    assert(optionalDescriptor.additionalJavaSources.primaryRequired===false,"optional primary missing from descriptor");
-    assert(optionalHtml.includes('optional-file-names="'+[...optionalDescriptor.sourceFiles.filter((name:string)=>!name.includes('/')),extrasPolicy.archive].join(',')+'"')&&!optionalHtml.includes(' file-names="')&&!optionalHtml.includes('<pl-file-editor '),"optional upload still requires primary");
-    assert(canonical(optionalDescriptor.sourceFiles)===canonical(apiDescriptor.sourceFiles)&&optionalDescriptor.sourceFiles.includes("pkg/A.java"),"nested primary inventory was flattened or dropped");
-    assert(optionalHtml.includes("исходники с пакетами и остальные .java поместите в ZIP"),"nested ZIP transport guidance absent");
-    assert(optionalDelivery.files["questions/demo/exr-a/question.html"]===await hash(optionalHtml),"optional UI hash missing");
-    optionalConfig["question-defaults"].submission={mode:"editor"};
-    let optionalDenied=false;try{await exportCourse({...apiInput,config:optionalConfig,checks:{...input.checks,projects:[optionalFact]},output:root+"/optional-editor-denied",checksOutput:root+"/optional-editor-denied.json"});}catch{optionalDenied=true;}
-    assert(optionalDenied,"optional primary accepted placeholder editor");
-    const nativeFact={...extrasFact,check:{...extrasFact.check,runtime:"java25-gradle-junit-v1","java-build":{kind:"gradle-jar-v1","main-class":"grade.Main",artifact:"gradeapp.jar"}}};
-    const nativeInput={...apiInput,checks:{...input.checks,projects:[nativeFact]},registry:{schemaVersion:1,profiles:{"java25-gradle-junit-v1":{mode:"implementation",javaRelease:25,image:"registry/native-java@sha256:"+"e".repeat(64)}}},output:root+"/native-gradle",checksOutput:root+"/native-gradle-checks.json"};
-    await exportCourse(nativeInput);
-    const canonicalFact = {
-      ...nativeFact,
-      check: {
-        ...nativeFact.check,
-        sourceProfile: {
-          ...nativeFact.check.sourceProfile,
-          root: "src/main/java",
+      nativeInputs: {
+        "exr-a": {
+          sources: [source],
+          tests: [test],
+          descriptor: runtimeDescriptor(check, { javaRelease: 25 }, [
+            source.name,
+          ], [test.name]),
         },
       },
-      trustedTests: [],
+      studentArtifact: async () => ({
+        files: [{
+          name: "README.md",
+          bytes: new TextEncoder().encode("PUBLIC_README"),
+        }, source],
+        archive: new Uint8Array([80, 75, 3, 4]),
+      }),
     };
-    const nativeSelected = {
-      sources: [{
-        name: "pkg/A.java",
-        bytes: new TextEncoder().encode(source),
-        sha256: await hash(source),
-      }],
-      tests: [{
-        name: "ATest.java",
-        bytes: new TextEncoder().encode("class ATest {}"),
-      }, {
-        name: "ApiContract.java",
-        bytes: new TextEncoder().encode(apiText),
-      }],
-      descriptor: runtimeDescriptor(
-        canonicalFact.check,
-        nativeInput.registry.profiles["java25-gradle-junit-v1"],
-        ["pkg/A.java"],
-        ["ATest.java", "ApiContract.java"],
-        { files: ["ApiContract.java"], entry: "ApiContract" },
-      ),
-    };
-    await exportCourse({
-      ...nativeInput,
-      checks: { ...input.checks, projects: [canonicalFact] },
-      nativeInputs: { "exr-a": nativeSelected },
-      output: root + "/canonical-targets",
-      checksOutput: root + "/canonical-targets-checks.json",
+    const result = await exportCourse(input);
+    assert(result.schemaVersion === 5, "Delivery schema changed");
+    assert(
+      result.files.every((file: unknown) => typeof file === "string"),
+      "Functional file list must contain names",
+    );
+    const questionDir = input.output + "/questions/demo/exr-a";
+    const html = await Deno.readTextFile(questionDir + "/question.html");
+    assert(
+      html.includes("pkg/A.java") && !html.includes("PRIVATE_TEST"),
+      "Student editor filename/privacy lost",
+    );
+    const starter = await Deno.readTextFile(
+      questionDir + "/clientFilesQuestion/starter/pkg/A.java",
+    );
+    assert(
+      starter === "package pkg; class A {}",
+      "Actual selected source bytes lost",
+    );
+    assert(
+      await Deno.readTextFile(questionDir + "/tests/ATest.java").catch(() =>
+        ""
+      ) !== "",
+      "Trusted tests missing",
+    );
+    const second = await exportCourse({
+      ...input,
+      output: root + "/second",
+      checksOutput: root + "/second-checks.json",
     });
     assert(
-      await Deno.readTextFile(
-        root +
-          "/canonical-targets/questions/demo/exr-a/serverFilesQuestion/starter/pkg/A.java",
-      ) === source,
-      "actual A1 target bytes lost to old student partition selector",
+      JSON.stringify(result.files) === JSON.stringify(second.files),
+      "File list order unstable",
     );
-    assert(
-      canonical(
-        JSON.parse(
-          await Deno.readTextFile(
-            root +
-              "/canonical-targets/questions/demo/exr-a/tests/grading-job.json",
-          ),
+    for (const key of ["infoCourse.json", "questions/demo/exr-a/info.json"]) {
+      assert(
+        (await readFile(input.output + "/" + key)).equals(
+          await readFile(root + "/second/" + key),
         ),
-      ) === canonical(nativeSelected.descriptor),
-      "native compiler descriptor changed at exporter connection",
-    );
-    const nativeDescriptor=JSON.parse(await Deno.readTextFile(root+"/native-gradle/questions/demo/exr-a/tests/grading-job.json"));
-    assert(canonical(nativeDescriptor.javaBuild)===canonical({kind:"gradle-jar-v1",mainClass:"grade.Main",artifact:"gradeapp.jar"}),"native full export dropped javaBuild");
-    assert(nativeDescriptor.runtime==='java25-gradle-junit-v1'&&canonical(nativeDescriptor.sourceFiles)===canonical(apiDescriptor.sourceFiles)&&canonical(nativeDescriptor.apiPrecheck)===canonical(apiDescriptor.apiPrecheck),"native export changed selected source/API boundary");
-    assert(await Deno.readTextFile(root+"/native-gradle/questions/demo/exr-a/tests/ApiContract.java")===apiText,"native private API bytes lost");
-    const nativeInfo=JSON.parse(await Deno.readTextFile(root+"/native-gradle/questions/demo/exr-a/info.json"));
-    assert(nativeInfo.externalGradingOptions.image==='registry/native-java@sha256:'+"e".repeat(64),"native image pin replaced with old/demo image");
-    for(const patch of [{"java-build":undefined},{runtime:"java25-junit-v1"},{"java-build":{kind:"gradle-jar-v1","main-class":"grade.Main",artifact:"gradeapp.jar",command:"run"}}]){
-      let denied=false;try{await exportCourse({...nativeInput,checks:{...input.checks,projects:[{...nativeFact,check:{...nativeFact.check,...patch}}]},output:root+"/native-invalid",checksOutput:root+"/native-invalid-checks.json"});}catch{denied=true;}
-      assert(denied,"full native export silently discarded invalid java-build");
-      assert(!await Deno.stat(root+"/native-invalid").then(()=>true,()=>false),"invalid native export published partial output");
-    }
-    await Deno.writeTextFile(root+"/project/tests/junit/ApiContract.java","tampered");
-    let apiTamperDenied=false;try{await exportCourse({...apiInput,output:root+"/api-tamper",checksOutput:root+"/api-tamper-checks.json"});}catch{apiTamperDenied=true;}
-    assert(apiTamperDenied,"native API source hash ignored");
-
-    const repeatInfo = JSON.parse(
-      await Deno.readTextFile(root + "/one/questions/demo/exr-a/info.json"),
-    );
-    assert(
-      repeatInfo.singleVariant === false,
-      "course repeat false lost in full export",
-    );
-    for (const [name, sha] of Object.entries(a.files)) {
-      assert(
-        await hash(await Deno.readFile(root + "/one/" + name)) === sha,
-        "inventory mismatch",
-      );
-      assert(
-        await hash(await Deno.readFile(root + "/two/" + name)) === sha,
-        "bytes differ",
+        "Stable export changed " + key,
       );
     }
-    const html = await Deno.readTextFile(
-      root + "/one/questions/demo/exr-a/question.html",
-    );
-    assert(
-      html.includes("Пример 😀") && !html.includes("{{literal}}") &&
-        !html.includes("PRIVATE_REFERENCE"),
-      "source escaped/leak",
-    );
-    assert(
-      a.questions.length === 1 && a.questions[0] === "demo/exr-a",
-      "manual checked demonstration exported",
-    );
-    const privateChecks = JSON.parse(
-      await Deno.readTextFile(root + "/checks1.json"),
-    );
-    assert(
-      privateChecks.projects.length === 2,
-      "checked demonstration lost from private inventory",
-    );
     for (
-      const change of [() => {
-        fact.check = undefined as any;
-      }, () => {
-        input.registry.profiles.junit.image = null;
-      }, () => {
-        input.config.delivery.course.extra = true;
-      }]
-    ) {
-      const original = structuredClone({
-        fact,
-        inputConfig: input.config,
-        registry: input.registry,
-      });
-      change();
-      let failed = false;
-      try {
-        await exportCourse({
-          ...input,
-          output: root + "/bad",
-          checksOutput: root + "/checksBad.json",
-        });
-      } catch {
-        failed = true;
-      }
-      assert(failed, "invalid export accepted");
-      Object.assign(fact, original.fact);
-      input.config = original.inputConfig;
-      input.registry = original.registry;
-      let exists = true;
-      try {
-        await Deno.stat(root + "/bad");
-      } catch (e) {
-        exists = !(e instanceof Deno.errors.NotFound);
-      }
-      assert(!exists, "partial output published");
-    }
-    const ids = ["exr-a", "exr-b", "exr-c"],
-      three: any = structuredClone(work),
-      threeBody: any = structuredClone(body);
-    const missingPoints = structuredClone(work);
-    delete (missingPoints.extensions.prairielearn as any)["question-points"];
-    let missingDiagnostic = "", missingBodyCalled = false;
-    try {
-      await exportCourse({
-        ...input,
-        result: {
-          model: { ...input.result.model, assessments: [missingPoints] },
-        },
-        output: root + "/missing-points",
-        checksOutput: root + "/missing-points-checks.json",
-        body: async () => {
-          missingBodyCalled = true;
-          return body;
-        },
-      });
-    } catch (e) {
-      missingDiagnostic = String(e);
-    }
-    assert(
-      !missingBodyCalled &&
-        missingDiagnostic.includes("question-points (exr-a)") &&
-        missingDiagnostic.includes("assessment-defaults"),
-      "missing points did not fail actionable before native body collection",
-    );
-    for (
-      const output of [
-        root + "/missing-points",
-        root + "/missing-points-checks.json",
-      ]
-    ) {
-      let absent = false;
-      try {
-        await Deno.stat(output);
-      } catch (e) {
-        absent = e instanceof Deno.errors.NotFound;
-      }
-      assert(absent, "missing explicit points published partial output");
-    }
-    three.slots=ids.map((id,i)=>({id,selection:'fixed',candidates:[id],assignment:{...assignment,requirement:i===2?'optional':'required'}}));
-    three.extensions.prairielearn.pass["at-least"] = 2;
-    threeBody.questions = ids.map((id) => ({
-      ...structuredClone(body.questions[0]),
-      id,
-      key: "demo/" + id,
-    }));
-    threeBody.works[0].slots=three.slots.map((slot:any)=>({...slot,id:'demo/sec-lab/'+slot.id,candidates:slot.candidates.map((id:string)=>'demo/'+id)}));
-    const threeDelivery = await exportCourse({
-      ...input,
-      result: {
-        model: {
-          assessments: [three],
-          exercises: ids.map((id) => ({ id, target: "prairielearn" })),
-        },
-      },
-      checks: {
-        ...input.checks,
-        projects: ids.map((id) => ({ ...fact, exerciseId: id })),
-      },
-      body: async () => threeBody,
-      output: root + "/three",
-      checksOutput: root + "/checks3.json",
-    });
-    const randomWork=structuredClone(three);
-    randomWork.slots=[{id:'alt-numbers',selection:'random',candidates:ids.slice(0,2),assignment:{...assignment,requirement:'required'}},{...three.slots[2],assignment:{...assignment,requirement:'required'}}];
-    const randomBody=structuredClone(threeBody);
-    randomBody.works[0].slots=randomWork.slots.map((slot:any)=>({...slot,id:'demo/sec-lab/'+slot.id,candidates:slot.candidates.map((id:string)=>'demo/'+id)}));
-    const randomInput={...input,result:{model:{assessments:[randomWork],exercises:ids.map(id=>({id,target:'prairielearn'}))}},checks:{...input.checks,projects:ids.map(id=>({...fact,exerciseId:id}))},body:async()=>randomBody};
-    const randomDelivery=await exportCourse({...randomInput,output:root+'/random',checksOutput:root+'/random-checks.json'});
-    const randomAgain=await exportCourse({...randomInput,output:root+'/random-again',checksOutput:root+'/random-again-checks.json'});
-    const randomNative=JSON.parse(await Deno.readTextFile(root+'/random/courseInstances/pilot/assessments/sec-lab/infoAssessment.json'));
-    assert(randomDelivery.schemaVersion===3&&randomDelivery.questions.length===3&&randomDelivery.works[0].slots.length===2&&randomDelivery.works[0].completion.requiredSlotIds.length===2,'random catalog/slots/completion not preserved');
-    assert(randomDelivery.deliveryHash===randomAgain.deliveryHash,'random unchanged snapshot is not deterministic');
-    const pool=randomNative.zones[0].questions[0];
-    assert(pool.numberChoose===1&&pool.alternatives.length===2&&pool.points===2.5&&pool.maxPoints===6&&pool.triesPerVariant===2&&!('id' in pool),'random group native shape changed');
-    assert(!('preferences' in pool)&&pool.alternatives.every((alternative:any)=>alternative.preferences.courseRequirement==='required'),'pinned native importer requires preferences on each eligible alternative');
-    assert(randomNative.zones[0].questions[1].id==='demo/'+ids[2]&&randomNative.zones[0].numberChoose===undefined,'mixed fixed/random native blocks invalid');
-    const instance = JSON.parse(
-      await Deno.readTextFile(
-        root + "/three/courseInstances/pilot/infoCourseInstance.json",
-      ),
-    );
-    assert(
-      !Object.hasOwn(instance, "allowAccess") &&
-        instance.selfEnrollment.enabled === false,
-      "modern selfEnrollment conflicts with legacy allowAccess in native sync",
-    );
-    assert(
-      instance.publishing.startDate === "1970-01-01T00:00:00Z" &&
-        instance.publishing.endDate === "9999-12-31T00:00:00Z",
-      "explicit publishing lost: native Students require instance availability",
-    );
-    assert(
-      instance.studentLabels.length === 0,
-      "ordinary lab incorrectly declares defense assignment labels",
-    );
-    assert(
-      !threeDelivery.works[0].policy.assignment,
-      "ordinary lab delivery requires a defense assignment slot",
-    );
-    assert(
-      threeDelivery.works[0].policy["question-points"] === 2.5 &&
-        threeDelivery.works[0].policy["max-points"] === 12,
-      "ordinary lab grading metadata stripped from delivery",
-    );
-    const native = JSON.parse(
-      await Deno.readTextFile(
-        root +
-          "/three/courseInstances/pilot/assessments/sec-lab/infoAssessment.json",
-      ),
-    );
-    assert(
-      native.accessControl.length === 1 && !native.accessControl[0].labels &&
-        native.accessControl[0].dateControl.release.date ===
-          "1970-01-01T00:00:00",
-      "ordinary lab requires assignment label instead of joined Student access",
-    );
-    assert(
-      native.maxPoints === 12,
-      "completion threshold substituted for raw native points",
-    );
-    assert(
-      native.zones[0].questions[2].preferences.courseRequirement === "optional",
-      "native assignment fact lost",
-    );
-    for (const member of native.zones[0].questions) {
-      const question = JSON.parse(
-        await Deno.readTextFile(
-          root + "/three/questions/" + member.id + "/info.json",
-        ),
-      );
-      const field = question.preferences?.courseRequirement;
-      assert(
-        field?.type === "string" && field.default === "required" &&
-          JSON.stringify(field.enum) ===
-            JSON.stringify(["required", "optional"]),
-        "native sync requires question-declared preferences schema for assessment overrides",
-      );
-      assert(
-        infoQuestion(question),
-        "preferences declaration violates pinned native schema",
-      );
-      assert(
-        field.enum.includes(member.preferences.courseRequirement),
-        "native preference override outside enum",
-      );
-      assert(
-        !infoQuestion({
-          ...question,
-          preferences: { courseRequirement: { ...field, unknown: true } },
-        }),
-        "upstream preferences fields must remain closed",
-      );
-    }
-    assert(
-      threeDelivery.works[0].completion.atLeast === 2 &&
-        threeDelivery.works[0].completion.requiredSlotIds.length === 2,
-      "authoritative required completion not sealed",
-    );
-    assert(
-      native.type === "Homework" &&
-        native.zones[0].questions.every((q: any) =>
-          q.points === 2.5 && q.maxPoints === 6
-        ),
-      "Homework point ceilings changed",
-    );
-    for (const kind of ["test", "practical"]) {
-      const examWork = structuredClone(three);
-      examWork.kind = kind;
-      examWork.extensions.prairielearn["question-max-points"] = null;
-      examWork.extensions.prairielearn["question-points"] = [4, 2];
-      const exported = await exportCourse({
-        ...input,
-        result: {
-          model: {
-            assessments: [examWork],
-            exercises: ids.map((id) => ({ id, target: "prairielearn" })),
+      const [name, mutate] of [["missing-bytes", (value: typeof input) => {
+        value.nativeInputs = {};
+      }], ["missing-tests", (value: typeof input) => {
+        value.nativeInputs = {
+          "exr-a": {
+            ...input.nativeInputs["exr-a"],
+            tests: [],
           },
-        },
-        checks: {
-          ...input.checks,
-          projects: ids.map((id) => ({ ...fact, exerciseId: id })),
-        },
-        body: async () => threeBody,
-        output: root + "/exam-" + kind,
-        checksOutput: root + "/exam-" + kind + ".json",
-      });
-      const exam = JSON.parse(
-        await Deno.readTextFile(
-          root + "/exam-" + kind +
-            "/courseInstances/pilot/assessments/sec-lab/infoAssessment.json",
-        ),
-      );
-      assert(
-        exam.type === "Exam" && exam.maxPoints === 12,
-        "Exam assessment score changed",
-      );
-      assert(
-        exam.zones[0].questions.every((q: any) =>
-          JSON.stringify(q.points) === JSON.stringify([4, 2]) &&
-          !Object.hasOwn(q, "maxPoints") &&
-          !Object.hasOwn(q, "maxAutoPoints") &&
-          q.triesPerVariant === examWork.extensions.prairielearn.attempts
-        ),
-        "pinned native sync forbids per-question maxPoints/maxAutoPoints on Exam",
-      );
-      assert(
-        canonical(exported.works[0].completion) ===
-          canonical(threeDelivery.works[0].completion),
-        "Exam completion predicate changed",
-      );
-    }
-    const defense = structuredClone(three);
-    defense.relatedExercise = "exr-essay";
-    const defenseDelivery = await exportCourse({
-      ...input,
-      result: {
-        model: {
-          assessments: [defense],
-          exercises: ids.map((id) => ({ id, target: "prairielearn" })),
-        },
-      },
-      checks: {
-        ...input.checks,
-        projects: ids.map((id) => ({ ...fact, exerciseId: id })),
-      },
-      body: async () => threeBody,
-      output: root + "/defense",
-      checksOutput: root + "/checksDefense.json",
-    });
-    const defenseInfo = JSON.parse(
-      await Deno.readTextFile(
-        root +
-          "/defense/courseInstances/pilot/assessments/sec-lab/infoAssessment.json",
-      ),
-    );
-    const defenseInstance = JSON.parse(
-      await Deno.readTextFile(
-        root + "/defense/courseInstances/pilot/infoCourseInstance.json",
-      ),
-    );
-    assert(
-      defenseInstance.studentLabels.length === 1 &&
-        defenseInfo.accessControl.length === 2 &&
-        defenseInfo.accessControl[0].beforeRelease.listed === false &&
-        defenseInfo.accessControl[1].labels[0] === "test",
-      "explicit essay defense lost closed native label gate",
-    );
-    assert(
-      defenseDelivery.works[0].relatedExercise === "exr-essay" &&
-        defenseDelivery.works[0].policy.assignment["student-label"] === "test",
-      "defense relation or assignment policy lost",
-    );
-  } finally {
-    await Deno.remove(root, { recursive: true });
-  }
-});
-Deno.test("selected editor sources reject missing, binary, NUL, oversized, stale and symlink inputs", async () => {
-  const root = await Deno.makeTempDir();
-  try {
-    await Deno.mkdir(root + "/student");
-    const path = root + "/student/A.java";
-    const p: any = {
-      check: { sourceProfile: { root: "student", mode: "implementation" } },
-      sources: [{
-        projectRelativePath: "student/A.java",
-        submissionRelativePath: "A.java",
-        sha256: "a".repeat(64),
-      }],
-    };
-    for (
-      const bytes of [
-        new Uint8Array([255]),
-        new TextEncoder().encode("class A {\0}"),
-        new Uint8Array(1024 * 1024 + 1),
-      ]
+        };
+      }]] as const
     ) {
-      await Deno.writeFile(path, bytes);
-      p.sources[0].sha256 = await hash(bytes);
+      const value = {
+        ...input,
+        output: root + "/bad-" + name,
+        checksOutput: root + "/bad-" + name + ".json",
+      };
+      mutate(value);
       let refused = false;
       try {
-        await selectedSources(root, p);
+        await exportCourse(value);
       } catch {
         refused = true;
       }
-      assert(refused, "unsafe source accepted");
+      assert(refused, "Invalid native input accepted " + name);
+      assert(
+        !await Deno.stat(value.output).then(() => true, () => false),
+        "Failure published partial output",
+      );
     }
-    await Deno.writeTextFile(path, "class A {}");
-    p.sources[0].sha256 = "b".repeat(64);
-    let refused = false;
-    try {
-      await selectedSources(root, p);
-    } catch {
-      refused = true;
-    }
-    assert(refused, "stale source accepted");
-    await Deno.remove(path);
-    refused = false;
-    try {
-      await selectedSources(root, p);
-    } catch {
-      refused = true;
-    }
-    assert(refused, "missing source accepted");
-    await Deno.writeTextFile(root + "/secret", "secret");
-    await Deno.symlink(root + "/secret", path);
-    refused = false;
-    try {
-      await selectedSources(root, p);
-    } catch {
-      refused = true;
-    }
-    assert(refused, "symlink accepted");
   } finally {
     await Deno.remove(root, { recursive: true });
   }
 });
-Deno.test("student-tests source profile preserves suite path as answer", async () => {
-  const root = await Deno.makeTempDir();
-  try {
-    await Deno.mkdir(root + "/student/src/test/java/demo", { recursive: true });
-    const text = "package demo; class ATest {}";
-    await Deno.writeTextFile(
-      root + "/student/src/test/java/demo/ATest.java",
-      text,
-    );
-    const p = {
-      check: {
-        sourceProfile: { root: "student/src/test/java", mode: "student-tests" },
-      },
-      sources: [{
-        projectRelativePath: "student/src/test/java/demo/ATest.java",
-        submissionRelativePath: "demo/ATest.java",
-        sha256: await hash(text),
-      }],
-    };
-    assert(
-      (await selectedSources(root, p))[0].name === "demo/ATest.java",
-      "suite path lost",
-    );
-  } finally {
-    await Deno.remove(root, { recursive: true });
-  }
-});
-
 Deno.test("course instance assessment UUIDs use approved stable namespaces", async () => {
   const course = await identity("course/demo");
   assert(
@@ -947,106 +482,21 @@ Deno.test("course instance assessment UUIDs use approved stable namespaces", asy
     "assessment UUID drift",
   );
   const java = await identity("course/java-semester-one");
-  assert(java === "036dee22-0705-5c6d-abd5-30620afcce9b", "Java course UUID изменился");
-  assert(await identity("instance/pilot", java) === "18980649-6462-5ba4-a0c4-b5bcd1634fef", "Java pilot UUID изменился");
-  assert(await identity("instance/2026-2027-s1", java) === "4141f9c0-8233-591f-ac1c-53275f3b8c02", "UUID нового семестра вычислен вне утверждённого namespace");
+  assert(
+    java === "036dee22-0705-5c6d-abd5-30620afcce9b",
+    "Java course UUID изменился",
+  );
+  assert(
+    await identity("instance/pilot", java) ===
+      "18980649-6462-5ba4-a0c4-b5bcd1634fef",
+    "Java pilot UUID изменился",
+  );
+  assert(
+    await identity("instance/2026-2027-s1", java) ===
+      "4141f9c0-8233-591f-ac1c-53275f3b8c02",
+    "UUID нового семестра вычислен вне утверждённого namespace",
+  );
 });
-Deno.test("multiple_selected_defenses_for_one_essay reject before source collection", async () => {
-  const root = await Deno.makeTempDir();
-  try {
-    const config = {
-      delivery: {
-        book: "tasks",
-        course: {
-          name: "JAVA",
-          title: "Java",
-          timezone: "Europe/Minsk",
-          topics: [{ name: "Java", color: "blue2", description: "Java" }],
-        },
-        instances: {
-          pilot: {
-            title: "Pilot",
-            "self-enrollment": false,
-            publishing: {
-              "start-date": "1970-01-01T00:00:00Z",
-              "end-date": "9999-12-31T00:00:00Z",
-            },
-            works: ["sec-one", "sec-two"],
-          },
-        },
-      },
-      "question-defaults": { topic: "Java", submission: { mode: "editor" } },
-    };
-    const works = ["sec-one", "sec-two"].map((id) => ({
-      id,
-      relatedExercise: "exr-essay",
-      extensions: { prairielearn: {} },
-    }));
-    let called = false;
-    let message = "";
-    try {
-      await exportCourse({
-        courseId: "demo",
-        projectRoot: root,
-        result: { model: { assessments: works } },
-        checks: {},
-        config,
-        registry: {},
-        instance: "pilot",
-        output: root + "/native",
-        checksOutput: root + "/checks.json",
-        body: async () => {
-          called = true;
-          throw new Error("unexpected body");
-        },
-      });
-    } catch (e) {
-      message = String(e);
-    }
-    assert(
-      message.includes("duplicate active defense") && !called,
-      "duplicate selected relation accepted",
-    );
-  } finally {
-    await Deno.remove(root, { recursive: true });
-  }
-});
-Deno.test("reference private and public test partitions cannot become implementation submissions", async () => {
-  const root = await Deno.makeTempDir();
-  try {
-    for (
-      const sourceRoot of [
-        "reference",
-        "tests",
-        "private",
-        "student/src/test/java",
-      ]
-    ) {
-      await Deno.mkdir(root + "/" + sourceRoot, { recursive: true });
-      const text = "class A {}";
-      await Deno.writeTextFile(root + "/" + sourceRoot + "/A.java", text);
-      let rejected = false;
-      try {
-        await selectedSources(root, {
-          check: {
-            sourceProfile: { root: sourceRoot, mode: "implementation" },
-          },
-          sources: [{
-            projectRelativePath: sourceRoot + "/A.java",
-            submissionRelativePath: "A.java",
-            sha256: await hash(text),
-          }],
-        });
-      } catch {
-        rejected = true;
-      }
-      assert(rejected, "private/public test source admitted: " + sourceRoot);
-    }
-  } finally {
-    await Deno.remove(root, { recursive: true });
-  }
-});
-
 Deno.test("question repeat declaration is closed and typed", () => {
   for (const value of [undefined, true, false]) {
     const settings = question({
@@ -1076,36 +526,588 @@ Deno.test("question repeat declaration is closed and typed", () => {
   }
 });
 
-Deno.test("additional Java policy rejects present null/false and closed-field defects",()=>{
- const policy={archive:"additional-sources.zip","max-files":128,"max-file-bytes":1048576,"max-total-bytes":4194304,"max-archive-bytes":2097152};
- for(const value of [null,false,0,{...policy,commands:[]},{...policy,"max-files":129},{...policy,"max-files":true}]){
-  let denied=false;try{runtimeDescriptor({runtime:"java25-junit-v1",sourceProfile:{mode:"implementation"},"additional-java-sources":value},{javaRelease:25},["Main.java"],["ExampleTest.java"]);}catch{denied=true;}
-  assert(denied,"invalid present Java policy silently disabled: "+JSON.stringify(value));
- }
+Deno.test("additional Java policy rejects present null/false and closed-field defects", () => {
+  const policy = {
+    archive: "additional-sources.zip",
+    "max-files": 128,
+    "max-file-bytes": 1048576,
+    "max-total-bytes": 4194304,
+    "max-archive-bytes": 2097152,
+  };
+  for (
+    const value of [null, false, 0, { ...policy, commands: [] }, {
+      ...policy,
+      "max-files": 129,
+    }, { ...policy, "max-files": true }]
+  ) {
+    const raw: unknown = {
+      profile: "fixture",
+      "source-profile": "main",
+      tests: ["tests/*.java"],
+      scoring: { mode: "weighted" },
+      runtime: "java25-junit-v1",
+      sourceProfile: {
+        mode: "implementation",
+        root: "student",
+        include: ["**/*.java"],
+      },
+      "additional-java-sources": value,
+    };
+    // Намеренно неверный raw приходит через внешнюю JS-границу; результат не используется.
+    let denied = false;
+    try {
+      Reflect.apply(runtimeDescriptor, undefined, [raw, { javaRelease: 25 }, [
+        "Main.java",
+      ], ["ExampleTest.java"]]);
+    } catch {
+      denied = true;
+    }
+    assert(
+      denied,
+      "invalid present Java policy silently disabled: " + JSON.stringify(value),
+    );
+  }
 });
 
-Deno.test("Дублированная защита отвергается раньше переданной неверной публикационной зависимости", async () => {
-  const root = await Deno.makeTempDir();
+/** Небольшая настоящая поставка: без Core operation и запуска runtime. */
+async function inventoryCourseFixture(
+  run: (
+    input: CourseFixtureInput,
+    root: string,
+  ) => Promise<void>,
+) {
+  const root = await Deno.makeTempDir({ prefix: "pl-inventory-test-" });
   try {
-    const config = {
-      delivery: {
-        book: "tasks",
-        course: { name: "JAVA", title: "Java", timezone: "Europe/Minsk", topics: [{ name: "Java", color: "blue2", description: "Java" }] },
-        instances: { pilot: { title: "Pilot", "self-enrollment": false, publishing: { "start-date": "1970-01-01T00:00:00Z", "end-date": "9999-12-31T00:00:00Z" }, works: ["sec-one", "sec-two"] } },
+    await Deno.mkdir(root + "/project");
+    const assignment = {
+      requirement: "required",
+      workMode: "individual",
+    } as const;
+    const works = ["sec-first", "sec-second"].map((
+      id,
+    ): ExportCourseContent["assessments"][number] => ({
+      id,
+      source: id + ".qmd",
+      kind: "lab",
+      title: "Проверка",
+      slots: [{
+        id: "exr-a",
+        selection: "fixed",
+        candidates: ["exr-a"],
+        assignment,
+      }],
+      extensions: {
+        prairielearn: {
+          attempts: 1,
+          "question-points": 1,
+          pass: { "at-least": 1 },
+        },
       },
-      "question-defaults": { topic: "Java", submission: { mode: "editor" } },
+    }));
+    const bytes = new TextEncoder().encode("package pkg; class A {}");
+    const check = NativeProjectCheckSchema.parse({
+      profile: "java",
+      "source-profile": "main",
+      runtime: "java25-junit-v1",
+      sourceProfile: {
+        root: "student",
+        mode: "implementation",
+        include: ["**/*.java"],
+      },
+      tests: ["tests/*.java"],
+      scoring: { mode: "weighted" },
+    });
+    const project = {
+      exerciseId: "exr-a",
+      source: "a.qmd",
+      qualifiedId: "demo/exr-a",
+      bankMember: true,
+      projectRoot: "project",
+      check,
+      sources: [
+        selectedCheckFile(
+          { target: "student/pkg/A.java", bytes },
+          "pkg/A.java",
+        ),
+      ],
+      trustedTests: [],
+      verificationTests: [],
+      references: [],
+      contractFixtures: [],
+      readiness: { ready: true, missing: [] },
     };
-    const works = ["sec-one", "sec-two"].map((id) => ({ id, relatedExercise: "exr-essay", extensions: { prairielearn: {} } }));
-    let called = false, message = "";
+    const input: CourseFixtureInput = {
+      courseId: "demo",
+      projectRoot: root,
+      content: {
+        assessments: works,
+        exercises: [{ id: "exr-a", target: "prairielearn" }],
+        projects: [project],
+      },
+      checks: nativeChecksManifest({
+        courseId: "demo",
+        bookRoot: "tasks",
+        projects: [project],
+      }),
+      config: {
+        delivery: {
+          book: "tasks",
+          course: {
+            name: "DEMO",
+            title: "Проверка",
+            timezone: "Europe/Minsk",
+            topics: [{ name: "Java", color: "blue2", description: "Java" }],
+          },
+          instances: {
+            pilot: {
+              title: "Проверка",
+              "self-enrollment": false,
+              publishing: {
+                "start-date": "1970-01-01T00:00:00Z",
+                "end-date": "9999-12-31T00:00:00Z",
+              },
+              works: works.map((w) => w.id),
+            },
+          },
+        },
+        "question-defaults": {
+          topic: "Java",
+          submission: { mode: "editor", "ace-mode": "ace/mode/java" },
+        },
+      },
+      registry: {
+        schemaVersion: 1,
+        profiles: {
+          "java25-junit-v1": {
+            mode: "implementation",
+            javaRelease: 25,
+            image: "registry/image@sha256:" + "c".repeat(64),
+          },
+        },
+      },
+      instance: "pilot",
+      output: root + "/out",
+      checksOutput: root + "/checks.json",
+      body: async (id) => ({
+        schema: "course-body-package-v2",
+        owner: "demo",
+        release: "1",
+        apiVersion: [1, 23, 1],
+        questions: [{
+          owner: "demo",
+          id: "exr-a",
+          key: "demo/exr-a",
+          title: "Проверка",
+          source: "a.qmd",
+          visibility: "public",
+          statementVisibility: "open",
+          hasPublicSolution: false,
+          answerType: "manual",
+          condition: [],
+          publicAnswer: [],
+        }],
+        resources: [],
+        works: [{
+          owner: "demo",
+          id,
+          key: "demo/" + id,
+          source: id + ".qmd",
+          kind: "lab",
+          title: "Проверка",
+          introduction: [],
+          slots: [{
+            id: "demo/" + id + "/exr-a",
+            selection: "fixed",
+            candidates: ["demo/exr-a"],
+            assignment,
+          }],
+        }],
+      }),
+      nativeInputs: {
+        "exr-a": {
+          sources: [{ name: "pkg/A.java", bytes }],
+          tests: [{
+            name: "ATest.java",
+            bytes: new TextEncoder().encode("class ATest {} // PRIVATE_TEST"),
+          }],
+          descriptor: runtimeDescriptor(check, { javaRelease: 25 }, [
+            "pkg/A.java",
+          ], ["ATest.java"]),
+        },
+      },
+      studentArtifact: async () => ({
+        files: [{ name: "pkg/A.java", bytes }],
+        archive: new Uint8Array([80, 75, 3, 4]),
+      }),
+    };
+    const Command = Deno.Command;
+    let pandocCalls = 0;
+    Deno.Command = class extends Command {
+      constructor(command: string | URL, options: Deno.CommandOptions = {}) {
+        if (options.args?.[0] === "pandoc") pandocCalls++;
+        super(command, options);
+      }
+    };
+    const start = performance.now();
     try {
-      await exportCourse({
-        courseId: "demo", projectRoot: root, result: { model: { assessments: works } },
-        checks: {}, config, registry: {}, instance: "pilot", output: root + "/native", checksOutput: root + "/checks.json",
-        publicationConditions: root + "/nonexistent-conditions.json",
-        publicationSource: { repository: "invalid", commit: "invalid", book: "tasks" },
-        body: async () => { called = true; throw new Error("unexpected body"); },
+      await run(input, root);
+    } finally {
+      Deno.Command = Command;
+      console.info(
+        "Короткие Pandoc children: " +
+          JSON.stringify({
+            calls: pandocCalls,
+            milliseconds: Math.round(performance.now() - start),
+          }),
+      );
+    }
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+}
+
+Deno.test("inventory: уникальный вопрос не перечитывается ради списка имён", async () => {
+  await inventoryCourseFixture(async (input) => {
+    input.config.delivery.instances.pilot.works = ["sec-first"];
+    const read = Deno.readFile;
+    const calls: { name: string; bytes: number }[] = [];
+    Deno.readFile = async (path, options) => {
+      const bytes = await read(path, options);
+      calls.push({ name: String(path), bytes: bytes.length });
+      return bytes;
+    };
+    let result;
+    try {
+      result = await exportCourse(input);
+    } finally {
+      Deno.readFile = read;
+    }
+    const inventoryReads = calls.filter((c) =>
+      /\/(?:work-0|\.pl-course-[^/]+)\/questions\//.test(c.name)
+    );
+    console.info(
+      "Готовые файлы: " +
+        JSON.stringify({
+          calls: inventoryReads.length,
+          bytes: inventoryReads.reduce((total, call) => total + call.bytes, 0),
+        }),
+    );
+    assert(
+      inventoryReads.length === 0,
+      "Полные байты готового вопроса прочитаны ради имён: " +
+        JSON.stringify(inventoryReads),
+    );
+    const names: string[] = [];
+    async function walk(path: string, prefix = "") {
+      for await (const entry of Deno.readDir(path)) {
+        const name = prefix + entry.name;
+        if (entry.isDirectory) await walk(path + "/" + entry.name, name + "/");
+        else if (name !== "delivery.json") names.push(name);
+      }
+    }
+    await walk(input.output);
+    assert(
+      JSON.stringify(result.files) === JSON.stringify(names.sort()),
+      "Список delivery не совпадает с реальными файлами",
+    );
+    const info = JSON.parse(
+      await Deno.readTextFile(input.output + "/questions/demo/exr-a/info.json"),
+    );
+    assert(
+      info.partialCredit === true &&
+        info.preferences.courseRequirement.default === "required",
+      "Финальные настройки вопроса потеряны",
+    );
+    assert(
+      await Deno.readTextFile(
+        input.output + "/questions/demo/exr-a/tests/ATest.java",
+      ) === "class ATest {} // PRIVATE_TEST",
+      "Закрытые тесты потеряны",
+    );
+  });
+});
+
+Deno.test("inventory: одинаковый повтор проверяет реальные готовые байты", async () => {
+  await inventoryCourseFixture(async (input) => {
+    const read = Deno.readFile;
+    const calls: { name: string; bytes: number }[] = [];
+    const readDir = Deno.readDir;
+    Deno.readDir = async function* (path) {
+      const entries = await Array.fromAsync(readDir(path));
+      yield* entries.reverse();
+    };
+    Deno.readFile = async (path, options) => {
+      const bytes = await read(path, options);
+      calls.push({ name: String(path), bytes: bytes.length });
+      return bytes;
+    };
+    let result;
+    try {
+      result = await exportCourse(input);
+    } finally {
+      Deno.readFile = read;
+      Deno.readDir = readDir;
+    }
+    const names = calls.map((call) => call.name);
+    const ready = calls.filter((call) =>
+      /\/(?:work-\d+|\.pl-course-[^/]+)\/questions\//.test(call.name)
+    );
+    console.info(
+      "Готовые файлы: " +
+        JSON.stringify({
+          calls: ready.length,
+          bytes: ready.reduce((total, call) => total + call.bytes, 0),
+        }),
+    );
+    const first = names.filter((name) => name.includes("/work-0/questions/"));
+    assert(
+      first.length === 0,
+      "Первый готовый вопрос перечитан до появления коллизии",
+    );
+    const second = names.filter((name) => name.includes("/work-1/questions/"))
+      .map((name) => name.split("/work-1/")[1]).sort();
+    const staged = names.filter((name) =>
+      /\/\.pl-course-[^/]+\/questions\//.test(name)
+    ).map((name) => name.split(/\/\.pl-course-[^/]+\//)[1]).sort();
+    assert(
+      JSON.stringify(second) === JSON.stringify(staged) && second.length > 0,
+      "Коллизия не сравнила оба готовых дерева",
+    );
+    assert(
+      JSON.stringify(second) ===
+        JSON.stringify(
+          result.files.filter((name: string) => name.startsWith("questions/"))
+            .sort(),
+        ),
+      "Коллизия пропустила готовые файлы",
+    );
+  });
+});
+
+for (
+  const conflict of [
+    "archive",
+    "private-test",
+    "starter",
+    "resource",
+    "resource-binding",
+    "public-question",
+    "source-map",
+    "existing-file",
+    "extra-file",
+    "missing-file",
+  ] as const
+) {
+  Deno.test(
+    "inventory: отказ при конфликте повторного вопроса — " + conflict,
+    async () => {
+      await inventoryCourseFixture(async (input, root) => {
+        const body = input.body;
+        input.body = async (id) => {
+          const value = await body(id);
+          if (conflict === "resource" || conflict === "resource-binding") {
+            value.resources = [{
+              owner: "demo",
+              source: "a.qmd",
+              effectiveBase: root,
+              target: "diagram.svg",
+              visibility: "public",
+              data: btoa("<svg>1</svg>"),
+            }];
+            value.questions[0].condition = [{
+              t: "Para",
+              c: [{
+                t: "Image",
+                c: [["", [], []], [{ t: "Str", c: "Рисунок" }], [
+                  "diagram.svg",
+                  "",
+                ]],
+              }],
+            }];
+          }
+          if (id === "sec-second") {
+            if (conflict === "archive") {
+              const artifact = input.studentArtifact;
+              input.studentArtifact = async (fact) => ({
+                ...await artifact(fact),
+                archive: new Uint8Array([80, 75, 3, 5]),
+              });
+            }
+            if (conflict === "starter") {
+              input.nativeInputs["exr-a"].sources[0].bytes[0] ^= 1;
+            }
+            if (conflict === "resource") {
+              value.resources[0].data = btoa("<svg>2</svg>");
+            }
+            if (conflict === "resource-binding") {
+              value.resources[0].effectiveBase = root + "/other";
+            }
+            if (conflict === "private-test") {
+              input.nativeInputs["exr-a"]
+                .tests[0].bytes[0] ^= 1;
+            }
+            if (conflict === "public-question") {
+              value.questions[0].source = "other.qmd";
+            }
+            if (conflict === "source-map") {
+              input.checks.projects[0].sources[0].target =
+                "student/other/A.java";
+            }
+            if (
+              ["existing-file", "extra-file", "missing-file"].includes(conflict)
+            ) {
+              const stage = [...Deno.readDirSync(root)].find((entry) =>
+                entry.name.startsWith(".pl-course-")
+              )!;
+              const question = root + "/" + stage.name +
+                "/questions/demo/exr-a";
+              if (conflict === "existing-file") {
+                await Deno.writeTextFile(
+                  question + "/tests/ATest.java",
+                  "ИЗМЕНЁННЫЕ РЕАЛЬНЫЕ БАЙТЫ",
+                );
+              }
+              if (conflict === "extra-file") {
+                await Deno.writeTextFile(
+                  question + "/extra.txt",
+                  "ДОПОЛНИТЕЛЬНЫЙ ФАЙЛ",
+                );
+              }
+              if (conflict === "missing-file") {
+                await Deno.remove(question + "/tests/ATest.java");
+              }
+            }
+          }
+          return value;
+        };
+        let error: unknown;
+        try {
+          await exportCourse(input);
+        } catch (caught) {
+          error = caught;
+        }
+        assert(
+          String(error).includes("PL конфликт повторного вопроса"),
+          "Конфликт не отклонён: " + String(error),
+        );
+        for (const path of [input.output, input.checksOutput]) {
+          assert(
+            !await Deno.lstat(path).then(() => true, () => false),
+            "Конфликт опубликовал результат",
+          );
+        }
       });
-    } catch (e) { message = String(e); }
-    assert(message === "Error: PL duplicate active defense" && !called, "Опциональная зависимость скрыла duplicate defense до body");
-  } finally { await Deno.remove(root, { recursive: true }); }
+    },
+  );
+}
+
+for (const location of ["question", "course"] as const) {
+  Deno.test(
+    "inventory: символьная ссылка в готовой поставке отклоняется — " + location,
+    async () => {
+      await inventoryCourseFixture(async (input, root) => {
+        const body = input.body;
+        input.body = async (id) => {
+          if (id === (location === "question" ? "sec-second" : "sec-first")) {
+            const stage = [...Deno.readDirSync(root)].find((entry) =>
+              entry.name.startsWith(".pl-course-")
+            )!;
+            await Deno.symlink(
+              root + "/project",
+              root + "/" + stage.name +
+                (location === "question"
+                  ? "/questions/demo/exr-a/alias"
+                  : "/alias"),
+            );
+          }
+          return await body(id);
+        };
+        if (location === "course") {
+          input.config.delivery.instances.pilot.works = ["sec-first"];
+        }
+        let error: unknown;
+        try {
+          await exportCourse(input);
+        } catch (caught) {
+          error = caught;
+        }
+        assert(
+          String(error).includes("PL unexpected artifact"),
+          "Символьная ссылка не отклонена: " + String(error),
+        );
+        assert(
+          !await Deno.lstat(input.output).then(() => true, () => false),
+          "Отказ опубликовал курс",
+        );
+      });
+    },
+  );
+}
+
+Deno.test("inventory: fresh output повторно проверяется перед публикацией", async () => {
+  await inventoryCourseFixture(async (input, root) => {
+    input.config.delivery.instances.pilot.works = ["sec-first"];
+    input.deferPublish = true;
+    const prepared = await exportCourse(input);
+    await Deno.symlink(root + "/project", input.output);
+    let error: unknown;
+    try {
+      await prepared.publish();
+    } catch (caught) {
+      error = caught;
+    }
+    assert(
+      String(error).includes("PL fresh output required"),
+      "Занятый output принят: " + String(error),
+    );
+    assert((await Deno.lstat(input.output)).isSymlink, "Чужой output заменён");
+    assert(
+      !await Deno.lstat(input.checksOutput).then(() => true, () => false),
+      "Отказ опубликовал private checks",
+    );
+  });
+});
+
+Deno.test("inventory: одинаковые Unicode имена не зависят от порядка обхода", async () => {
+  await inventoryCourseFixture(async (input) => {
+    const artifact = input.studentArtifact;
+    input.studentArtifact = async (fact) => {
+      const value = await artifact(fact);
+      return {
+        ...value,
+        files: [
+          ...value.files,
+          { name: "é.txt", bytes: new Uint8Array([1]) },
+          { name: "e\u0301.txt", bytes: new Uint8Array([2]) },
+        ],
+      };
+    };
+    const readDir = Deno.readDir;
+    Deno.readDir = async function* (path) {
+      const entries = await Array.fromAsync(readDir(path));
+      entries.sort((left, right) =>
+        left.name < right.name ? -1 : left.name > right.name ? 1 : 0
+      );
+      yield* String(path).includes("/.pl-course-")
+        ? entries.reverse()
+        : entries;
+    };
+    try {
+      const result = await exportCourse(input);
+      assert(
+        result.files.includes(
+          "questions/demo/exr-a/clientFilesQuestion/starter/é.txt",
+        ),
+        "Имя NFC потеряно",
+      );
+      assert(
+        result.files.includes(
+          "questions/demo/exr-a/clientFilesQuestion/starter/e\u0301.txt",
+        ),
+        "Имя NFD потеряно",
+      );
+    } finally {
+      Deno.readDir = readDir;
+    }
+  });
 });

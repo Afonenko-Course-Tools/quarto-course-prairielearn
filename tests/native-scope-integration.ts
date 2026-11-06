@@ -107,6 +107,15 @@ prairielearn:
   await capture();
   const candidate = await readNativeAdapterExpectation(Core, root);
   assert.deepEqual(candidate.identity.profiles, ["student"]);
+  await Core.withNativePublication(candidate.expectation,
+    { expectedSources: ["index.qmd", "slides.qmd"] },
+    async (publication: import("course-core/public.ts").NativePublication) => {
+      const data = await PL.inspectPublication(publication);
+      assert.equal(data.documents.length, 2);
+    });
+  await assert.rejects(() => Core.withNativePublication(candidate.expectation,
+    { expectedSources: ["index.qmd"] },
+    (publication: import("course-core/public.ts").NativePublication) => PL.inspectPublication(publication)), /RELEASE.COVERAGE/);
   await Core.withCurrentNativeOperation(
     candidate.expectation,
     async (op: any) => {
@@ -170,15 +179,14 @@ prairielearn:
         "plain DTO: 0 IO and no business/cache/publication authority",
       );
       for (
-        const readSet of [[], ["configuration"], [
-          "configuration",
-          "assessment",
-          "projectChecks",
-          "projectChecks",
-        ]]
+        const nativeMetadata of [
+          undefined,
+          { foreign: {} },
+          { readSet: ["configuration"], values: {} },
+        ]
       ) {
         const bad = structuredClone(input);
-        bad.nativeMetadata.readSet = readSet;
+        bad.nativeMetadata = nativeMetadata;
         await assert.rejects(() => plain.validate(bad));
       }
       const missing = structuredClone(input);
@@ -281,13 +289,6 @@ prairielearn:
       checks.push(
         "post-acquisition candidate drift: same-op exact request reuses proof with0 candidate reads; new request rereads/refuses and clears cache",
       );
-      const data = await PL.inspectPublication(Core, op, request);
-      assert.equal(data.documents.length, 2);
-      checks.push("genuine installed public partial consumer");
-      await assert.rejects(() =>
-        PL.inspectPublication(Core, op, { expectedSources: ["index.qmd"] })
-      );
-      checks.push("partial owner coverage refused");
       const copy = {
         ...op,
         assertCurrent: async () => {
@@ -319,11 +320,6 @@ prairielearn:
         2,
       ));
     },
-  );
-  const text = await Deno.readTextFile(join(root, "project/input.txt"));
-  await Deno.writeTextFile(join(root, "project/input.txt"), text + "DRIFT");
-  await assert.rejects(() =>
-    Core.withCurrentNativeOperation(candidate.expectation, () => {})
   );
 } finally {
   if (Deno.env.get("C35_KEEP_FIXTURE")) console.log("RETAINED", root);

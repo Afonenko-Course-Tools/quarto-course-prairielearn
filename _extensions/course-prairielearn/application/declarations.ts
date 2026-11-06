@@ -2,9 +2,9 @@ import { NativeSeedTargetsSchema } from "./native-materialization.ts";
 import { submission as parseSubmission } from "./submission.ts";
 import { createMetrics as __createMetrics } from "../observability/bridge.ts";
 const __metrics = __createMetrics("course-prairielearn");
-export const object = (v: any) =>
+export const object = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
-export function closed(v: any, required: string[], optional: string[] = []) {
+export function closed(v: unknown, required: string[], optional: string[] = []) {
   if (!object(v)) throw new Error("PL.DECLARATION_INVALID: expected map");
   const missing = required.filter((k) => !Object.hasOwn(v, k));
   const unknown = Object.keys(v).filter((k) =>
@@ -18,26 +18,23 @@ export function closed(v: any, required: string[], optional: string[] = []) {
           : "unknown " + unknown.join(", ")),
     );
   }
+  return v;
 }
-function readQuestion(v: any, complete: boolean) {
-  closed(
-    v,
-    complete ? ["topic", "submission"] : [],
-    complete
-      ? ["single-variant", "grading"]
-      : ["topic", "submission", "single-variant", "grading"],
-  );
-  if (
-    Object.hasOwn(v, "single-variant") &&
-    typeof v["single-variant"] !== "boolean"
-  ) {
-    throw Error("PL single-variant requires boolean");
+function readQuestion(value: unknown, complete: boolean) {
+  const v = closed(value, complete ? ["topic", "submission"] : [], complete
+    ? ["single-variant", "grading"] : ["topic", "submission", "single-variant", "grading"]);
+
+  let singleVariant: boolean | undefined;
+  if (Object.hasOwn(v, "single-variant")) {
+    const value = v["single-variant"];
+    if (typeof value !== "boolean") throw Error("PL single-variant requires boolean");
+    singleVariant = value;
   }
-  if (
-    Object.hasOwn(v, "topic") &&
-    (typeof v.topic !== "string" || !v.topic.trim())
-  ) {
-    throw Error("PL topic required");
+  let topic: string | undefined;
+  if (Object.hasOwn(v, "topic")) {
+    const value = v.topic;
+    if (typeof value !== "string" || !value.trim()) throw Error("PL topic required");
+    topic = value;
   }
   const submission = Object.hasOwn(v, "submission")
     ? parseSubmission(v.submission, true)
@@ -51,88 +48,99 @@ function readQuestion(v: any, complete: boolean) {
       "PL.WORKSPACE_INVALID: Workspace требует Manual и single-variant: true",
     );
   }
-  return { submission, grading };
+  return { submission, grading, topic, singleVariant };
 }
 /** Частичная native publication policy: отсутствие поля не становится default delivery. */
-export function publicationQuestion(v: any) {
-  const { submission, grading } = readQuestion(v, false);
+export function publicationQuestion(v: unknown) {
+  const { submission, grading, topic, singleVariant } = readQuestion(v, false);
   return {
-    ...(Object.hasOwn(v, "topic") ? { topic: v.topic } : {}),
-    ...(submission ? { submission } : {}),
-    grading,
-    ...(Object.hasOwn(v, "single-variant")
-      ? { singleVariant: v["single-variant"] }
-      : {}),
+    ...(topic !== undefined ? { topic } : {}),
+    ...(submission ? { submission } : {}), grading,
+    ...(singleVariant !== undefined ? { singleVariant } : {}),
     ...(submission?.mode === "workspace" ? { singleVariant: true } : {}),
   };
 }
-export function question(v: any) {
-  const { submission, grading } = readQuestion(v, true);
+export function question(v: unknown) {
+  const { submission, grading, topic, singleVariant } = readQuestion(v, true);
   return {
-    topic: v.topic,
-    ...(v.grading !== undefined && v.grading !== "external" ? { grading } : {}),
-    ...(Object.hasOwn(v, "single-variant")
-      ? { singleVariant: v["single-variant"] }
-      : {}),
-    ...(submission!.mode === "workspace" ? { singleVariant: true } : {}),
+    topic: topic!,
+    ...(grading.method !== "external" ? { grading } : {}),
+    ...(singleVariant !== undefined ? { singleVariant } : {}),
+    ...(submission?.mode === "workspace" ? { singleVariant: true } : {}),
     submission: submission!,
   };
 }
-export function gradingMethod(
-  value: any,
-): { method: "external" | "manual" | "mixed" } {
-  if (value === undefined || value === "external") {
-    return { method: "external" };
+export function gradingMethod(value: unknown): { method: "external" | "manual" | "mixed" } {
+  if (value === undefined || value === "external") return { method: "external" };
+  const record = closed(value, ["method"]);
+  const method = record.method;
+  if (method !== "manual" && method !== "mixed") {
+    throw Error("PL.GRADING_INVALID: grading.method должен быть manual или mixed");
   }
-  closed(value, ["method"]);
-  if (!["manual", "mixed"].includes(value.method)) {
-    throw Error(
-      "PL.GRADING_INVALID: grading.method должен быть manual или mixed",
-    );
-  }
-  return { method: value.method };
+  return { method };
 }
-export function declarations(raw: any, key: string) {
-  closed(raw, ["delivery", "question-defaults"], [
+export function declarations(value: unknown, key: string) {
+  const raw = closed(value, ["delivery", "question-defaults"], [
     "assessment-defaults",
     "seed-targets",
   ]);
+  if (
+    object(raw["assessment-defaults"]) &&
+    Object.hasOwn(raw["assessment-defaults"], "uuid")
+  ) {
+    throw Error(
+      "PL.ASSESSMENT_INVALID: uuid разрешён только в локальной assessment.prairielearn, не в assessment-defaults",
+    );
+  }
   if (raw["seed-targets"] !== undefined) {
     NativeSeedTargetsSchema.parse(raw["seed-targets"]);
   }
-  closed(raw.delivery, ["book", "course", "instances"]);
-  const course = raw.delivery.course;
-  closed(course, ["name", "title", "timezone", "topics"]);
+  const delivery = closed(raw.delivery, ["book", "course", "instances"]);
+  const course = closed(delivery.course, [
+    "name",
+    "title",
+    "timezone",
+    "topics",
+  ]);
   for (const f of ["name", "title", "timezone"]) {
     if (typeof course[f] !== "string" || !course[f].trim()) {
       throw new Error("PL course " + f + " required");
     }
   }
   try {
-    new Intl.DateTimeFormat("en", { timeZone: course.timezone });
+    new Intl.DateTimeFormat("en", { timeZone: course.timezone as string });
   } catch {
     throw new Error("PL timezone invalid");
   }
   if (!Array.isArray(course.topics) || !course.topics.length) {
     throw new Error("PL topics required");
   }
-  for (const topic of course.topics) {
-    closed(topic, ["name", "color", "description"]);
+  for (const value of course.topics) {
+    const topic = closed(value, ["name", "color", "description"]);
     if (Object.values(topic).some((v) => typeof v !== "string" || !v)) {
       throw new Error("PL topic invalid");
     }
   }
   if (
-    !object(raw.delivery.instances) ||
-    !Object.hasOwn(raw.delivery.instances, key) ||
+    !object(delivery.instances) ||
+    !Object.hasOwn(delivery.instances, key) ||
     !/^[a-z0-9][a-z0-9-]*$/.test(key)
   ) throw new Error("PL instance missing");
-  for (
-    const [id, v] of Object.entries(raw.delivery.instances) as [string, any][]
-  ) {
-    closed(v, ["title", "self-enrollment", "works", "publishing"]);
-    closed(v.publishing, ["start-date", "end-date"]);
-    const dates = [v.publishing["start-date"], v.publishing["end-date"]];
+  type Instance = {
+    title: string;
+    "self-enrollment": boolean;
+    works: string[];
+    publishing: { "start-date": string; "end-date": string };
+  };
+  for (const [id, value] of Object.entries(delivery.instances)) {
+    const v = closed(value, [
+      "title",
+      "self-enrollment",
+      "works",
+      "publishing",
+    ]);
+    const publishing = closed(v.publishing, ["start-date", "end-date"]);
+    const dates = [publishing["start-date"], publishing["end-date"]];
     const timestamp =
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
     if (
@@ -143,7 +151,7 @@ export function declarations(raw: any, key: string) {
             0,
             19,
           ) !== date.slice(0, 19)
-      ) || Date.parse(dates[0]) >= Date.parse(dates[1])
+      ) || Date.parse(dates[0] as string) >= Date.parse(dates[1] as string)
     ) {
       throw new Error(
         "PL instance publishing requires ordered explicit timestamps with offsets",
@@ -153,19 +161,26 @@ export function declarations(raw: any, key: string) {
       !/^[a-z0-9][a-z0-9-]*$/.test(id) || typeof v.title !== "string" ||
       !v.title || typeof v["self-enrollment"] !== "boolean" ||
       !Array.isArray(v.works) || !v.works.length ||
-      new Set(v.works).size !== v.works.length || v.works.some((w: any) =>
+      new Set(v.works).size !== v.works.length || v.works.some((w: unknown) =>
         typeof w !== "string" || !/^sec-[a-z0-9-]+$/.test(w)
       )
     ) {
       throw new Error("PL instance invalid");
     }
   }
+  const defaults = question(raw["question-defaults"]);
   return {
-    raw,
-    book: raw.delivery.book,
-    course,
-    instance: raw.delivery.instances[key],
-    defaults: question(raw["question-defaults"]),
+    raw: raw as typeof raw & {
+      delivery: typeof delivery & { instances: Record<string, Instance> };
+      "question-defaults": Record<string, unknown>;
+    },
+    book: delivery.book,
+    course: course as {
+      name: string; title: string; timezone: string;
+      topics: {name: string; color: string; description: string}[];
+    },
+    instance: delivery.instances[key] as Instance,
+    defaults,
   };
 }
 

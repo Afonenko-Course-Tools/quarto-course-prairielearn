@@ -1,9 +1,10 @@
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import { stripVTControlCharacters } from "node:util";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 const assert = (v: unknown, m: string) => {
   if (!v) throw Error(m);
 };
-const p = () => ({
+const p = (): PublicBodyPackage => ({
   schema: "course-body-package-v2",
   owner: "demo",
   release: "native",
@@ -186,7 +187,10 @@ Deno.test("PL refuses questions outside selected work and protects literal templ
     }
     assert(rejected, "unassigned question exported");
     const literal = p();
-    literal.questions[0].condition[0].c[0].c = "Literal {{closed_answer}}";
+    literal.questions[0].condition[0] = {
+      t: "Para",
+      c: [{ t: "Str", c: "Literal {{closed_answer}}" }],
+    };
     await exportPrairieLearn(literal, context, binding, root + "/literal");
     const html = await Deno.readTextFile(
       root + "/literal/questions/demo/exr-clamp/question.html",
@@ -390,17 +394,14 @@ Deno.test("Pandoc command failure preserves tool exit stdout stderr and cause wi
 Deno.test("staged filesystem failure removes partial delivery and retains unknown error", async () => {
   const root = await Deno.makeTempDir();
   try {
-    const candidate: any = p(), bytes = new TextEncoder().encode("resource");
-    const sha256 = Array.from(
-      new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
-      (x) => x.toString(16).padStart(2, "0"),
-    ).join("");
+    const candidate = p();
     candidate.resources.push({
       owner: "demo",
+      source: "tasks.qmd",
+      effectiveBase: ".",
       target: "Clamp.java/image.png",
       visibility: "public",
       data: btoa("resource"),
-      sha256,
     });
     candidate.questions[0].condition = [{
       t: "Para",
@@ -546,13 +547,14 @@ Deno.test("CLI preserves foreign Core diagnostic and unknown stack", async () =>
 Deno.test("ADAPTER invalid resource encoding keeps original cause and resource field", async () => {
   const root = await Deno.makeTempDir();
   try {
-    const candidate: any = p();
+    const candidate = p();
     candidate.resources = [{
       owner: "demo",
+      source: "tasks.qmd",
+      effectiveBase: ".",
       target: "image.png",
       visibility: "public",
       data: "!",
-      sha256: "unused",
     }];
     candidate.questions[0].condition = [{
       t: "Para",
@@ -803,7 +805,7 @@ Deno.test("PL restricted conditions retain closed-marker and resource safety gua
       const [name, target, visibility, hash] of [
         ["private resource", "image.png", "private", "unused"],
         ["resource path traversal", "../image.png", "public", "unused"],
-        ["resource hash mismatch", "image.png", "public", "incorrect"],
+        ["invalid resource encoding", "image.png", "public", "incorrect"],
       ]
     ) {
       const candidate: any = p();
@@ -815,8 +817,7 @@ Deno.test("PL restricted conditions retain closed-marker and resource safety gua
         owner: "demo",
         target,
         visibility,
-        data: btoa("image"),
-        sha256: hash,
+        data: hash === "incorrect" ? "!!!!" : btoa("image"),
       }];
       let error: any;
       try {
@@ -1462,5 +1463,120 @@ Deno.test("publication conditions проходят normal prepared files и coll
     } finally {
       await Deno.remove(root, { recursive: true });
     }
+  }
+});
+
+
+Deno.test("Java формы взаимоисключающие по точным выбранным исходникам", async () => {
+  const root = await Deno.makeTempDir();
+  const policy = { archive: "solution.zip", maxFiles: 128, maxFileBytes: 1048576,
+    maxTotalBytes: 4194304, maxArchiveBytes: 2097152 };
+  const cases = [
+    { names: ["Расчёт.java"], form: "editor" },
+    { names: ["grade/Study.java", "model/Value.java"], form: "editor" },
+    { names: ["A.java", "B.java", "C.java"], form: "files" },
+    { names: ["grade/Study.java", "grade/Value.java", "model/Key.java"], form: "zip" },
+  ];
+  try {
+    for (const [index, test] of cases.entries()) {
+      const project = "/project-" + index;
+      for (const name of [...test.names, "Unselected.java"]) {
+        const path = root + project + "/student/" + name;
+        await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
+        await Deno.writeTextFile(path, "// STARTER ёж & <x> {{x}} " + name);
+      }
+      await Deno.mkdir(root + project + "/tests", { recursive: true });
+      await Deno.writeTextFile(root + project + "/tests/grade.sh", "PRIVATE_TEST");
+      for (const primaryRequired of [false, true]) {
+        const b = structuredClone(binding) as any;
+        Object.assign(b.questions["exr-clamp"], { files: test.names,
+          submission: { mode: "upload", layout: "files-or-zip" },
+          additionalJavaSources: { ...policy, primaryRequired, allowAdditional: true } });
+        const out = root + "/out-" + index + "-" + primaryRequired;
+        await exportPrairieLearn(p(), { projectRoot: root, projects: { "exr-clamp": project } }, b, out);
+        const html = await Deno.readTextFile(out + "/questions/demo/exr-clamp/question.html");
+        const editors = (html.match(/<pl-file-editor /g) ?? []).length;
+        const uploads = (html.match(/<pl-file-upload /g) ?? []).length;
+        if (test.form === "editor") {
+          assert(editors === test.names.length && uploads === 0, "Один/два выбранных файла требуют только редакторы");
+          assert(test.names.every(name => html.includes('file-name="' + name + '"')), "Настоящие имена потеряны");
+          assert(html.includes("STARTER ёж &amp; &lt;x&gt; &#123;&#123;x&#125;&#125;"), "UTF-8 starter не сохранён");
+          assert(!html.includes('allow-blank="true"'), "Сохранился обход пустого editor для ZIP");
+        } else if (test.form === "files") {
+          assert(editors === 0 && uploads === 1 && html.includes('file-names="A.java,B.java,C.java"'), "Плоские 3+ требуют только файловый диалог");
+        } else {
+          assert(editors === 0 && uploads === 1 && html.includes('file-names="solution.zip"'), "Дерево 3+ требует только ZIP");
+        }
+        assert(!html.includes("optional-file-") && !html.includes("очистите"), "Смешанные пути ответа остались в форме");
+        assert(!html.includes("PRIVATE_TEST"), "Закрытые проверки раскрыты");
+      }
+    }
+  } finally { await Deno.remove(root, { recursive: true }); }
+});
+
+Deno.test("ordinary public-tests Div reaches question HTML and preserves supplied README and public JUnit", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const markdown = `::: {.public-tests}
+### Открытые проверки
+
+Сравните **пустую строку** и \`null\`. См. [JUnit](https://junit.org/).
+
+| Вызов | Результат |
+|---|---|
+| \`value()\` | \`42\` |
+
+\`\`\`java
+assertEquals(42, Clamp.value());
+\`\`\`
+:::
+`;
+    await Deno.writeTextFile(root + "/condition.md", markdown);
+    const pandoc = async (format: string) => {
+      const result = await new Deno.Command(Deno.env.get("QUARTO") || "quarto", {
+        args: ["pandoc", root + "/condition.md", "--from=markdown", "--to=" + format],
+        stdout: "piped", stderr: "piped",
+      }).output();
+      assert(result.success, "ordinary Pandoc conversion failed");
+      return new TextDecoder().decode(result.stdout);
+    };
+    const ast = JSON.parse(await pandoc("json"));
+    assert(ast.blocks[0].t === "Div" && ast.blocks[0].c[0][1].includes("public-tests"),
+      "fixture must use a real ordinary Pandoc Div");
+    const readme = await pandoc("gfm");
+    const publicJUnit = "import org.junit.jupiter.api.Test;\nimport static org.junit.jupiter.api.Assertions.assertEquals;\nclass PublicChecks { @Test void result() { assertEquals(42, Clamp.value()); } }\n";
+    const starter = "public class Clamp { public static int value() { return 0; } }\n";
+    const artifactFiles = [{name: "README.md", bytes: new TextEncoder().encode(readme)},
+      {name: "src/test/java/PublicChecks.java", bytes: new TextEncoder().encode(publicJUnit)},
+      {name: "Clamp.java", bytes: new TextEncoder().encode(starter)}];
+    await Deno.mkdir(root + "/project/student", { recursive: true });
+    await Deno.mkdir(root + "/project/tests", { recursive: true });
+    await Deno.writeTextFile(root + "/project/student/Clamp.java", starter);
+    await Deno.writeTextFile(root + "/project/tests/grade.sh", "PRIVATE_CHECKS");
+    const body = p();
+    body.apiVersion = ast["pandoc-api-version"];
+    body.questions[0].condition = ast.blocks;
+    const original = JSON.stringify(body.questions[0].condition);
+    const b = structuredClone(binding) as any;
+    b.questions["exr-clamp"].submission = {mode: "editor", aceMode: "ace/mode/java"};
+    await exportPrairieLearn(body, {
+      nativeBody: true, projectRoot: root, projects: {"exr-clamp": "/project"},
+      // Packaging belongs to Download; this test checks the supplied file boundary.
+      studentArtifacts: {"exr-clamp": {files: artifactFiles, archive: new Uint8Array([80, 75, 3, 4])}},
+    }, b, root + "/out");
+    const base = root + "/out/questions/demo/exr-clamp";
+    const html = await Deno.readTextFile(base + "/question.html");
+    for (const content of ['class="public-tests"', "Открытые проверки", "<table>", "<strong>", "assertEquals", 'href="https://junit.org/"']) {
+      assert(html.includes(content), "ordinary Markdown lost: " + content);
+    }
+    assert(!html.includes("PRIVATE_CHECKS") && !html.includes("pl-file-upload"),
+      "private files or mixed submission controls leaked");
+    assert(JSON.stringify(body.questions[0].condition) === original, "Body was mutated");
+    assert(await Deno.readTextFile(base + "/clientFilesQuestion/starter/README.md") === readme,
+      "supplied ordinary README changed");
+    assert(await Deno.readTextFile(base + "/clientFilesQuestion/starter/src/test/java/PublicChecks.java") === publicJUnit,
+      "real public JUnit file lost or rewritten");
+  } finally {
+    await Deno.remove(root, { recursive: true });
   }
 });

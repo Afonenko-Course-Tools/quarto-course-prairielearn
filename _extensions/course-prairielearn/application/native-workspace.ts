@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import {
   captureNativeAuxiliary,
   type NativeAuxiliary,
@@ -8,15 +9,13 @@ import {
 } from "./native-materialization.ts";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { hash, safePath } from "./source-selection.ts";
+import { safePath } from "./source-selection.ts";
 import { submission } from "./submission.ts";
 
 const trustedModule = join(
   dirname(fileURLToPath(import.meta.url)),
   "trusted-git/build_git_materials.py",
 );
-const trustedModuleHash =
-  "2962ec664db71376a84331489ab15e7d2dfe3e31b2ed0e5e9094ac0eabec7c29";
 type File = { name: string; bytes: Uint8Array };
 async function ownerFile(root: string, path: string) {
   if (!safePath(path)) {
@@ -35,7 +34,7 @@ async function ownerFile(root: string, path: string) {
 }
 /** Узкая production-операция для уже принятого include-git seed_recipe.py.
  * Native operation и его executable PL validator обязан вызвать composition.
- * .git не проходит через общий Core ArtifactInventory.
+ * .git не проходит через общий Core ArtifactFiles.
  */
 export async function nativeWorkspaceArtifact(options: {
   root: string;
@@ -115,7 +114,7 @@ export async function nativeWorkspaceArtifact(options: {
     const selected = options.files.filter((file) => file.name === target);
     if (
       selected.length !== 1 ||
-      await hash(source) !== await hash(selected[0].bytes)
+      !isDeepStrictEqual(source,selected[0].bytes)
     ) {
       throw Error(
         "PL.WORKSPACE_SEED: common file lacks exact native inventory binding",
@@ -123,10 +122,6 @@ export async function nativeWorkspaceArtifact(options: {
     }
   }
   const recipe = await ownerFile(root, options.project + "/seed_recipe.py");
-  const helperBytes = await Deno.readFile(trustedModule);
-  if (await hash(helperBytes) !== trustedModuleHash) {
-    throw Error("PL.WORKSPACE_SEED: trusted module changed");
-  }
   await options.assertCurrent();
   const stage = await Deno.makeTempDir({ prefix: "pl-native-seed-" });
   try {
@@ -252,7 +247,7 @@ export async function nativeWorkspaceArtifact(options: {
     ) {
       const generated = files.find((f) => f.name === original.name);
       if (
-        !generated || await hash(generated.bytes) !== await hash(original.bytes)
+        !generated || !isDeepStrictEqual(generated.bytes,original.bytes)
       ) {
         throw Error(
           "PL.WORKSPACE_SEED: recipe changes declared starter material",
@@ -265,15 +260,11 @@ export async function nativeWorkspaceArtifact(options: {
       files.some((f) => !safePath(f.name) || f.name.startsWith(".pl-seed/"))
     ) throw Error("PL.WORKSPACE_SEED: duplicate/service file");
     paths(files, true);
-    if (await hash(await Deno.readFile(trustedModule)) !== trustedModuleHash) {
-      throw Error("PL.WORKSPACE_SEED: trusted module changed");
-    }
     await options.assertCurrent();
     return {
       files,
       archive: options.zip(files),
       initial,
-      trustedModuleSha256: trustedModuleHash,
     };
   } finally {
     await Deno.remove(stage, { recursive: true });

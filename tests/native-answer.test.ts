@@ -1,3 +1,5 @@
+import type { NativeAdapterValidationInput } from "course-core/public.ts";
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 function fixtureSlots(a: any) {
   const slot = (name: string, type: string, i: number, extra: any = {}) => ({
     name,
@@ -38,10 +40,15 @@ async function copyTree(from: string, to: string) {
     else await Deno.copyFile(from + "/" + e.name, to + "/" + e.name);
   }
 }
-import { exportCourse } from "../_extensions/course-prairielearn/application/export-course.ts";
+import {
+  exportCourse,
+  type ExportCourseContent,
+} from "../_extensions/course-prairielearn/application/export-course.ts";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 import { infoQuestion } from "../_extensions/course-prairielearn/application/native-validators.js";
-const forms = [{ type: "manual", submission: "text" }, {
+const forms: NonNullable<
+  NativeAdapterValidationInput["declarations"][number]["answer"]
+>[] = [{ type: "manual", submission: "text" }, {
   type: "numeric",
   key: { value: 734129, tolerance: { absolute: 0.1 } },
 }, {
@@ -78,7 +85,7 @@ for (const answer of forms) {
         const id = "exr-answer",
           key = "fixture/" + id,
           manual = answer.type === "manual",
-          pkg = {
+          pkg: PublicBodyPackage = {
             schema: "course-body-package-v2",
             owner: "fixture",
             release: "native",
@@ -139,7 +146,7 @@ for (const answer of forms) {
           : answer.type === "multipart"
           ? { "auto-points": 80, "manual-points": 20 }
           : { "question-points": 1 };
-        const work = {
+        const work: ExportCourseContent["assessments"][number] = {
           id: "sec-work",
           source: "work.qmd",
           kind: "lab",
@@ -207,12 +214,14 @@ for (const answer of forms) {
             projects: [],
           },
           checks: {
-            schemaVersion: 1,
+            schemaVersion: 3,
             courseId: "fixture",
             bookRoot: "tasks",
-            sourceSnapshotHash: "a".repeat(64),
-            inventoryHash: "b".repeat(64),
             projects: [],
+          },
+          nativeInputs: {},
+          studentArtifact: async () => {
+            throw Error("Ответ без проекта не запрашивает student artifact");
           },
           registry: { schemaVersion: 1, profiles: {} },
           config,

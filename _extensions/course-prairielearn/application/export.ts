@@ -1,7 +1,8 @@
+import type { BodyResource, PublicBodyPackage } from "course-core/body-export/model.ts";
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { renderNativeAnswer } from "./native-answer.ts";
 import { workspaceSeed } from "./workspace-seed.ts";
-import { submission as parseSubmission } from "./submission.ts";
+import { fileSubmission, submission as parseSubmission } from "./submission.ts";
 import {
   type PublicationCondition,
   publicationConditionFile,
@@ -29,6 +30,10 @@ const safe = (v: unknown): v is string =>
 const fields = (v: any, required: string[], optional: string[] = []) =>
   record(v) && required.every((k) => Object.hasOwn(v, k)) &&
   Object.keys(v).every((k) => [...required, ...optional].includes(k));
+export interface StudentArtifact {
+  files: { name: string; bytes: Uint8Array; reason?: string }[];
+  archive: Uint8Array;
+}
 export interface ProjectContext {
   deferPublish?: boolean;
   nativeBody?: boolean;
@@ -37,10 +42,7 @@ export interface ProjectContext {
   projectRoot: string;
   projects: Record<string, string>;
   publicationConditions?: Record<string, PublicationCondition>;
-  studentArtifacts?: Record<
-    string,
-    { files: { name: string; bytes: Uint8Array }[]; archive: Uint8Array }
-  >;
+  studentArtifacts?: Record<string, StudentArtifact>;
 }
 export async function publicProjectFiles(root: string) {
   const result = await files(root, { field: "project.student" }, true);
@@ -209,7 +211,7 @@ async function files(
   return collected.sort((a, b) => a.name.localeCompare(b.name));
 }
 export async function renderPublicBody(
-  p: any,
+  p: Pick<PublicBodyPackage, "owner" | "apiVersion" | "resources">,
   nodes: any[],
   key: string,
   questionContext: DiagnosticContext,
@@ -229,8 +231,8 @@ export async function renderPublicBody(
     markerIndex++;
   }
   const resourceMarker = "PL_CLIENT_FILE_URL_TOKEN_" + markerIndex;
-  const resources = new Map<string, any>();
-  const declaredResources = new Map<string, any>();
+  const resources = new Map<string, BodyResource>();
+  const declaredResources = new Map<string, BodyResource>();
   for (const resource of p.resources) {
     const previous = declaredResources.get(resource.target);
     if (previous && canonical(previous) !== canonical(resource)) {
@@ -445,18 +447,6 @@ export async function renderPublicBody(
         cause,
       );
     }
-    const hash = Array.from(
-      new Uint8Array(
-        await crypto.subtle.digest("SHA-256", new Uint8Array(bytes!)),
-      ),
-      (x) => x.toString(16).padStart(2, "0"),
-    ).join("");
-    if (hash !== r.sha256) {
-      questionFail(
-        "Контрольная сумма ресурса не совпадает: " + r.target,
-        "resources.sha256",
-      );
-    }
     files.push({
       name: resourceBase + "/" + r.target,
       data: bytes!,
@@ -474,7 +464,9 @@ export async function renderPublicBody(
   ).replaceAll(resourceMarker + "/", clientFilesToken + "/");
   return { html, files };
 }
-function metadata(q: any): string {
+function metadata(
+  q: Pick<PublicBodyPackage["questions"][number], "difficulty" | "time">,
+): string {
   const difficulty: Record<string, string> = {
     introductory: "Начальный",
     intermediate: "Средний",
@@ -489,7 +481,7 @@ function metadata(q: any): string {
     : "";
 }
 export async function exportPrairieLearn(
-  p: any,
+  p: PublicBodyPackage,
   context: ProjectContext,
   binding: any,
   output: string,
@@ -547,7 +539,7 @@ export async function exportPrairieLearn(
     refuse("Требуется одна работа", "works");
   }
   if (
-    !fields(work, ["owner", "id", "key", "source", "kind", "title", "slots"], [
+    !work || !fields(work, ["owner", "id", "key", "source", "kind", "title", "slots"], [
       "theoryTime",
       "relatedExercise",
       "introduction",
@@ -562,20 +554,24 @@ export async function exportPrairieLearn(
     work.theoryTime !== undefined &&
       (typeof work.theoryTime !== "number" ||
         !Number.isFinite(work.theoryTime) || work.theoryTime <= 0)
-  ) refuse("Неверные поля работы v2", "works");
+  ) return refuse("Неверные поля работы v2", "works");
   try {
     validateSlots(work.slots, p.owner, work.id, true);
   } catch (error) {
     refuse("Неверные позиции Body v2: " + String(error), "works.slots");
   }
-  const candidates = work.slots.flatMap((slot: any) => slot.candidates);
+  const candidates = work.slots.flatMap((slot) => slot.candidates);
   if (
     candidates.length !== p.questions.length ||
-    p.questions.some((q: any) => !candidates.includes(q?.key))
+    p.questions.some((q) => !candidates.includes(q?.key))
   ) refuse("Каталог должен содержать всех кандидатов", "works.slots");
-  const assignments = Object.fromEntries(
-    work.slots.flatMap((slot: any) =>
-      slot.candidates.map((id: string) => [id, slot.assignment])
+  const assignments = Object.fromEntries<
+    PublicBodyPackage["works"][number]["slots"][number]["assignment"]
+  >(
+    work.slots.flatMap((slot) =>
+      slot.candidates.map((id): [string, typeof slot.assignment] =>
+        [id, slot.assignment]
+      )
     ),
   );
   const prepared: { name: string; data: Uint8Array }[] = [];
@@ -626,7 +622,7 @@ export async function exportPrairieLearn(
         q.answerType,
       ) ||
       !Array.isArray(q.condition) || !Array.isArray(q.publicAnswer)
-    ) questionFail("Неверный публичный вопрос", "questions");
+    ) return questionFail("Неверный публичный вопрос", "questions");
     if (
       ["test", "practical"].includes(work.kind) &&
       q.statementVisibility !== "restricted"
@@ -751,11 +747,11 @@ export async function exportPrairieLearn(
       : undefined;
     if (
       manual &&
-      (submission.mode === "editor" || b.additionalJavaSources !== undefined ||
-        b.externalGradingOptions !== undefined)
+      (b.additionalJavaSources !== undefined || b.externalGradingOptions !== undefined ||
+        submission.mode === "editor" && (!b.files.length || b.files.some((name: string) => !name.endsWith(".java"))))
     ) {
       questionFail(
-        "Manual требует upload или Workspace без автоматического runtime",
+        "Manual требует настоящие Java starter-файлы для editor и не допускает автоматический runtime",
         "submission",
       );
     }
@@ -934,11 +930,15 @@ export async function exportPrairieLearn(
         b.files,
         tests.map((f) => f.name),
       );
-    if (extras?.primaryRequired === false && submission.mode !== "upload") {
-      questionFail(
-        "Необязательные primary Java sources требуют submission.mode: upload",
-        "submission",
-      );
+    if (!workspace && b.files.length && b.files.every((name: string) => name.endsWith(".java")) && (extras || manual)) {
+      submission = fileSubmission(b.files, submission.mode === "editor" ? submission.aceMode : undefined);
+    }
+    if (manual && b.files.length && b.files.every((name: string) => name.endsWith(".java"))) {
+      for (const name of b.files) {
+        const starter = student.find(file => file.name === name);
+        if (!starter) questionFail("Нет настоящего starter для Manual Java", "project.student." + name);
+        prepared.push({ name: base + "/serverFilesQuestion/starter/" + name, data: starter!.data });
+      }
     }
     let controls: string;
     if (workspace) {
@@ -979,30 +979,22 @@ export async function exportPrairieLearn(
         '<pl-file-download file-name="' + escape(f.name) +
         '"></pl-file-download>'
       ).join("\n");
-      controls = downloads + (extras?.primaryRequired === false
-        ? '\n<pl-file-upload optional-file-names="' +
-          escape([
-            ...b.files.filter((name: string) => !name.includes("/")),
-            extras.archive,
-          ].join(",")) + '"></pl-file-upload>'
+      const layout = submission.mode === "upload" ? submission.layout : undefined;
+      const zip = layout === "zip" || layout === undefined &&
+        b.files.length >= 3 && b.files.some((name: string) => name.includes("/"));
+      if (zip && !manual && !extras) {
+        questionFail("Для вложенного ответа требуется явный ZIP transport в additional-java-sources", "submission");
+      }
+      controls = downloads + (zip
+        ? '\n<pl-file-upload file-names="' + escape(extras?.archive ?? "solution.zip") + '"></pl-file-upload>'
+        : layout === "files"
+        ? '\n<pl-file-upload file-names="' + escape(b.files.join(",")) + '"></pl-file-upload>'
         : manual
         ? '\n<pl-file-upload file-patterns="*" optional-file-patterns="*"></pl-file-upload>'
-        : '\n<pl-file-upload file-names="' +
-          escape(b.files.join(",")) + '"' + (extras
-            ? ' optional-file-names="' + escape(extras.archive) + '"'
-            : "") +
-          "></pl-file-upload>");
+        : '\n<pl-file-upload file-names="' + escape(b.files.join(",")) + '"></pl-file-upload>');
     }
-    if (extras) {
-      if (submission.mode === "editor") {
-        controls += '\n<pl-file-upload optional-file-names="' +
-          escape(extras.archive) + '"></pl-file-upload>';
-      }
-    }
-    if (extras?.primaryRequired === false) {
-      controls =
-        "<p>Перечисленные в поле загрузки файлы можно отправить отдельно; исходники с пакетами и остальные .java поместите в ZIP, сохранив относительные пути.</p>\n" +
-        controls;
+    if (submission.mode === "upload" && submission.layout === "zip") {
+      controls = "<p>Загрузите один ZIP со всеми исходниками, сохранив перечисленные относительные пути внутри архива.</p>\n" + controls;
     }
     if (artifact) {
       controls =

@@ -1,21 +1,29 @@
-import { runtimeDescriptor } from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
 import {
-  hash,
-  selectedSources,
-} from "../_extensions/course-prairielearn/application/source-selection.ts";
+  type NativeProjectCheck,
+  NativeProjectCheckSchema,
+} from "../_extensions/course-prairielearn/application/native-checks.ts";
+import { runtimeDescriptor } from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
 const assert = (v: unknown, m: string) => {
   if (!v) throw Error(m);
 };
-const build = {
+const build: NonNullable<NativeProjectCheck["java-build"]> = {
   kind: "gradle-jar-v1",
   "main-class": "grade.Main",
   artifact: "gradeapp.jar",
 };
-const check = {
+const check = NativeProjectCheckSchema.parse({
+  profile: "fixture",
+  "source-profile": "main",
+  tests: ["tests/**"],
+  scoring: { mode: "weighted" },
   runtime: "java25-gradle-junit-v1",
-  sourceProfile: { mode: "implementation", root: "student/src/main/java" },
+  sourceProfile: {
+    mode: "implementation",
+    root: "student/src/main/java",
+    include: ["**/*.java"],
+  },
   "java-build": build,
-};
+});
 const profile = { mode: "implementation", javaRelease: 25 };
 function rejected(fn: () => unknown) {
   let denied = false;
@@ -77,11 +85,16 @@ Deno.test("native Gradle descriptors fail closed on absent records unknown recip
       { sourceProfile: { ...check.sourceProfile, mode: "student-tests" } },
     ]
   ) {
-    rejected(() =>
-      runtimeDescriptor({ ...check, ...patch }, profile, ["Main.java"], [
-        "Checks.java",
-      ])
-    );
+    const raw: unknown = { ...check, ...patch };
+    // Намеренно неверный raw приходит через внешнюю JS-границу; результат не используется.
+    rejected(() => {
+      Reflect.apply(runtimeDescriptor, undefined, [
+        raw,
+        profile,
+        ["Main.java"],
+        ["Checks.java"],
+      ]);
+    });
   }
   for (
     const artifact of [
@@ -101,7 +114,10 @@ Deno.test("native Gradle descriptors fail closed on absent records unknown recip
   ) {
     rejected(() =>
       runtimeDescriptor(
-        { ...check, "java-build": { ...build, artifact } },
+        {
+          ...check,
+          "java-build": { ...build, artifact },
+        },
         profile,
         ["Main.java"],
         ["Checks.java"],
@@ -120,7 +136,10 @@ Deno.test("native Gradle descriptors fail closed on absent records unknown recip
   ) {
     rejected(() =>
       runtimeDescriptor(
-        { ...check, "java-build": { ...build, "main-class": main } },
+        {
+          ...check,
+          "java-build": { ...build, "main-class": main },
+        },
         profile,
         ["Main.java"],
         ["Checks.java"],
@@ -140,14 +159,14 @@ Deno.test("native Gradle descriptors fail closed on absent records unknown recip
     ]
   ) rejected(() => runtimeDescriptor(check, p, ["Main.java"], ["Checks.java"]));
   const legacy = runtimeDescriptor(
-    { runtime: "java25-junit-v1", sourceProfile: { mode: "implementation" } },
+    { ...check, runtime: "java25-junit-v1", "java-build": undefined },
     profile,
     ["Main.java"],
     ["Checks.java"],
   );
   assert(!("javaBuild" in legacy), "plain Java acquired native build");
   const fish = runtimeDescriptor(
-    { runtime: "fish-git-v1", sourceProfile: { mode: "implementation" } },
+    { ...check, runtime: "fish-git-v1", "java-build": undefined },
     { sourceExtensions: [".fish"] },
     ["main.fish"],
     ["checks.py"],
@@ -157,72 +176,12 @@ Deno.test("native Gradle descriptors fail closed on absent records unknown recip
     "fish acquired Java build",
   );
 });
-Deno.test("native Gradle selection rejects scripts artifacts public tests and invalid coupling before payload", async () => {
-  const root = await Deno.makeTempDir({ prefix: "pl-native-gradle-" });
-  try {
-    const name = "student/src/main/java/grade/Main.java",
-      bytes = new TextEncoder().encode("package grade; class Main {}");
-    await Deno.mkdir(root + "/student/src/main/java/grade", {
-      recursive: true,
-    });
-    await Deno.writeFile(root + "/" + name, bytes);
-    const source = {
-      projectRelativePath: name,
-      submissionRelativePath: "grade/Main.java",
-      sha256: await hash(bytes),
-    };
-    const fact = { check, sources: [source] };
-    const selected = await selectedSources(root, fact, profile);
-    assert(
-      selected.length === 1 && selected[0].name === "grade/Main.java",
-      "native selected source lost",
-    );
-    for (
-      const bad of [
-        { ...fact, check: { ...check, "java-build": undefined } },
-        { ...fact, check: { ...check, runtime: "java25-junit-v1" } },
-        {
-          ...fact,
-          sources: [{ ...source, submissionRelativePath: "build.gradle" }],
-        },
-        {
-          ...fact,
-          sources: [{ ...source, submissionRelativePath: "gradeapp.jar" }],
-        },
-        {
-          ...fact,
-          check: {
-            ...check,
-            sourceProfile: {
-              mode: "implementation",
-              root: "student/src/test/java",
-            },
-          },
-          sources: [{
-            ...source,
-            projectRelativePath: "student/src/test/java/Main.java",
-            submissionRelativePath: "Main.java",
-          }],
-        },
-      ]
-    ) {
-      let denied = false;
-      try {
-        await selectedSources(root, bad, profile);
-      } catch {
-        denied = true;
-      }
-      assert(denied, "native payload admitted invalid source/coupling");
-    }
-  } finally {
-    await Deno.remove(root, { recursive: true });
-  }
-});
 Deno.test("Java API capability accepts only the two explicit implementation runtimes", () => {
   const api = { files: ["Api.java"], entry: "Api" };
   const c = {
+    ...check,
+    "java-build": undefined,
     runtime: "custom-java-v1",
-    sourceProfile: { mode: "implementation" },
     "api-precheck": { files: ["tests/Api.java"], entry: "Api" },
   };
   rejected(() =>
@@ -235,7 +194,7 @@ Deno.test("Java API capability accepts only the two explicit implementation runt
     )
   );
   const plain = runtimeDescriptor(
-    { ...c, runtime: "java25-junit-v1" },
+    NativeProjectCheckSchema.parse({ ...c, runtime: "java25-junit-v1" }),
     profile,
     ["Main.java"],
     ["Api.java", "Checks.java"],
@@ -278,25 +237,27 @@ Deno.test("optional-primary policy preserves absent bytes and validates both typ
     );
   }
   for (const value of [0, 1, "false", null, undefined, []]) {
-    rejected(() =>
-      runtimeDescriptor(
-        {
-          ...check,
-          "additional-java-sources": { ...extra, "primary-required": value },
-        },
+    const raw: unknown = {
+      ...check,
+      "additional-java-sources": { ...extra, "primary-required": value },
+    };
+    // Намеренно неверный raw приходит через внешнюю JS-границу; результат не используется.
+    rejected(() => {
+      Reflect.apply(runtimeDescriptor, undefined, [
+        raw,
         profile,
         ["Main.java"],
         ["Checks.java"],
-      )
-    );
+      ]);
+    });
   }
 });
 
 Deno.test("native library Gradle descriptor omits mainClass and rejects bad present values", () => {
-  const library = {
+  const library = NativeProjectCheckSchema.parse({
     ...check,
     "java-build": { kind: "gradle-jar-v1", artifact: "library.jar" },
-  };
+  });
   const result: any = runtimeDescriptor(library, profile, ["Book.java"], [
     "Api.java",
     "Checks.java",
@@ -307,16 +268,31 @@ Deno.test("native library Gradle descriptor omits mainClass and rejects bad pres
     "library requires fictitious mainClass",
   );
   for (const value of [null, "", false, 5, "bad;Main"]) {
-    rejected(() =>
-      runtimeDescriptor(
-        {
-          ...library,
-          "java-build": { ...library["java-build"], "main-class": value },
-        },
+    const raw: unknown = {
+      ...library,
+      "java-build": { ...library["java-build"], "main-class": value },
+    };
+    // Намеренно неверный raw приходит через внешнюю JS-границу; результат не используется.
+    rejected(() => {
+      Reflect.apply(runtimeDescriptor, undefined, [
+        raw,
         profile,
         ["Book.java"],
         ["Checks.java"],
-      )
-    );
+      ]);
+    });
   }
+});
+
+Deno.test("ZIP фиксированного проекта сохраняет закрытый состав исходников", () => {
+  const parsed = NativeProjectCheckSchema.parse({ ...check,
+    "additional-java-sources": { "primary-required": true, "allow-additional": false,
+      archive: "solution.zip", "max-files": 128, "max-file-bytes": 1048576,
+      "max-total-bytes": 4194304, "max-archive-bytes": 2097152 },
+  });
+  const descriptor = runtimeDescriptor(parsed, profile,
+    ["grade/Main.java", "grade/Student.java", "grade/Reports.java"], ["Check.java"]);
+  assert(descriptor.additionalJavaSources?.allowAdditional === false &&
+    descriptor.additionalJavaSources.primaryRequired === true,
+    "ZIP расширил допустимый состав ответа");
 });

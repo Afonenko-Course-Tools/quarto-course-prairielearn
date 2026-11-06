@@ -2,13 +2,6 @@ type Artifact = {
   files: { name: string; bytes: Uint8Array }[];
   archive: Uint8Array;
 };
-const sha256 = async (bytes: Uint8Array) =>
-  Array.from(
-    new Uint8Array(
-      await crypto.subtle.digest("SHA-256", new Uint8Array(bytes)),
-    ),
-    (b) => b.toString(16).padStart(2, "0"),
-  ).join("");
 
 export async function workspaceSeed(
   artifact: Artifact | undefined,
@@ -38,17 +31,7 @@ export async function workspaceSeed(
   if (!names.some((name) => name.startsWith("work/.git/objects/"))) {
     throw Error("PL.WORKSPACE_SEED: нет Git objects");
   }
-  const entries = await Promise.all(
-    artifact.files.map(async (file) => ({
-      name: file.name,
-      sha256: await sha256(file.bytes),
-    })),
-  );
-  const manifest = {
-    schema: "pl-git-workspace-seed-v1",
-    sha256: await sha256(artifact.archive),
-    files: entries,
-  };
+  const manifest = { schema: "pl-git-workspace-seed-v1", files: names };
   return [
     { name: ".pl-seed/starter.zip", data: artifact.archive },
     {

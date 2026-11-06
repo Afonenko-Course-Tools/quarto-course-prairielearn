@@ -1,3 +1,14 @@
+import type * as CorePublic from "course-core/public.ts";
+import type {
+  NativeOperationIdentity,
+  NativeOperation,
+  NativeAssignmentRequest,
+  NativeAssignmentDeliveryOptions,
+  NativeAdapterValidationInput,
+  NativePendingOperationExpectation,
+  NativePreparedLease,
+  NativePreparedOperation,
+} from "course-core/public.ts";
 import { nativeBusinessInput, nativeMetadataReadSet } from "./native-input.ts";
 import { assertNativeSeedTargets } from "./native-business.ts";
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
@@ -10,18 +21,24 @@ import { nativeWorkspaceArtifact } from "./native-workspace.ts";
 import { readNativeEntryCandidate } from "./native-entry.ts";
 import { decodeNativeCheck } from "./native-checks.ts";
 import { decodeNativeBusiness } from "./native-business.ts";
-import { hash, safePath } from "./source-selection.ts";
+import { safePath } from "./source-selection.ts";
 
-// Runtime-схемы Core поставляет composition через его публичный модуль.
-export type PublicCore = {
-  withPendingNativeOperation: (
-    expectation: any,
-    callback: (pending: any) => Promise<unknown>,
-  ) => Promise<unknown>;
-  NativeAdapterValidationInputSchema: { parse: (value: unknown) => any };
-  ArtifactInventorySchema: { parse: (value: unknown) => any };
-  NativeOperationIdentitySchema: { parse: (value: unknown) => any };
-  NativePreparedOperationSchema?: { parse: (value: unknown) => any };
+// Типы берутся из того же публичного Core, который выбирает composition.
+// При проверке course-core/ разрешается import map; runtime import отсутствует.
+export type PublicCore = Pick<
+  typeof CorePublic,
+  | "withPendingNativeOperation"
+  | "NativeAdapterValidationInputSchema"
+  | "ArtifactFilesSchema"
+  | "NativeOperationIdentitySchema"
+  | "NativePreparedOperationSchema"
+>;
+export type NativePreparedRequest = {
+  schema: "pl-native-business-request-v1";
+  owner: string;
+  identity: NativeOperationIdentity;
+  outputDirectory: string;
+  inputs: NativePreparedOperation["inputs"];
 };
 const ownBase = "_generated/course-spec/prairielearn-native";
 const generation = z.string().uuid();
@@ -56,10 +73,10 @@ async function ownFile(root: string, path: string) {
 }
 async function requestValue(
   root: string,
-  identity: any,
-  inputs: any[],
+  identity: NativeOperationIdentity,
+  inputs: NativePreparedOperation["inputs"],
   outputDirectory: string,
-) {
+): Promise<NativePreparedRequest> {
   if (
     !inputs.length || inputs.some((input) =>
       !safePath(input.source) ||
@@ -87,7 +104,7 @@ export async function nativePreparedRequest(core: PublicCore, value: unknown) {
   ) throw Error("PL.CAPTURE_CHANGED: prepared owner/output");
   return await requestValue(d.root, d.identity, d.inputs, d.outputDirectory);
 }
-async function saveRequest(root: string, request: any) {
+async function saveRequest(root: string, request: NativePreparedRequest) {
   const id = generation.parse(request.identity.operation),
     folder = await directory(root, ownBase + "/" + id);
   try {
@@ -120,8 +137,10 @@ async function saveRequest(root: string, request: any) {
 }
 export async function prepareNativeAdapter(
   core: PublicCore,
-  expectation: any,
-  lease?: { descriptor: unknown; assert(expected: unknown): Promise<void> },
+  expectation: Omit<NativePendingOperationExpectation, "profiles"> & {
+    profiles?: string[];
+  },
+  lease?: Pick<NativePreparedLease, "descriptor" | "assert">,
 ) {
   const root = await Deno.realPath(expectation.root);
   if (lease) {
@@ -208,15 +227,17 @@ export function createNativeAdapter(
     : options.core.NativeOperationIdentitySchema.parse(
       options.preparedIdentity,
     );
-  const loaded = new Map<string, ReturnType<typeof decodeNativeBusiness>>();
-  const effectiveInputs = new Map<string, any>();
+  const captured = new Map<string, {
+    business: ReturnType<typeof decodeNativeBusiness>;
+    input: NativeAdapterValidationInput;
+  }>();
   let composing = false;
   let validatingRequest: Awaited<ReturnType<typeof requestFor>> | undefined;
   let validatedCourse: {
-    operation: any;
-    identity: any;
-    request: any;
-    proof: any;
+    operation: NativeOperation;
+    identity: NativeOperation["identity"];
+    request: Parameters<NativeOperation["validateRelease"]>[0];
+    proof: Awaited<ReturnType<NativeOperation["validateRelease"]>>;
   } | undefined;
   const adapter = {
     name: "prairielearn",
@@ -297,16 +318,15 @@ export function createNativeAdapter(
         ) sources.push({ path: common.source, kind: "file" });
       }
       if (composing) {
-        loaded.set(input.origin.source, business);
-        effectiveInputs.set(input.origin.source, input);
+        captured.set(input.origin.source, { business, input });
       }
       return { sources };
     },
     async validateCourse(
-      operation: any,
-      request: { expectedSources: string[]; courseId?: string },
+      operation: NativeOperation,
+      request: Parameters<NativeOperation["validateRelease"]>[0],
       checkpoint?: () => Promise<void>,
-    ) {
+    ): Promise<Awaited<ReturnType<NativeOperation["validateRelease"]>>> {
       if (composing) throw Error("PL.ASSESSMENT_INVALID: recursive validation");
       if (
         validatedCourse && validatedCourse.operation === operation &&
@@ -318,13 +338,11 @@ export function createNativeAdapter(
           return validatedCourse.proof;
         } catch (error) {
           validatedCourse = undefined;
-          loaded.clear();
-          effectiveInputs.clear();
+          captured.clear();
           throw error;
         }
       }
-      loaded.clear();
-      effectiveInputs.clear();
+      captured.clear();
       validatedCourse = undefined;
       composing = true;
       try {
@@ -350,12 +368,14 @@ export function createNativeAdapter(
         await operation.assertCurrent();
         const proof = await operation.validateRelease(request, [adapter]);
         if (
-          loaded.size !== request.expectedSources.length ||
-          request.expectedSources.some((source) => !loaded.has(source))
+          captured.size !== request.expectedSources.length ||
+          request.expectedSources.some((source) => !captured.has(source))
         ) throw Error("PL.ASSESSMENT_INVALID: missing authenticated source");
-        assertNativeSeedTargets([...loaded.values()]);
+        assertNativeSeedTargets(
+          [...captured.values()].map(({ business }) => business),
+        );
         const methods: Record<string, "external" | "manual" | "mixed"> = {};
-        for (const business of loaded.values()) {
+        for (const { business } of captured.values()) {
           for (const [id, settings] of Object.entries(business.questions)) {
             if (Object.hasOwn(methods, id)) {
               throw Error("PL.ASSESSMENT_INVALID: repeated declaration");
@@ -363,8 +383,7 @@ export function createNativeAdapter(
             methods[id] = settings.grading.method;
           }
         }
-        for (const [source, business] of loaded) {
-          const input = effectiveInputs.get(source);
+        for (const [source, { business, input }] of captured) {
           if (input.assessment && business.assessment) {
             validateGradingComponents({
               ...input.assessment,
@@ -374,11 +393,6 @@ export function createNativeAdapter(
           }
         }
         await operation.assertCurrent();
-        if (!isDeepStrictEqual(await requestFor(root), validatingRequest)) {
-          throw Error(
-            "PL.CAPTURE_CHANGED: correlation changed during validation",
-          );
-        }
         validatedCourse = {
           operation,
           identity: structuredClone(operation.identity),
@@ -387,8 +401,7 @@ export function createNativeAdapter(
         };
         return proof;
       } catch (error) {
-        loaded.clear();
-        effectiveInputs.clear();
+        captured.clear();
         throw error;
       } finally {
         composing = false;
@@ -399,9 +412,9 @@ export function createNativeAdapter(
      * живой composition. Этот bridge не создаёт scope/plan/condition authority.
      */
     async assignmentDelivery(
-      operation: any,
-      request: { source: string; assessmentId: string },
-      options: { projectPlans: readonly unknown[]; references?: unknown },
+      operation: NativeOperation,
+      request: NativeAssignmentRequest,
+      options: NativeAssignmentDeliveryOptions,
       release: { expectedSources: string[]; courseId?: string },
       checkpoint?: () => Promise<void>,
     ) {
@@ -427,15 +440,18 @@ export function createNativeAdapter(
       ) {
         throw Error("PL.ASSIGNMENT_CHANGED: public delivery binding");
       }
-      const nativeAnswers: Record<string, unknown> = {},
-        nativeSettings: Record<string, unknown> = {};
+      const nativeAnswers: Record<
+        string,
+        NonNullable<NativeAdapterValidationInput["declarations"][number]["answer"]>
+      > = {},
+        nativeSettings: ReturnType<typeof decodeNativeBusiness>["questions"] = {};
       const ids = new Set<string>();
       for (const question of delivery.publicPackage.questions) {
-        const input = effectiveInputs.get(question.source);
-        const declaration = input?.declarations.find((d: any) =>
+        const source = captured.get(question.source);
+        const declaration = source?.input.declarations.find((d) =>
           d.id === question.id
         );
-        const settings = loaded.get(question.source)?.questions[question.id];
+        const settings = source?.business.questions[question.id];
         if (
           !declaration || !settings || ids.has(question.id) ||
           !delivery.conditions[question.id]
@@ -466,11 +482,11 @@ export function createNativeAdapter(
     },
     /** Закрытое состояние PL composition; не включать в public Body/catalog/README. */
     validatedInput(source: string) {
-      const input = effectiveInputs.get(source);
-      if (!validatedCourse || !input) {
+      const value = captured.get(source);
+      if (!validatedCourse || !value) {
         throw Error("PL.CAPTURE_MISSING: validation не выполнена");
       }
-      return structuredClone(input);
+      return structuredClone(value.input);
     },
     async workspaceArtifact(
       request: {
@@ -487,28 +503,23 @@ export function createNativeAdapter(
       await adapter.validateCourse(request.operation, {
         expectedSources: request.expectedSources,
       }, request.checkpoint);
-      const business = loaded.get(request.source),
-        input = effectiveInputs.get(request.source);
-      const declaration = input?.declarations.find((d: any) =>
+      const source = captured.get(request.source),
+        business = source?.business,
+        input = source?.input;
+      const declaration = input?.declarations.find((d) =>
         d.id === request.exerciseId
       );
       if (
         !business || !declaration ||
-        request.operation.identity.operation !== input.origin.operation
+        request.operation.identity.operation !== input?.origin.operation
       ) throw Error("PL.CAPTURE_CHANGED: Workspace operation");
-      const inventory = options.core.ArtifactInventorySchema.parse(
+      const inventory = options.core.ArtifactFilesSchema.parse(
         request.inventory,
       );
       if (
-        inventory.operation !== input.origin.operation ||
         inventory.exerciseId !== request.exerciseId ||
         inventory.audience !== "student"
       ) throw Error("PL.WORKSPACE_SEED: inventory identity");
-      for (const file of inventory.files) {
-        if (await hash(file.bytes) !== file.sha256) {
-          throw Error("PL.WORKSPACE_SEED: inventory bytes changed");
-        }
-      }
       return await nativeWorkspaceArtifact({
         root: options.root,
         project: declaration.attributes.project.replace(/^\//, ""),
@@ -528,11 +539,11 @@ export function createNativeAdapter(
     },
     /** Значения только после настоящего executable callback; publish владеет outer Core fence. */
     business(source: string) {
-      const result = loaded.get(source);
+      const result = captured.get(source);
       if (!validatedCourse || !result) {
         throw Error("PL.CAPTURE_MISSING: validation не выполнена");
       }
-      return structuredClone(result);
+      return structuredClone(result.business);
     },
   };
   return adapter;

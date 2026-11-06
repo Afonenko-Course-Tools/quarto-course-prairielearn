@@ -29,9 +29,9 @@ export function nativeSlotBlocks(courseId:string,work:any,grading:any){
 /** Choice is a separate visible best-one zone; regular blocks keep their semantics. */
 export function nativeSlotZones(courseId:string,work:any,grading:any){
  const slots=validateSlots(work.slots,courseId,work.id),zones:any[]=[];let regular:any[]=[];
- const flush=()=>{if(regular.length){zones.push({title:work.title,questions:nativeSlotBlocks(courseId,{...work,slots:regular},grading)});regular=[]}};
+ const flush=()=>{if(regular.length){zones.push({title:regular[0].assignment.requirement==='optional'?'Добровольные задания':work.title,questions:nativeSlotBlocks(courseId,{...work,slots:regular},grading)});regular=[]}};
  for(const slot of slots){
-  if(slot.selection!=='choice'){regular.push(slot);continue}
+  if(slot.selection!=='choice'){if(regular.length&&regular[0].assignment.requirement!==slot.assignment.requirement)flush();regular.push(slot);continue}
   flush();zones.push({title:'Выполните одну из задач',bestQuestions:1,questions:slot.candidates.map((id:string)=>({id:courseId+'/'+id,...grading.slots[slot.id],preferences:{courseRequirement:slot.assignment.requirement}}))});
  }
  flush();return zones;

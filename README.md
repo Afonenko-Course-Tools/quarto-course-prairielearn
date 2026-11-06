@@ -208,9 +208,9 @@ Quarto `--profile`, сохраняются при экспорте.
 Полный exporter 7.0.0 требует авторский `question-points`; пример явно объявляет
 default 1, который можно заменить в course/directory/document metadata. Баллы,
 ceiling и повторные попытки описаны в [контракте](docs/authoring.md#авторские-баллы-и-повторные-попытки-exporter-500);
-`inspect-grading.ts` читает уже завершённую genuine Core operation и показывает
-effective policy без нового inspect/render. Он требует полного текущего capture;
-plain DTO или старая correlation candidate не дают publication authority.
+`inspect-publication.ts` читает завершённый capture через `Core.withNativePublication`
+и показывает author business policy без нового inspect/render. Полная pricing/seed
+qualification не требуется обычному сайту. Plain DTO не заменяет живую operation.
 Текущий контракт 7.1.0 сохраняет Body v2; установка нового тега требует
 фактической публикации и явного обновления metadata курса.
 
@@ -228,7 +228,7 @@ prairielearn:
 An exercise may override this with `prairielearn-single-variant="false"`.
 Only YAML booleans and the attribute literals `true`/`false` are accepted.
 The normalized question policy carries `single-variant` to native
-`info.json.singleVariant`; `inspect-grading` reports its effective value.
+`info.json.singleVariant`; `inspect-publication` показывает его эффективное значение.
 When absent the exporter omits the field: pinned Community documents its
 native default as `false` (variants may be generated). Declare `true` explicitly
 to preserve the earlier exporter's forced single-variant behavior.
@@ -329,17 +329,22 @@ prepared correlation и исполняет один TS business decoder. Пов�
 обхода, per-document child и business sidecars нет. Частичная publication
 валидация не выдумывает обязательные delivery topic/submission.
 
-`inspectPublication(Core, operation, request)` читает уже аутентичные callback
-facts через публичный Core API. Его data result не является lease/plan или
-разрешением assignment delivery. Прямая проверка DTO не наполняет native
-business cache. Для той же живой operation и exact request полная проверка
-повторно использует private proof с currentness fence перед artifact boundary.
-Другой generation/request и failure не наследуют cache.
+`Core.withNativePublication(expectation, selection, use)` открывает одну живую
+ordinary publication: Core проверяет общую семантику capture, роли и принадлежащие
+владельцу пути; PL `inspectPublication(publication)` проверяет собственные metadata
+и cross-document members. Результат `PublicationInspection` — типизированные данные,
+без release proof/certificate. Полная grading/seed qualification и prepared correlation
+остаются у отдельного course exporter. Site и Download не вызывают их для ordinary
+публикации. Cache freshness и произвольный немаркированный computed text не получают
+новой гарантии приватности: профили выбираются конфигурацией Quarto.
 
-## Кандидат 9.0.1: обычная публикация
+## Текущий договор native-проектов
 
-[Адресная поправка](docs/release-9.0.1.md) связывает common sources с настоящим Core release proof. Полная delivery и её grading/prepared guards не менялись; новый тег требует OTHER и CI.
+Экспортёр использует публичный пакетный loader Core с каталогами проектов.
+Пути описываются адресами `{path, base?}`; общие ресурсы явно объявляют
+`base: config`. Действительные файлы и байты передаются без собственных SHA,
+origin DTO и свидетельств актуальности. Public delivery v5 и private checks v3
+обновляются совместно с Platform. Git refs и OCI digests сохраняются.
 
-## Native project contracts 9.0.2
-
-Экспортёр предпочитает публичный `withProjectContracts` Core 9.3.0 для планов student/full. Если этот метод отсутствует, сохраняется `withProjectContexts`; ошибка нового метода не запускает повтор через старый. Правила grading, release proof и currentness не меняются. Source ref требует собственной проверки установленной композиции.
+См. [договор контекстов](docs/native-operation-reuse-consumer.md) и
+[правила автора](docs/authoring.md#допустимый-состав-java-ответа).

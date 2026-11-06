@@ -58,6 +58,18 @@ Native TS Core 9 и C 9 используют публичные capture/current-
 адаптера: restricted условия и закрытые блоки не остаются в студенческой
 проекции. Заголовок работы и её `.assessment-preview` доступны на сайте.
 
+Необязательное `assessment.prairielearn.uuid` задаёт сохранённый native UUID
+конкретной работы в стандартной форме `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+(шестнадцатеричные цифры). При переименовании `assessment.id` прежнее значение
+UUID можно оставить: оно без изменения записывается в `infoAssessment.json`.
+Без поля действует прежний алгоритм UUIDv5: `assessment/<work.id>` в namespace
+course UUID, вычисленном из `course/<course.id>`. Для новых работ поле не требуется.
+В `prairielearn.assessment-defaults` поле `uuid` запрещено. Неверная форма и
+совпадение UUID выбранных работ, включая совпадение с автоматически вычисленным
+UUID и различие только регистром, останавливают экспорт до создания поставки.
+Поле сохраняет identity исходников; соответствие UUID уже установленному курсу
+проверяется отдельно при интеграции с PrairieLearn.
+
 После объединения требуются все поля:
 
 | Поле | Значение |
@@ -106,6 +118,12 @@ student-label = "pl-" + sha1(UTF8(course.id) + byte(0) + UTF8(assessment.id))
 Экспортёр использует публичную проекцию Body как условие задания. Поле
 `gradingNotes`, авторское решение и закрытые тесты не должны попадать
 в материалы студента.
+Открытые примеры проверок можно описать обычным Markdown внутри
+`::: {.public-tests}`. Существующая публичная проекция сохраняет этот Pandoc
+Div в условии PrairieLearn, а Core — в README стартового комплекта. Описание
+не превращается в настройки runtime. Поля `public-cases` и `feedback` в
+`project-check` не поддерживаются; реальные публичные JUnit-файлы остаются
+в стартовом комплекте.
 `project` — путь к исходному проекту, а не разрешение публиковать весь каталог.
 Состав поставки задаёт выбранная работа. Несвязанная открытая демонстрация
 сохраняется в банке и не входит в эту поставку. Задание с программным проектом
@@ -203,7 +221,7 @@ attempts/pass/assignment и права доступа задаются отде�
 размером не больше 1 MiB. Его содержимое становится начальным текстом поля;
 HTML и literal Mustache braces экранируются, Unicode сохраняется. `aceMode`
 необязателен и имеет форму `ace/mode/<name>`. Остальные student-файлы не
-публикуются, download/upload элементы не создаются. Ресурсы самого условия
+публикуются, upload элементы не создаются. Ресурсы самого условия
 по-прежнему поставляются по публичному Body-контракту. Приватные tests и
 external grading options сохраняются; PL преобразует ввод в `_files` и
 `/grade/student/<file>` без отдельного `server.py`.
@@ -212,10 +230,12 @@ external grading options сохраняются; PL преобразует вв�
 курсов. У upload нет `aceMode`. Неизвестные поля/режимы, отсутствующая заготовка
 или двоичные данные отклоняются до публикации результата.
 
-Для Core Java обычный сценарий — одно поле с заготовкой класса/метода. Полная
-сборка, Examples, README и .gitignore нужны автору для локальной проверки либо
-студенту для автономного выполнения. Поставка ZIP является отдельным сценарием
-`project-download`; проект с VSCode/workspace требует отдельной настройки PL.
+Для Java одна или две выбранные программы используют редакторы с настоящими
+именами и заготовками. При трёх и более выбранных файлах плоская структура
+использует один файловый диалог, дерево относительных путей — один ZIP.
+Редакторы, отдельные файлы и ZIP не смешиваются в одной форме ответа.
+Самостоятельный стартовый комплект остаётся доступным отдельно; Workspace
+сохраняет собственный договор и не выводится из этого правила.
 
 Контракт сверён с официальными [pl-file-editor](https://docs.prairielearn.com/elements/pl-file-editor/)
 и [external grading](https://docs.prairielearn.com/externalGrading/) и исходниками
@@ -245,7 +265,7 @@ Question defaults задают topic/submission и необязательный 
 отсутствующее поле опускается (документированный default pinned PL: `false`).
 Явное `true` сохраняет прежний режим единственного варианта.
 `prairielearn-single-variant="true|false"` переопределяет настройку упражнения;
-`inspect-grading` показывает эффективное значение. Редкие атрибуты
+`inspect-publication` показывает эффективное значение. Редкие атрибуты
 `prairielearn-topic` и `prairielearn-submission="editor|upload"` переопределяют
 платформенные поля. Runtime и источники выбирает общий project-check. Unknown
 metadata/attributes, missing inputs, symlinks, binary/NUL/oversize и изменение
@@ -327,7 +347,7 @@ slot-overrides меняет их по local slot ID. Случайная груп
 `prairielearn.assessment-defaults.question-points` в `_quarto.yml: [9,7,5]`
 и directory `_metadata.yml: [4,2]` даёт `[9,7,5,4,2]`. Экспортёр сохраняет этот
 целиком авторский список. Если concatenation делает Exam schedule возрастающим,
-экспорт отказывается с диагностикой; проверьте результат через `inspect-grading`.
+экспорт отказывается с диагностикой; проверьте результат через `inspect-publication`.
 
 Отдельное объединение адаптера применяется между разными путями: inherited
 `prairielearn.assessment-defaults`, локальная `assessment.prairielearn` и
@@ -392,15 +412,19 @@ ID и поля отвергаются. `maxVariants` и другие непод�
 Перед созданием native файлов автор может увидеть effective значения:
 
 ```sh
-quarto run tasks/_extensions/course-prairielearn/entrypoints/inspect-grading.ts . --instance pilot --output effective-grading.json
+quarto run tasks/_extensions/course-prairielearn/entrypoints/inspect-publication.ts tasks --projection student --profiles student --output-directory _site/student --output publication.json
 ```
 
-Отчёт содержит source, kind, разрешённую policy и точный native mapping каждого
-вопроса; production registry/image не нужны, native артефакт не создаётся. Missing
-points вызывает actionable отказ с source/work/question и местом объявления.
-Delivery сохраняет все effective grading поля и overrides; у ordinary labs
-удаляется только assignment, который им не нужен. Completion по полностью
-выполненным required вопросам остаётся отдельной закрытой политикой.
+Отчёт обычной публикации содержит source/format, Core assessment composition,
+разобранную PL policy и доступные question summaries. Он не строит native grading
+mapping и не требует полного набора points; production registry/image не нужны,
+новый native артефакт не создаётся.
+
+Полный course-export отдельно строит native mapping и отказывает при missing points
+с source/work/question и местом объявления. Delivery сохраняет все effective grading
+поля и overrides; у ordinary labs удаляется только assignment, который им не нужен.
+Completion по полностью выполненным required вопросам остаётся отдельной закрытой
+политикой.
 
 Native awarded score и результат тестов различаются. Gateway берёт
 `instance_question.score_perc / 100`, а completion требует ровно 1. Pinned
@@ -421,7 +445,7 @@ Core 7.0.0 задаёт `slots` вместо прежних `items/assignments`.
 принимает только Body `course-body-package-v2`. `slot.id` в Body и delivery —
 `course/work/slot`, кандидаты — `course/exr-*`. Все кандидаты экспортируются и
 проверяются атомарно, включая неназначенные конкретному студенту. Повтор снимка
-сохраняет стабильные UUID, полный каталог и delivery hash.
+сохраняет стабильные UUID и полный каталог.
 
 Случайный Span `[@exr-a; @exr-b]{.task-alternatives #alt-x selection="random"}`
 создаёт один native блок `{numberChoose:1, points, triesPerVariant, alternatives}`.
@@ -436,7 +460,7 @@ triesPerVariant наследуются только выбранным вопр�
 имеют одинаковую максимальную цену. Completion v2 использует slotIds/requiredSlotIds,
 `mode: required-slot-completion`, `source: per-slot-results-v2`. Порог pass.at-least
 считает обязательные позиции; частичный балл и optional их не заменяют.
-Native delivery имеет schemaVersion2, work.slots и полный questions каталог.
+Native delivery имеет `schemaVersion: 5`, `work.slots` и полный каталог вопросов.
 
 ## Название, учебные метаданные и обзор работы (unreleased)
 
@@ -457,11 +481,19 @@ Selected Body v2 передаёт вопросу читаемый `title`, не�
 убирается Core по canonical identity; остальные ссылки разрешаются через
 публичный QRC контракт. Неизвестные цели не становятся фиктивными URL.
 
-## Необязательные дополнительные исходники Java
+## Форма ответа Java и runtime policy
 
-Локальный unreleased candidate переносит Core project-check `additional-java-sources` в закрытое `additionalJavaSources` runtime descriptor. Опция относится только к `java25-junit-v1` / implementation и не является новым PL submission option. Editor-режим сохраняет основные редакторы и добавляет один штатный `pl-file-upload optional-file-names`; upload-режим использует тот же единственный upload с обязательными основными и необязательным ZIP именем. Без policy UI прежний.
+`additional-java-sources` переносится в закрытый `additionalJavaSources`
+runtime descriptor, но не добавляет ZIP или дополнительные поля к редакторам.
+Форма определяется точными выбранными исходниками: 1–2 editor, 3+ плоских —
+`upload` с `layout: files`, 3+ с деревом — `upload` с `layout: zip`.
+`primary-required: false` не запрещает editor и не меняет это правило.
+В форме ровно один способ отправки. Очистка редактора для сдачи ZIP не нужна.
 
-Интерфейс сообщает maxFiles/maxFileBytes/maxTotalBytes/maxArchiveBytes и ручной fallback. Штатный общий предел PrairieLearn 5 MB включает весь ответ с редакторными файлами: номинальные 2 MiB ZIP не гарантируются при больших основных файлах. ZIP необязателен и не вводит student helper API. Безопасную инвентаризацию, sourcepath и API staging определяет Platform; student/trusted/reference partitions и exact delivery hashes сохраняются. Это локальная проверяемая поставка, без утверждения о live PL или опубликованном образе.
+Ограничения maxFiles/maxFileBytes/maxTotalBytes/maxArchiveBytes и проверку
+допустимых исходников по-прежнему применяет runtime. Штатный общий предел
+PrairieLearn 5 MB включает весь ответ. Ручная Java-задача сохраняет native
+Manual и не получает автоматического runtime из-за наличия editor или ZIP.
 
 ## Закрытый native Gradle build record
 
@@ -506,53 +538,24 @@ Platform; source candidate не доказывает archive/image/runtime/cours
 сохраняется. Mixed по-прежнему имеет native External и отдельные auto/manual
 компоненты; manual не получает фиктивных tests/runtime.
 
-Bodyv2, deliveryv3 и public resultsv2 сохранены. Exact Core-кандидат закреплён в CI.
+Body v2 и public results v2 сохранены; текущий delivery v5 требует согласованного consumer. Exact Core-кандидат закреплён в CI.
 Новый whole-course capture/export, доступ Student, Moodle учёт и публикация
 кандидата8.2.1 — отдельные последующие проверки.
 
-## Явные conditions ZIP принятой публикации
+## Файлы native-поставки
 
-Опциональный CLI-параметр `--publication-conditions /absolute/manifest.json`
-подключает целые архивы уже принятой публикации. Это отдельные внешние зависимости,
-не Core student materialization и не содержимое `starter.zip`. Без параметра
-сохраняется прежний экспорт. Core по-прежнему удаляет contextual Download links
-из публичного Body; адаптер добавляет только явно разрешённые conditions archives.
+Текущий CLI получает исходный курс, каталог результата и при необходимости
+`--checks-output`. Параметры `--staging-receipt`, `--publication-conditions` и
+переменная `PRAIRIELEARN_PUBLICATION_CONDITIONS` удалены вместе с собственными
+свидетельствами актуальности. Публичное условие, ресурсы и student-комплект
+получаются из текущей операции Core; ZIP собирает установленный Download.
 
-Неизменённый host builder Platform 2.3.0 передаёт окружение настоящему
-установленному entrypoint. Для этого маршрута вместо CLI используется один
-явный `PRAIRIELEARN_PUBLICATION_CONDITIONS=/absolute/manifest.json`.
-CLI и ENV одновременно запрещены, даже с одинаковым значением; пустой или
-относительный путь отвергается. Если оба отсутствуют, прежний экспорт сохраняется.
-Один эффективный путь определяет ту же source authority (`stagingReceipt.publicBase`
-в private stage), проверки и JSON dependency receipt в stdout. Исполнитель должен
-закрепить exact ENV, manifest, публикационный receipt и whole ZIP в собственных
-sealed inputs; неявное ambient значение не является разрешением. Другая версия
-builder/runtime assembly или новые образы для этого transport не требуются.
-
-Manifest имеет схему `pl-publication-conditions-v1` и точные поля:
-
-- `courseId` — текущий курс;
-- `source: {repository, commit, book}` — текущий public Git source; в private stage
-  это `publicBase` принятого staging receipt;
-- `publication: {repository, commit, receipt: {path, bytes, sha256}}` — источник
-  исторической публикации и внешнее принятое свидетельство;
-- `archives` — записи `{questionId, source, sourceSha256, file: {path, bytes, sha256}}`.
-  `source` задаёт owner-relative QMD текущего вопроса, `file` — полный исходный ZIP.
-
-Набор записей должен точно совпадать с conditions requests выбранных упражнений
-в исходном native AST, до публичной Core partition. Foreign/duplicate/missing
-IDs, несоответствие source/hash, symlink/hardlink/alias, небезопасный путь,
-collision client target и изменение входов до публикации означают отказ.
-Внешние зависимости читаются на границах операции, не в цикле вопросов.
-Адаптер не создаёт HTML или ZIP и не объявляет исторические архивы новым capture.
-
-Точные bytes копируются в `clientFilesQuestion/<ID>-conditions.zip`; вопрос
-получает ссылку «Скачать условие для локального просмотра» через обычный PL
-client-files URL. Файлы и HTML входят в стандартные inventory/delivery hash.
-Схемы delivery и provenance не меняются: manifest и исходная публикация связаны
-sealed caller inputs, pre/post checks и JSON dependency receipt в CLI stdout,
-сохраняемом внешним исполнителем. Само наличие manifest не доказывает допустимость
-старого Site: публикацию и её ZIP заранее принимает внешний владелец evidence.
+`delivery` v5 содержит реальные имена файлов. Закрытый checks v3 передаёт
+выбранные исходники, доверенные тесты, эталоны и материалы проверки как
+`{name, target, data}`: `data` — base64 действительных байтов. Исходные физические
+пути и собственные контрольные суммы не являются частью этих контрактов.
+`contractCases` содержит разобранные случаи, а не их отпечаток. Git refs и
+OCI digests сохраняют обычный смысл своих систем.
 
 ## Git-история в стартовом комплекте
 
@@ -563,22 +566,35 @@ Git-историю. При прямом копировании в `clientFilesQu
 весь native курс обычным Git clone без вложенных gitlinks; историю учащийся
 получает после распаковки неизменённого ZIP.
 
-### Загрузка без обязательного starter primary
+### Выбранные исходники и единственный способ отправки Java
 
-`additional-java-sources.primary-required: false` переносится в runtime descriptor
-как `additionalJavaSources.primaryRequired: false`. Это opt-in только для Java
-implementation с полной bounded ZIP policy. Используйте `submission.mode: upload`:
-в единственном `pl-file-upload` все известные основные имена и архив перечислены
-в `optional-file-names`; editor явно отклоняется. Runtime проверяет непустую union
-реально загруженных Java sources и сохраняет API/tests/scoring. Подстановка
-starter/reference и автоматическое переключение в ручную проверку не выполняются.
-Отсутствие поля сохраняет прежний descriptor и UI; `true` сохраняет обязательные
-основные файлы. Starter inventory остаётся непустым.
+Автоматическая Java-задача считает только настоящие compiler inputs из Core
+selection. Ручная Java-задача использует реальные файлы Core с `reason: starter`
+под `**/src/main/java/**`, включая `programs/<name>/src/main/java/**`.
+Публичные tests и примеры компиляции сохраняются в стартовом комплекте, но не
+входят в число исходников ответа. Legacy `student/` вне выбранного Core artifact
+не становится источником формы.
 
-В opt-in upload отдельно перечисляются только primary без каталогов и архив.
-Nested primary передаются внутри ZIP с исходными относительными путями; полный
-`sourceFiles` и canonical binding сохраняются. Flattening, кодирование имён и
-wildcard загрузка не применяются.
+Один или два выбранных файла дают только штатные editor с исходными именами,
+относительными путями и UTF-8 содержимым. Три и более файла без вложенных путей
+дают только файловый диалог с `layout: files`; наличие дерева путей требует
+одного полного ZIP с `layout: zip`. Имя автоматического архива берётся из прежней
+runtime policy, ручного — `solution.zip`. Путь и имя класса не заменяются на
+`Main.java`. Старое входное значение `files-or-zip` не создаёт смешанной формы
+Java: экспорт приводит его к одному способу по фактически выбранным файлам.
+
+Для Manual Java исходные application bytes дополнительно копируются в
+`serverFilesQuestion/starter/<исходный путь>`: проверка поставки сверяет с ними
+представленный editor без нового поля binding. Количество редакторов не меняет
+`gradingMethod: Manual`, баллы или необходимость проверки преподавателем.
+У editor сохраняются обычный запрет пустого ввода, fatal UTF-8, отсутствие NUL
+и предел 1 MiB на starter. Самостоятельные публичные комплекты и ресурсы
+по-прежнему доступны; SP Workspace сохраняет прежнюю отдельную форму.
+
+`additional-java-sources` и его `primary-required`, `allow-additional`, guards и
+caps остаются существующим runtime договором. Генератор не подставляет starter
+вместо ответа учащегося и не меняет grader ради формы ввода. Вопрос не предлагает
+editor одновременно с загрузкой отдельных `.java` или ZIP.
 
 ## Ранний Git Workspace: локальный кандидат
 
@@ -594,7 +610,7 @@ refs, HEAD и index; произвольная вложенная структу�
 
 `exportPrairieLearn` принимает полный student artifact от Core/Download,
 сохраняет его ZIP без изменения в `workspace/.pl-seed/starter.zip` и связывает
-manifest с SHA-256 архива и каждым member исходного inventory. При отсутствии
+manifest с действительными именами файлов комплекта. При отсутствии
 Git seed либо неполном договоре возврата публикация отвергается. Служебные
 байты `.pl-seed` принадлежат транспорту. Студент не создаёт ZIP в Workspace.
 Native вопрос содержит `pl-workspace`, `pl-file-preview` и необязательную
@@ -603,7 +619,7 @@ Native вопрос содержит `pl-workspace`, `pl-file-preview` и нео
 Назначенный image `sp-git-workspace` проверяет seed до первого использования,
 создаёт только исходный A/main и записывает identity. При restart существующие
 HEAD/index/worktree не изменяются. Существующая работа без identity, пропавшая
-работа с identity или изменённый seed дают явный отказ без автоматического сброса.
+работа с identity дают явный отказ без автоматического сброса. Обновление seed не сбрасывает существующую работу.
 Ручной разбор различает конечные свойства и свидетельства двух restore.
 
 `describeSubmission(contract, files)` возвращает нейтральный фрагмент README:
@@ -644,25 +660,26 @@ patterns `explanation.m[d]` и `.pl-seed/identity.jso[n]`. Они выбираю
 
 ## Проверка публикации и полная поставка
 
-`inspectPublication(Core, operation, {expectedSources})` вызывают внутри живого
-публичного `withCurrentNativeOperation`. Этот частичный vet проверяет metadata,
-нормализацию, assignment, порог и принадлежность всех members платформе; он
-не требует отсутствующий topic/submission до полной delivery и не создаёт
-assignment authority. Core остаётся единственным владельцем AST, private
-preprojection facts, source/currentness и native format/profile binding.
+Обычный сайт открывает `Core.withNativePublication(expectation, selection, use)`.
+Core владеет общей семантикой capture, catalog, actual root/outputDirectory,
+проекцией, физическими путями и lifetime. В callback вызывают
+`inspectPublication(publication)`; его typed `PublicationInspection` содержит
+course и documents с source/format/assessment/business, без proof. PL проверяет
+свои metadata, assignment/порог, common-file paths и принадлежность members.
+Topic/submission до полной delivery остаются необязательными.
 
-Полный `createNativeAdapter` получает все четыре авторитетных metadata planes
-через typed Core validator; повторный Lua collector/child/sidecar не нужен.
-Prepared correlation сверяется до capture и полной composition. Direct DTO
-validation даёт только data result, без business/cache/proof/publish прав.
-Один private proof повторно используется только для той же operation identity
-и exact request, с currentness fence перед выдачей следующего artifact.
-Failure очищает cache; getter не читает дерево/metadata и не запускает inspect.
-`inspect-grading.ts` потребляет уже завершённый capture, не строит legacy модель.
+Ordinary публикация не требует полного grading/pricing, seed qualification,
+prepared PL correlation или certificate. Полный `createNativeAdapter`/`validateCourse`
+остаётся отдельным маршрутом course-export с прежними требованиями. Borrowed Core
+методы истекают при завершении callback; DTO не продлевает их lifetime. Остающиеся
+Core currentness/private/physical guards не заменены новым proof.
 
-### Ordinary proof и common sources в кандидате 9.0.1
-
-`inspectPublication` возвращает также `proof` — уже полученный публичный Core release result, data без новых полномочий. Для каждого упражнения common-file paths из существующего PL decoder передаются тому же Core source guard, включая скрытые декларации до projection. Cross-document grading/pricing остаётся обязанностью полной delivery, а не обычного сайта. Если Core не выбрал PL adapter, результат содержит действительный общий proof и пустой PL documents list; установленный optional PL не меняет ordinary noPL маршрут. Полный `createNativeAdapter.validateCourse` и prepared correlation не изменены.
+`inspect-publication.ts OWNER --projection student|author --output-directory PATH
+[--profiles student,other] [--output PATH]` показывает тот же business result без
+дополнительного inspect/render, instance/book selection и grading projection.
+Имена student/full задаются Quarto configuration. Роли защищают отмеченный контент
+и выбранные файлы; свежесть вычислений и немаркированный profile-dependent текст
+остаются Native execution/cache policy автора.
 
 ## Полный набор файлов авторского Java reference
 
@@ -688,3 +705,21 @@ identity, proof cache keys, QRC/registry/standalone bindings, selection и bytes
 
 Изменение пока Source-only: unit counts не подтверждают скорость whole-course
 export, Native qualification, prior P или готовность выпуска.
+
+## Повторное использование materialization при checked export
+
+Для проверяемого проекта адаптер сначала получает настоящий private `full`
+комплект. Общий selector выбирает из его starter-файлов предварительные имена
+и bytes сдачи с прежними root/include, UTF-8 и size limits. По ним адаптер
+вычисляет итоговую инструкцию и один раз материализует настоящий `student`
+комплект через Core. Все окончательные проверки student/full plans, private
+ролей, compiler inputs, references и verification-tests выполняются на этих
+настоящих комплектах. Имена, target, роли и bytes выбранных исходников, имя
+additional-Java архива и итоговая инструкция должны совпасть с предварительным
+расчётом до упаковки. `full` не превращается в student inventory.
+
+В этом пути два materialization вместо трёх; без Markdown fragments это четыре
+Pandoc child вместо шести. Для непроверяемого проекта сохраняется прежняя
+последовательность student-проходов. Full может отказать раньше student, чем
+в прежнем порядке, но результат не упаковывается до всех окончательных проверок.
+Публичный Core API и правила выбора editor/upload/ZIP не меняются.

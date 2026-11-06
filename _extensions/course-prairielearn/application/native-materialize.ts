@@ -1,9 +1,28 @@
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { hash } from "./source-selection.ts";
-import { describeSubmission } from "./submission.ts";
+import { isDeepStrictEqual } from "node:util";
+import {
+  applicationJavaTarget,
+  describeSubmission,
+  fileSubmission,
+} from "./submission.ts";
+import { selectNativeStarterSources } from "./native-selection.ts";
 import { projectNativeChecks } from "./native-check-projection.ts";
+import type { CheckedNativeProjectFact } from "./native-check-projection.ts";
+import type * as CorePublic from "course-core/public.ts";
+import type {
+  ArtifactFiles,
+  MaterializableCondition,
+  MaterializationBindings,
+  NativeAssignmentProjectPlans,
+  NativeOperation,
+  ProjectPlan,
+  SubmissionInstructions,
+} from "course-core/public.ts";
+import type { createNativeAdapter } from "./native-adapter.ts";
+import type { question } from "./declarations.ts";
+import type { RuntimeProfile } from "./runtime-descriptor.ts";
 export async function publicExtension(owner: string, name: string) {
   for (
     const root of [
@@ -22,23 +41,15 @@ export async function publicExtension(owner: string, name: string) {
   }
   throw Error("PL.PUBLIC_API_REQUIRED: installed " + name + "/public.ts");
 }
-/** Файлы C/operator inputs: data only, hash fence без source discovery. */
+/** Обычное чтение JSON-конфигурации один раз за операцию. */
 export async function checkedJSON(path: string) {
   const canonical = await Deno.realPath(path);
   if (canonical !== resolve(path)) {
     throw Error("PL.INPUT_INVALID: aliased JSON input");
   }
-  const bytes = await Deno.readFile(canonical),
-    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)),
-    sha256 = await hash(bytes);
+  const bytes = await Deno.readFile(canonical);
   return {
-    value,
-    async assert() {
-      if (
-        await Deno.realPath(path) !== canonical ||
-        await hash(await Deno.readFile(canonical)) !== sha256
-      ) throw Error("PL.INPUT_CHANGED: JSON dependency");
-    },
+    value: JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)),
   };
 }
 export async function nativeReferenceBindings(
@@ -47,7 +58,7 @@ export async function nativeReferenceBindings(
     outputDirectory: string;
     book: string;
     config: any;
-    operation: any;
+    operation: Pick<NativeOperation, "catalog">;
   },
 ) {
   const QRC = await publicExtension(input.owner, "reference-catalog"),
@@ -77,14 +88,13 @@ export async function nativeReferenceBindings(
     })
     : QRC.createBodyLinks({ catalog: file.value, baseUrl });
   const sources = Object.fromEntries(
-    input.operation.catalog.documents.map((d: any) => [d.source, d.output]),
+    input.operation.catalog.documents.map((d) => [d.source, d.output]),
   );
   return {
     QRC,
     catalog: file.value,
     baseUrl,
     sources,
-    check: file.assert,
     references: {
       namespace,
       resolve: links.resolve,
@@ -95,10 +105,18 @@ export async function nativeReferenceBindings(
         return new URL(sources[source], baseUrl).href;
       },
     },
-    async bindings(Core: any, plan: any, condition: any, submission: any) {
+    async bindings(
+      Core: Pick<typeof CorePublic, "materializationClosure">,
+      plan: ProjectPlan,
+      condition: MaterializableCondition,
+      submission: SubmissionInstructions,
+    ): Promise<MaterializationBindings> {
       const closure = await Core.materializationClosure(plan, condition),
-        linksBySource: any = {},
-        referencesBySource: any = {};
+        linksBySource: NonNullable<MaterializationBindings["linksBySource"]> =
+          {},
+        referencesBySource: NonNullable<
+          MaterializationBindings["referencesBySource"]
+        > = {};
       for (const fragment of closure.fragments) {
         linksBySource[fragment.source] = QRC.bindConditionLinks({
           context: { input: fragment.source },
@@ -125,19 +143,36 @@ export async function nativeReferenceBindings(
 /** Genuine Core calls remain inside the live A1 + native operation callback. */
 export async function materializeNativeQuestion(
   input: {
-    Core: any;
-    operation: any;
-    pair: any;
-    condition: any;
-    fact: any;
+    Core: Pick<
+      typeof CorePublic,
+      | "materializeProject"
+      | "ArtifactFilesSchema"
+      | "ProjectPlanSchema"
+      | "ArtifactFileSchema"
+    >;
+    operation: NativeOperation;
+    pair: NativeAssignmentProjectPlans;
+    condition: MaterializableCondition;
+    fact: CheckedNativeProjectFact;
     materialization?: { includeGit?: boolean };
-    settings: any;
-    sourceRows: any[];
+    settings: Pick<ReturnType<typeof question>, "submission">;
     courseId: string;
-    runtime: any;
-    bindings: (plan: any, condition: any, submission: any) => Promise<any>;
-    Download: any;
-    adapter: any;
+    runtime: RuntimeProfile;
+    bindings: (
+      plan: ProjectPlan,
+      condition: MaterializableCondition,
+      submission: SubmissionInstructions,
+    ) => Promise<MaterializationBindings>;
+    Download: {
+      zip: Parameters<
+        Awaited<ReturnType<typeof createNativeAdapter>>["workspaceArtifact"]
+      >[0]["zip"];
+      packageArtifact: (inventory: ArtifactFiles) => Promise<Uint8Array>;
+    };
+    adapter: Pick<
+      Awaited<ReturnType<typeof createNativeAdapter>>,
+      "workspaceArtifact"
+    >;
     expectedSources: string[];
     auxiliary?: NativeAuxiliary;
     checkpoint?: () => Promise<void>;
@@ -145,11 +180,8 @@ export async function materializeNativeQuestion(
 ) {
   const { Core, pair, condition } = input;
   const initial = describeSubmission(input.settings.submission, []);
-  const student = await Core.materializeProject(
-    pair.student,
-    condition,
-    await input.bindings(pair.student, condition, initial),
-  );
+  // Full остаётся private inventory; только настоящие starter roles нужны
+  // для предварительных имён сдачи. Окончательный student проверяет сам Core.
   const full = input.fact.check
     ? await Core.materializeProject(
       pair.full,
@@ -157,42 +189,86 @@ export async function materializeNativeQuestion(
       await input.bindings(pair.full, condition, initial),
     )
     : undefined;
-  let checked;
-  if (input.fact.check) {
-    checked = await projectNativeChecks({
-      ...input,
-      student,
-      full,
-      studentPlan: pair.student,
-      fullPlan: pair.full,
-    });
-  }
-  const submission = describeSubmission(
-    input.settings.submission,
-    checked?.selection.sources.map((f: any) => ({
-      name: f.name,
-      starterPath: f.target,
-    })) ?? [],
+  const preliminary = input.fact.check && full
+    ? await selectNativeStarterSources(
+      Core.ArtifactFilesSchema.parse(full).files.filter((file) =>
+        file.reason === "starter"
+      ),
+      input.fact.check.sourceProfile,
+      input.runtime,
+    )
+    : undefined;
+  const student = preliminary ? undefined : await Core.materializeProject(
+    pair.student,
+    condition,
+    await input.bindings(pair.student, condition, initial),
   );
+  const summarize = (
+    sourceMappings: SubmissionInstructions["files"],
+    archive?: string,
+  ) => {
+    const javaFiles = sourceMappings.length &&
+      sourceMappings.every((file) => file.name.endsWith(".java"));
+    const selectedSubmission =
+      input.settings.submission.mode !== "workspace" && javaFiles
+        ? fileSubmission(
+          sourceMappings.map((file) => file.name),
+          input.settings.submission.mode === "editor"
+            ? input.settings.submission.aceMode
+            : undefined,
+        )
+        : input.settings.submission;
+    return describeSubmission(selectedSubmission, sourceMappings, {
+      archive: archive ??
+        (javaFiles && selectedSubmission.mode === "upload" &&
+            selectedSubmission.layout === "zip"
+          ? "solution.zip"
+          : undefined),
+    });
+  };
+  const sourceMappings = preliminary?.map((file) => ({
+    name: file.name,
+    starterPath: file.target,
+  })) ??
+    student!.files.filter((file) =>
+      input.settings.submission.mode !== "workspace" &&
+      file.reason === "starter" && applicationJavaTarget(file.target)
+    ).map((file) => ({ name: file.target, starterPath: file.target }));
+  const preliminaryArchive = input.fact.check?.["additional-java-sources"]
+    ?.archive;
+  const submission = summarize(sourceMappings, preliminaryArchive);
   const final = await Core.materializeProject(
     pair.student,
     condition,
     await input.bindings(pair.student, condition, submission),
   );
-  if (checked) {
-    for (const f of checked.selection.sources) {
-      const actual = final.files.find((file: any) => file.target === f.target);
-      if (
-        !actual || actual.sha256 !== f.sha256 ||
-        await hash(actual.bytes) !== f.sha256
-      ) throw Error("PL.SELECTION_CHANGED: final starter");
+  let checked;
+  if (input.fact.check) {
+    checked = await projectNativeChecks({
+      ...input,
+      student: final,
+      full,
+      studentPlan: pair.student,
+      fullPlan: pair.full,
+    });
+    if (!isDeepStrictEqual(checked.selection.sources, preliminary)) {
+      throw Error("PL.SELECTION_CHANGED: final starter");
+    }
+    const actualSubmission = summarize(
+      checked.selection.sources.map((file) => ({
+        name: file.name,
+        starterPath: file.target,
+      })),
+      checked.selection.descriptor.additionalJavaSources?.archive,
+    );
+    if (
+      checked.selection.descriptor.additionalJavaSources?.archive !==
+        preliminaryArchive ||
+      !isDeepStrictEqual(actualSubmission, submission)
+    ) {
+      throw Error("PL.SELECTION_CHANGED: final submission");
     }
   }
-  const files = final.files.map((f: any) => ({
-    name: f.target,
-    bytes: f.bytes,
-  }));
-  let archive = await input.Download.packageArtifact(final);
   if (
     input.settings.submission.mode === "workspace" ||
     input.materialization?.includeGit === true
@@ -214,6 +290,12 @@ export async function materializeNativeQuestion(
       archive: workspace.archive,
     };
   }
+  const files = final.files.map((f) => ({
+    name: f.target,
+    bytes: f.bytes,
+    reason: f.reason,
+  }));
+  const archive = await input.Download.packageArtifact(final);
   await (input.checkpoint
     ? input.checkpoint()
     : input.operation.assertCurrent());

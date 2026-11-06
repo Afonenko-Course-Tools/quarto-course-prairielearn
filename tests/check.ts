@@ -1,5 +1,6 @@
 // Каноническая проверка C: typed owner contracts и genuine ordinary producer.
 import { dirname, resolve } from "node:path";
+import { writeNativeCoreImportMap } from "../tools/native-core-import-map.ts";
 const core = Deno.args[0];
 if (!core) throw Error("Укажите immutable Core companion");
 const repo = dirname(dirname(new URL(import.meta.url).pathname));
@@ -16,14 +17,21 @@ const commands = [["run", "--no-config", "-A", "tools/check-contracts.ts"], [
   "--allow-env",
   ...files.sort(),
 ]];
-for (const args of commands) {
-  const r = await new Deno.Command(Deno.execPath(), {
-    args,
-    cwd: repo,
-    stdout: "inherit",
-    stderr: "inherit",
-  }).output();
-  if (!r.success) throw Error("Canonical TS check failed: " + args[0]);
+const temporary = await Deno.makeTempDir({ prefix: "pl-check-imports-" });
+try {
+  const map = resolve(temporary, "imports.json");
+  await writeNativeCoreImportMap(core, map);
+  for (const [command, ...args] of commands) {
+    const r = await new Deno.Command(Deno.execPath(), {
+      args: [command, "--import-map", map, ...args],
+      cwd: repo,
+      stdout: "inherit",
+      stderr: "inherit",
+    }).output();
+    if (!r.success) throw Error("Canonical TS check failed: " + command);
+  }
+} finally {
+  await Deno.remove(temporary, { recursive: true });
 }
 const r = await new Deno.Command("quarto", {
   args: ["run", "tests/native-scope-integration.ts", resolve(core)],

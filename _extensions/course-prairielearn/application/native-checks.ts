@@ -50,24 +50,6 @@ const fields = {
     networking: z.literal(false).optional(),
     "max-output-bytes": integer.optional(),
   }).optional(),
-  feedback: z.strictObject({ requirement: text, "what-check": text })
-    .optional(),
-  "public-cases": z.array(
-    z.strictObject({
-      id: text,
-      name: text,
-      test: text,
-      input: text.optional(),
-      state: text.optional(),
-      action: text.optional(),
-      expected: text,
-    }).refine(
-      (c) =>
-        c.input !== undefined || c.state !== undefined ||
-        c.action !== undefined,
-      "public case requires input/state/action",
-    ),
-  ).max(32).optional(),
   scoring: z.discriminatedUnion("mode", [
     z.strictObject({ mode: z.literal("weighted") }),
     z.strictObject({ mode: z.literal("all-pass") }),
@@ -113,6 +95,7 @@ const fields = {
   }).optional(),
   "additional-java-sources": z.strictObject({
     "primary-required": z.boolean().optional(),
+    "allow-additional": z.boolean().optional(),
     archive: text.regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.zip$/),
     "max-files": integer.max(128),
     "max-file-bytes": integer.max(1048576),
@@ -141,16 +124,13 @@ export const NativeProjectCheckSchema = z.strictObject({
         "Java Gradle/API/extra sources require explicit implementation policy",
     });
   }
-  if (
-    new Set(c["public-cases"]?.map((x) => x.id)).size !==
-      c["public-cases"]?.length && c["public-cases"]
-  ) ctx.addIssue({ code: "custom", message: "Duplicate public case" });
 });
 export const NativeProjectChecksSchema = z.strictObject({
   defaults: z.strictObject(fields).partial().default({}),
   "source-profiles": z.record(text, NativeSourceProfileSchema),
   profiles: z.record(text, z.strictObject(fields).partial()),
 });
+export type NativeProjectCheck = z.output<typeof NativeProjectCheckSchema>;
 /** Только PL policy inheritance. Native metadata inheritance уже выполнил Quarto. */
 function merge(base: any, local: any): any {
   if (!local || typeof local !== "object" || Array.isArray(local)) return local;

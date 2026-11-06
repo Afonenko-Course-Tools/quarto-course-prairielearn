@@ -65,3 +65,21 @@ Deno.test("Workspace summary описывает native сдачу без вым�
     "PL бизнес-данные продублированы в Core envelope",
   );
 });
+
+import { describeSubmission } from "../_extensions/course-prairielearn/application/submission.ts";
+
+Deno.test("README Java описывает один способ ответа по выбранным исходникам", () => {
+  for (const primaryRequired of [false, true]) {
+    for (const test of [
+      { names: ["Example.java"], wanted: "редакторы", forbidden: "ZIP" },
+      { names: ["a/Study.java", "b/Value.java"], wanted: "редакторы", forbidden: "ZIP" },
+      { names: ["A.java", "B.java", "C.java"], wanted: "исходные файлы", forbidden: "ZIP" },
+      { names: ["a/Study.java", "a/Value.java", "b/Key.java"], wanted: "ZIP", forbidden: "отдельные" },
+    ]) {
+      const result = describeSubmission({ mode: "upload", layout: "files-or-zip" },
+        test.names.map(name => ({ name })), { freeComposition: true, primaryRequired, archive: "solution.zip" });
+      assert(result.instructions.includes(test.wanted) && !result.instructions.includes(test.forbidden), "README предлагает другой или смешанный способ ответа");
+      assert(!result.instructions.includes("очистите"), "README требует очистку для ZIP");
+    }
+  }
+});

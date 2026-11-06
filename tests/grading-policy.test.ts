@@ -1,7 +1,8 @@
+import type { NativeBusinessInput } from "../_extensions/course-prairielearn/application/native-business.ts";
 import { gradingPolicy } from "../_extensions/course-prairielearn/application/grading-policy.ts";
-const assert = (v: unknown, m: string) => {
+function assert(v: unknown, m: string): asserts v {
   if (!v) throw Error(m);
-};
+}
 Deno.test("required zero-ceiling Homework fails actionable; optional zero-point zero-ceiling remains supported", () => {
   const w = work();
   w.slots[0].assignment.requirement = "required";
@@ -26,7 +27,11 @@ Deno.test("required zero-ceiling Homework fails actionable; optional zero-point 
     "optional zero-ceiling policy changed",
   );
 });
-const work = () => ({
+type FixtureWork = NonNullable<NativeBusinessInput["assessment"]> & {
+  source: string;
+  extensions: { prairielearn: Record<string, unknown> };
+};
+const work = (): FixtureWork => ({
   id: "sec-lab",
   source: "tasks/lab.qmd",
   kind: "lab",
@@ -48,7 +53,7 @@ const work = () => ({
           "question-max-points": null,
         },
       },
-    } as any,
+    },
   },
 });
 Deno.test("authored scores and retry controls preserve scalar values and per-question null/overrides", () => {
@@ -119,7 +124,7 @@ Deno.test("Exam accepts nonincreasing arrays, clears max; Homework rejects array
       ["slot-overrides", { "exr-a": null }],
       ["slot-overrides", { "exr-unknown": { "question-points": 1 } }],
       ["slot-overrides", { "exr-a": { unknown: 1 } }],
-    ] as [string, any][]
+    ] satisfies [string, unknown][]
   ) {
     const w = work();
     w.extensions.prairielearn[field] = value;
@@ -185,4 +190,85 @@ Deno.test("required zero-point questions fail closed; optional zero never suppli
     gradingPolicy(w).slots["exr-a"].points === 0,
     "optional zero with no ceiling rejected",
   );
+});
+
+
+import {
+  decodeNativeBusiness,
+  validateNativeRaw,
+} from "../_extensions/course-prairielearn/application/native-business.ts";
+
+Deno.test("Локальный native UUID проходит business contract при переименовании assessment", () => {
+  const uuid = "6cbeb308-b0c5-51fc-bc0e-0f6bcbe75a45";
+  for (const id of ["sec-lab", "sec-renamed"]) {
+    const assessment = work();
+    assessment.id = id;
+    const raw = {
+      config: { "assessment-defaults": { attempts: 3, pass: { "at-least": 1 }, "question-points": 2 } },
+      assessment: { uuid, assignment: { mode: "assessment-id" } },
+      declarations: [],
+    };
+    const decoded = decodeNativeBusiness(raw, {
+      course: { id: "demo" }, assessment, declarations: [],
+    }, { deferComposition: true });
+    assert(decoded.assessment !== undefined, "Авторская политика должна присутствовать");
+    assert(decoded.assessment.uuid === uuid, "Native business потерял явную identity");
+    gradingPolicy({ ...assessment, extensions: { prairielearn: decoded.assessment } });
+  }
+});
+
+Deno.test("Native UUID запрещён в defaults и неверный локальный UUID отвергается", () => {
+  const assessment = work();
+  for (const uuid of [null, false, 42, "", "not-a-uuid", "6cbeb308b0c551fcbc0e0f6bcbe75a45", "6cbeb308-b0c5-51fc-bc0e-0f6bcbe75a45\n"]) {
+    let message = "";
+    try {
+      decodeNativeBusiness({
+        assessment: { ...assessment.extensions.prairielearn, uuid, assignment: { mode: "assessment-id" } },
+        declarations: [],
+      }, { course: { id: "demo" }, assessment, declarations: [] }, { deferComposition: true });
+    } catch (error) { message = String(error); }
+    assert(message.includes("uuid"), "Неверный UUID прошёл native business contract");
+  }
+  let message = "";
+  try {
+    validateNativeRaw({
+      config: { "assessment-defaults": { uuid: "6cbeb308-b0c5-51fc-bc0e-0f6bcbe75a45" } },
+      declarations: [],
+    });
+  } catch (error) { message = String(error); }
+  assert(message.includes("uuid"), "Один UUID допускается для всех работ через defaults");
+});
+
+import { validateGradingComponents } from "../_extensions/course-prairielearn/application/grading-policy.ts";
+Deno.test("добровольные mixed и manual сохраняют проверку без зачётного веса", () => {
+  const w = work();
+  w.extensions.prairielearn["question-points"] = undefined;
+  delete w.extensions.prairielearn["question-points"];
+  delete w.extensions.prairielearn["question-max-points"];
+  w.extensions.prairielearn["slot-overrides"] = {
+    "exr-a": { "auto-points": 0, "manual-points": 0 },
+    "exr-b": { "auto-points": 80, "manual-points": 20 },
+  };
+  for (const method of ["mixed", "manual", "external"] as const) {
+    const policy = validateGradingComponents(w, { "exr-a": method, "exr-b": "mixed" });
+    assert(policy.slots["exr-a"].autoPoints === 0 && policy.slots["exr-a"].manualPoints === 0,
+      "Добровольная задача изменила обязательный вес");
+    assert(policy.slots["exr-b"].autoPoints === 80 && policy.slots["exr-b"].manualPoints === 20,
+      "Обязательные 80/20 изменены");
+  }
+  w.slots[0].assignment.requirement = "required";
+  let rejected = false;
+  try { gradingPolicy(w); } catch { rejected = true; }
+  assert(rejected, "Обязательная позиция потеряла положительный вес");
+});
+
+Deno.test("настоящая native business граница принимает добровольные нулевые компоненты", () => {
+  const assessment=work();
+  const policy={attempts:3,pass:{"at-least":1},assignment:{mode:"assessment-id"},
+    "slot-overrides":{"exr-a":{"auto-points":0,"manual-points":0},"exr-b":{"auto-points":80,"manual-points":20}}};
+  const decoded=decodeNativeBusiness({assessment:policy,declarations:[]},
+    {course:{id:"demo"},assessment,declarations:[]},{deferComposition:true});
+  const native=gradingPolicy({...assessment,extensions:{prairielearn:decoded.assessment}});
+  assert(native.slots['exr-a'].autoPoints===0&&native.slots['exr-b'].manualPoints===20,
+    "Native decoder изменил обязательные или добровольные компоненты");
 });

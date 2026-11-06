@@ -1,13 +1,24 @@
+import type * as CorePublic from "course-core/public.ts";
+import type {
+  NativeAssignmentProjectPlans,
+  NativeOperationProjectContextBatch,
+  NativeOperationProjectContextMetrics,
+  NativePreparedOperation,
+} from "course-core/public.ts";
+import type {
+  NativeAssignmentDeliveryOptions,
+  NativeOperation,
+} from "course-core/public.ts";
+import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import { captureNativeAuxiliary } from "./native-auxiliary.ts";
 import { dirname, join, resolve } from "node:path";
 import { createNativeAdapter } from "./native-adapter.ts";
-import { nativeProjectWitness } from "./native-provenance.ts";
+import { nativeProjectRows } from "./native-provenance.ts";
 import type { NativeEntryOptions } from "./native-entry.ts";
 import { canonical } from "./source-selection.ts";
 import { decodeNativeCheck } from "./native-checks.ts";
 import { validateNativeRaw } from "./native-business.ts";
 import { nativeChecksManifest } from "./native-check-inventory.ts";
-import { nativeVerificationInventory } from "./verification-inventory.ts";
 import { exportCourse, nativeUnitMenus } from "./export-course.ts";
 import { exportPrairieLearn } from "./export.ts";
 import {
@@ -16,115 +27,113 @@ import {
   nativeReferenceBindings,
   publicExtension,
 } from "./native-materialize.ts";
+type NativeAdapter = ReturnType<typeof createNativeAdapter>;
+type NativeDelivered = Awaited<ReturnType<NativeAdapter["assignmentDelivery"]>>;
 export type NativeProjectPlansResult<T> = {
   value: T;
   projectContextMetrics: Readonly<{
-    inside: Readonly<Record<string, number>>;
-    final: Readonly<Record<string, number>>;
+    inside: NativeOperationProjectContextMetrics;
+    final: NativeOperationProjectContextMetrics;
   }>;
 };
 /** Один genuine operation batch держит все actual formats/планы до выдачи.
  * Metrics читаются после await, когда закрывающий A1 fence уже выполнен. */
 export async function withNativeProjectPlans<T>(
-  Core: any,
+  Core: typeof CorePublic,
   root: string,
   profiles: string[],
-  witness: any,
-  use: (plans: any[], checkpoint: () => Promise<void>) => Promise<T>,
-  operation: any,
+  projectRows: ReturnType<typeof nativeProjectRows>,
+  use: (
+    plans: NativeAssignmentProjectPlans[],
+    checkpoint: () => Promise<void>,
+  ) => Promise<T>,
+  operation: NativeOperation,
 ): Promise<NativeProjectPlansResult<T>> {
-  const withProjects = typeof operation?.withProjectContracts === "function"
-    ? operation.withProjectContracts
-    : operation?.withProjectContexts;
-  if (typeof withProjects !== "function") {
-    throw Error(
-      "PL.NATIVE_PROJECT_CONTEXT_REUSE_REQUIRED: public current-operation A1 batch unavailable; no standalone fallback",
-    );
-  }
   const formats = [
-    ...new Set(witness.projects.map((p: any) => p.format)),
-  ] as string[];
+    ...new Set(projectRows.map((p) => p.format)),
+  ];
   const requests = formats.map((format) => ({
     owner: root,
     profiles,
     format,
-    inputs: [
+    directories: [
       ...new Set(
-        witness.projects.filter((p: any) => p.format === format).map((p: any) =>
-          p.fact.projectRoot + "/native-input.qmd"
+        projectRows.filter((p) => p.format === format).map((p) =>
+          p.fact.projectRoot
         ),
       ),
-    ] as string[],
+    ],
   }));
-  let retained: any, inside: Readonly<Record<string, number>> | undefined;
+  let retained: NativeOperationProjectContextBatch | undefined,
+    inside: NativeOperationProjectContextMetrics | undefined;
   const metrics = () => {
     const snapshot = retained?.metrics;
     if (
-      !snapshot || typeof snapshot.inspectCalls !== "number" ||
-      typeof snapshot.fullWalks !== "number" ||
+      !snapshot || typeof snapshot.yamlFileReads !== "number" ||
+      typeof snapshot.directoryLayers !== "number" ||
       typeof snapshot.sourceBytesRead !== "number"
     ) {
       throw Error(
-        "PL.NATIVE_METRICS_UNAVAILABLE: fresh public A1 batch observations required",
+        "PL.NATIVE_METRICS_UNAVAILABLE: project loader observations required",
       );
     }
-    return snapshot as Readonly<Record<string, number>>;
+    return snapshot;
   };
-  const value = await withProjects.call(
-    operation,
-    requests,
-    async (batch: any) => {
-      retained = batch;
-      // Capability захватывается только этой callback; старый Core всегда full.
-      const checkpoint = typeof batch.checkpoint === "function"
-        ? () => batch.checkpoint()
-        : () => operation.assertCurrent();
-      if (batch.groups.length !== requests.length) {
+  const useBatch = async (
+    batch: NativeOperationProjectContextBatch,
+  ): Promise<T> => {
+    retained = batch;
+    // Capability захватывается только этой callback; старый Core всегда full.
+    const checkpoint = () => operation.assertCurrent();
+    if (batch.groups.length !== requests.length) {
+      throw Error(
+        "PL.PROVENANCE_CHANGED: A1 group coverage",
+      );
+    }
+    const plans: NativeAssignmentProjectPlans[] = [];
+    for (let index = 0; index < requests.length; index++) {
+      const request = requests[index],
+        contexts = batch.groups[index].contexts;
+      if (contexts.length !== request.directories.length) {
         throw Error(
-          "PL.PROVENANCE_CHANGED: A1 group coverage",
+          "PL.PROVENANCE_CHANGED: A1 context coverage",
         );
       }
-      const plans: any[] = [];
-      for (let index = 0; index < requests.length; index++) {
-        const request = requests[index],
-          contexts = batch.groups[index].contexts;
-        if (contexts.length !== request.inputs.length) {
+      const pairs = new Map<
+        string,
+        Pick<NativeAssignmentProjectPlans, "student" | "full">
+      >();
+      for (let i = 0; i < request.directories.length; i++) {
+        const input = request.directories[i];
+        if (contexts[i].input !== join(root, input)) {
           throw Error(
-            "PL.PROVENANCE_CHANGED: A1 context coverage",
+            "PL.PROVENANCE_CHANGED: A1 input order",
           );
         }
-        const pairs = new Map<string, any>();
-        for (let i = 0; i < request.inputs.length; i++) {
-          const input = request.inputs[i];
-          if (contexts[i].input !== join(root, input)) {
-            throw Error(
-              "PL.PROVENANCE_CHANGED: A1 input order",
-            );
-          }
-          pairs.set(input, {
-            student: await Core.planProject(contexts[i], {
-              audience: "student",
-            }),
-            full: await Core.planProject(contexts[i], { audience: "full" }),
-          });
-        }
-        for (
-          const row of witness.projects.filter((p: any) =>
-            p.format === request.format
-          )
-        ) {
-          plans.push({
-            source: row.source,
-            exerciseId: row.fact.exerciseId,
-            ...pairs.get(row.fact.projectRoot + "/native-input.qmd"),
-          });
-        }
+        pairs.set(input, {
+          student: await Core.planProject(contexts[i], {
+            audience: "student",
+          }),
+          full: await Core.planProject(contexts[i], { audience: "full" }),
+        });
       }
-      const result = await use(plans, checkpoint);
-      inside = metrics();
-      return result;
-    },
-  );
+      for (
+        const row of projectRows.filter((p) => p.format === request.format)
+      ) {
+        const pair = pairs.get(row.fact.projectRoot);
+        if (!pair) throw Error("PL.SELECTION_INVALID: missing project pair");
+        plans.push({
+          source: row.source,
+          exerciseId: row.fact.exerciseId,
+          ...pair,
+        });
+      }
+    }
+    const result = await use(plans, checkpoint);
+    inside = metrics();
+    return result;
+  };
+  const value = await operation.withProjectContracts(requests, useBatch);
   const final = metrics();
   if (!inside) {
     throw Error("PL.NATIVE_METRICS_UNAVAILABLE: callback observation missing");
@@ -135,22 +144,22 @@ export async function withNativeProjectPlans<T>(
  * conditions остаются связанными с одной operation. References даёт QRC owner. */
 export async function withNativeAssignments<T>(
   input: {
-    Core: any;
-    operation: any;
-    descriptor: any;
+    Core: typeof CorePublic;
+    operation: NativeOperation;
+    descriptor: NativePreparedOperation;
     selection: {
       expectedSources: string[];
       assessments: { source: string; id: string }[];
     };
-    references?: unknown;
+    references?: NativeAssignmentDeliveryOptions["references"];
   },
   use: (
     prepared: {
-      adapter: any;
-      proof: any;
-      witness: any;
-      projectPlans: any[];
-      deliveries: any[];
+      adapter: NativeAdapter;
+      proof: Awaited<ReturnType<NativeAdapter["validateCourse"]>>;
+      projectRows: ReturnType<typeof nativeProjectRows>;
+      projectPlans: NativeAssignmentDeliveryOptions["projectPlans"];
+      deliveries: NativeDelivered[];
       checkpoint: () => Promise<void>;
     },
   ) => Promise<T>,
@@ -163,18 +172,14 @@ export async function withNativeAssignments<T>(
   });
   const release = { expectedSources: selection.expectedSources };
   const proof = await adapter.validateCourse(operation, release);
-  const witness = await nativeProjectWitness(
-    Core,
-    await operation.assignmentProvenance(),
-    { identity: descriptor.identity, sources: selection.expectedSources },
-  );
+  const projectRows = nativeProjectRows(await operation.assignmentProvenance());
   return await withNativeProjectPlans(
     Core,
     descriptor.root,
     descriptor.identity.profiles,
-    witness,
+    projectRows,
     async (projectPlans, checkpoint) => {
-      const deliveries = [];
+      const deliveries: NativeDelivered[] = [];
       for (const assessment of selection.assessments) {
         deliveries.push(
           await adapter.assignmentDelivery(
@@ -196,7 +201,7 @@ export async function withNativeAssignments<T>(
       return await use({
         adapter,
         proof,
-        witness,
+        projectRows,
         projectPlans,
         deliveries,
         checkpoint,
@@ -206,9 +211,12 @@ export async function withNativeAssignments<T>(
   );
 }
 /** Full captured check coverage, not an assumption about instance naming. */
-export function assertNativeChecksCoverage(witness: any, projects: any[]) {
-  const expected = witness.projects.filter((p: any) => p.fact.check).map((
-    p: any,
+export function assertNativeChecksCoverage(
+  projectRows: ReturnType<typeof nativeProjectRows>,
+  projects: readonly import("./native-check-inventory.ts").NativeCheckProject[],
+) {
+  const expected = projectRows.filter((p) => p.fact.check).map((
+    p,
   ) => p.source + "\0" + p.fact.exerciseId).sort();
   const actual = projects.map((p) => p.source + "\0" + p.exerciseId).sort();
   if (
@@ -237,9 +245,9 @@ export function authoredNativeSettings(value: any) {
 }
 export async function prepareNativeCourse(
   input: {
-    Core: any;
-    operation: any;
-    descriptor: any;
+    Core: typeof CorePublic;
+    operation: NativeOperation;
+    descriptor: NativePreparedOperation;
     selection: {
       expectedSources: string[];
       assessments: { source: string; id: string }[];
@@ -256,18 +264,6 @@ export async function prepareNativeCourse(
     await operation.assertCurrent();
   };
   const auxiliary = captureNativeAuxiliary(() => liveFence());
-  // Existing flags are explicit dependencies; never silently replace a stage or
-  // publication-source receipt with a second materialization/guessed provenance.
-  if (options.stagingReceipt) {
-    throw Error(
-      "PL.NATIVE_STAGE_RECEIPT_UNQUALIFIED: native A1 replaces stage source reading; receipt integration pending review",
-    );
-  }
-  if (options.publicationConditions) {
-    throw Error(
-      "PL.NATIVE_PUBLICATION_SOURCE_UNQUALIFIED: explicit publication source binding required",
-    );
-  }
   const references = await nativeReferenceBindings({
     owner: descriptor.root,
     outputDirectory: descriptor.outputDirectory,
@@ -281,19 +277,17 @@ export async function prepareNativeCourse(
       ...input,
       references: references.references,
     }, async (prepared) => {
-      const { adapter, witness, projectPlans, deliveries, checkpoint } =
+      const { adapter, projectRows, projectPlans, deliveries, checkpoint } =
         prepared;
       const courseId = deliveries[0]?.publicPackage.owner;
       if (
         !courseId ||
-        deliveries.some((d: any) => d.publicPackage.owner !== courseId)
+        deliveries.some((d) => d.publicPackage.owner !== courseId)
       ) throw Error("PL.ASSIGNMENT_CHANGED: course owner");
-      const rows = witness.sourceRows,
-        bySource = new Map(rows.map((r: any) => [r.source, r.sha256]));
       const content: any = {
         assessments: [],
         exercises: [],
-        projects: witness.projects.map((p: any) => p.fact),
+        projects: projectRows.map((p) => p.fact),
       };
       for (const source of selection.expectedSources) {
         const value = adapter.validatedInput(source),
@@ -319,13 +313,15 @@ export async function prepareNativeCourse(
           });
         }
       }
-      const projects: any[] = [],
-        nativeInputs: any = {},
+      type Materialized = Awaited<ReturnType<typeof materializeNativeQuestion>>;
+      const projects: NonNullable<Materialized["project"]>[] = [],
+        nativeInputs: Record<string, NonNullable<Materialized["selection"]>> =
+          {},
         nativeAnswers: any = {},
         nativeResponseSlots: any = {},
-        artifacts: any = {},
+        artifacts: Record<string, Materialized> = {},
         settings: any = {},
-        bodies = new Map<string, any>();
+        bodies = new Map<string, PublicBodyPackage>();
       // Введение каждого реально используемого меню готово до дорогих A1 ZIP.
       // Assignment membership проверяет Core по раннему observed context intent.
       if (options.instance) {
@@ -362,15 +358,8 @@ export async function prepareNativeCourse(
         }
       }
       let registryInput: any;
-      let standaloneBinding: { assert: () => Promise<void> } | undefined;
-      const checkBindings = async () => {
-        await references.check();
-        await registryInput?.assert();
-        await standaloneBinding?.assert();
-      };
       const fence = async () => {
         await checkpoint();
-        await checkBindings();
       };
       // Ровно одна batch в этой composition; после выхода остаётся старый
       // истёкший token, а не fallback или checkpoint следующей партии.
@@ -388,10 +377,10 @@ export async function prepareNativeCourse(
         }
         return registryInput.value;
       };
-      const materializationTotal = new Set(deliveries.flatMap((d: any) =>
-        d.publicPackage.questions.filter((q: any) =>
+      const materializationTotal = new Set(deliveries.flatMap((d) =>
+        d.publicPackage.questions.filter((q) =>
           !d.nativeAnswers[q.id]
-        ).map((q: any) =>
+        ).map((q) =>
           q.id
         )
       )).size;
@@ -414,21 +403,27 @@ export async function prepareNativeCourse(
             if (
               nativeAnswers[q.id] &&
               canonical(nativeAnswers[q.id]) !== canonical(answer)
-            ) throw Error("PL.ASSIGNMENT_CHANGED: repeated answer");
+            ) {
+              throw Error("PL.ASSIGNMENT_CHANGED: repeated answer");
+            }
             nativeAnswers[q.id] = answer;
             const slots = delivered.conditions[q.id].responseSlots;
             if (
               nativeResponseSlots[q.id] &&
               canonical(nativeResponseSlots[q.id]) !== canonical(slots)
-            ) throw Error("PL.ASSIGNMENT_CHANGED: repeated slots");
+            ) {
+              throw Error("PL.ASSIGNMENT_CHANGED: repeated slots");
+            }
             nativeResponseSlots[q.id] = slots;
             continue;
           }
-          if (artifacts[q.id]) continue;
-          const facts = witness.projects.filter((p: any) =>
+          if (artifacts[q.id]) {
+            continue;
+          }
+          const facts = projectRows.filter((p) =>
             p.source === q.source && p.fact.exerciseId === q.id
           );
-          const pairs = projectPlans.filter((p: any) =>
+          const pairs = projectPlans.filter((p) =>
             p.source === q.source && p.exerciseId === q.id
           );
           if (facts.length !== 1 || pairs.length !== 1) {
@@ -437,16 +432,18 @@ export async function prepareNativeCourse(
           const fact = facts[0].fact,
             business = adapter.business(q.source),
             declaration = adapter.validatedInput(q.source).declarations.find((
-              d: any,
-            ) => d.id === q.id);
+              d,
+            ) =>
+              d.id === q.id
+            );
           if (
             fact.check &&
-            canonical(
-                decodeNativeCheck(
-                  business.raw.projectChecks,
-                  declaration.attributes["project-check"],
-                ),
-              ) !== canonical(fact.check)
+            (!declaration || canonical(
+                  decodeNativeCheck(
+                    business.raw.projectChecks,
+                    declaration.attributes["project-check"],
+                  ),
+                ) !== canonical(fact.check))
           ) throw Error("PL.CHECKS_CHANGED: Core/C policy parity");
           const runtime = fact.check
             ? (await registry()).profiles?.[fact.check.runtime]
@@ -469,7 +466,6 @@ export async function prepareNativeCourse(
             fact,
             materialization: facts[0].materialization,
             settings: value,
-            sourceRows: rows,
             courseId,
             runtime,
             bindings: (plan, condition, submission) =>
@@ -486,7 +482,7 @@ export async function prepareNativeCourse(
           artifacts[q.id] = materialized;
           if (materialized.project) {
             projects.push(materialized.project);
-            nativeInputs[q.id] = materialized.selection;
+            nativeInputs[q.id] = materialized.selection!;
           }
         }
       }
@@ -496,30 +492,11 @@ export async function prepareNativeCourse(
         if (!options.checksOutput) {
           throw Error("PL.INPUT_INVALID: course checks-output required");
         }
-        assertNativeChecksCoverage(witness, projects);
-        const sources = selection.expectedSources.map((source) => ({
-          source,
-          sha256: bySource.get(source) as string,
-        })).sort((a, b) => a.source.localeCompare(b.source));
-        const selectionScope = {
-          schema: "pl-native-selected-checks-v1",
-          identity: descriptor.identity,
-          assessments: selection.assessments,
-          sources,
-          automaticIds: projects.map((p) => p.qualifiedId).sort(),
-        };
-        const checks = await nativeChecksManifest({
+        assertNativeChecksCoverage(projectRows, projects);
+        const checks = nativeChecksManifest({
           courseId,
           bookRoot: options.book,
-          sources,
           projects,
-          version: 2,
-          selectionScope,
-        });
-        const nativeVerification = await nativeVerificationInventory({
-          courseId,
-          operation: descriptor.identity.operation,
-          selections: nativeInputs,
         });
         const config = validateNativeRaw(
           adapter.business(selection.assessments[0].source).raw,
@@ -537,20 +514,20 @@ export async function prepareNativeCourse(
           output,
           checksOutput: options.checksOutput,
           body: async (id) => {
-            if (!bodies.has(id)) {
+            const body = bodies.get(id);
+            if (!body) {
               throw Error(
                 "PL.NATIVE_INTENT_INCOMPLETE: selected menu context absent: " +
                   id,
               );
             }
-            return bodies.get(id);
+            return body;
           },
           candidateImage: options.candidateImage,
           deferPublish: true,
           nativeInputs,
           nativeAnswers,
           nativeResponseSlots,
-          nativeVerification,
           nativeBody: true,
           nativeAuxiliary: auxiliary,
           studentArtifact: async (fact) => artifacts[fact.exerciseId],
@@ -566,7 +543,6 @@ export async function prepareNativeCourse(
           );
         }
         const binding = await checkedJSON(resolve(options.bindingPath));
-        standaloneBinding = binding;
         const scratch = await Deno.makeTempDir({
           dir: dirname(resolve(output)),
           prefix: ".pl-native-inputs-",
@@ -604,7 +580,7 @@ export async function prepareNativeCourse(
             if (selected) {
               if (
                 canonical(provided.files) !==
-                  canonical(selected.sources.map((f: any) => f.name))
+                  canonical(selected.sources.map((f) => f.name))
               ) throw Error("PL.BINDING_CHANGED: primary files");
               for (
                 const [folder, files] of [["student", selected.sources], [
@@ -623,7 +599,7 @@ export async function prepareNativeCourse(
                 JSON.stringify(selected.descriptor),
               );
               const profile = registryInput.value.profiles[
-                projects.find((p) => p.exerciseId === q.id).check.runtime
+                projects.find((p) => p.exerciseId === q.id)!.check!.runtime
               ];
               if (
                 !profile.image ||
@@ -657,7 +633,7 @@ export async function prepareNativeCourse(
         }
       }
       await fence();
-      return bindNativePublication(result, checkBindings);
+      return result;
     });
     return {
       ...composed.value,
@@ -681,25 +657,4 @@ export async function withNativeStagedOutput<T>(
     await staged?.discard();
     throw error;
   }
-}
-
-/** После закрытия Core/A1 здесь нет live guard. Это не prior-P gate. */
-export function bindNativePublication<
-  T extends { publish: () => Promise<any>; discard: () => Promise<void> },
->(
-  prepared: T,
-  checkBindings: () => Promise<void>,
-): T {
-  return {
-    ...prepared,
-    publish: async () => {
-      try {
-        await checkBindings();
-        return await prepared.publish();
-      } catch (error) {
-        await prepared.discard();
-        throw error;
-      }
-    },
-  };
 }

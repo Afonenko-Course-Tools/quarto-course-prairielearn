@@ -1,11 +1,15 @@
 // Внутренняя закрытая граница captured Core check → Platform descriptor.
+import type { RuntimeCheckInput } from "./runtime-check.ts";
 export interface JavaBuild {
   kind: "gradle-jar-v1";
   mainClass?: string;
   artifact: string;
 }
 export function javaBuild(
-  check: any,
+  check: Pick<
+    RuntimeCheckInput,
+    "runtime" | "sourceProfile" | "java-build"
+  >,
   profile?: {
     mode?: string;
     javaRelease?: number;

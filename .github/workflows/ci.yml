@@ -40,13 +40,13 @@ jobs:
         with:
           repository: Afonenko-Course-Tools/quarto-course
           # Core 9: независимо проверенный исходный код; полный hosted CI и выпуск отдельно.
-          ref: 04c189fccfaa56badfc079f7be46fea4969ccf37
+          ref: c62e6c877f769f33a9ffd6fe713811df75c794c6
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "04c189fccfaa56badfc079f7be46fea4969ccf37"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "c62e6c877f769f33a9ffd6fe713811df75c794c6"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -80,7 +80,7 @@ jobs:
         run: quarto run tests/native-answers-integration.ts .ci-deps/core --author
       - name: Отказ несовместимого cross-document grading
         run: quarto run tests/native-answers-integration.ts .ci-deps/core --wrong-grading
-      - name: Подлинные source origin и три различные hash-области
+      - name: Выбранные байты и точные имена без source origin
         run: quarto run tests/native-raw-origin-values.ts .ci-deps/core
       - name: Полные reference sources без student ZIP policy
         run: quarto run tests/native-reference-projection.ts .ci-deps/core
@@ -110,16 +110,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: 04c189fccfaa56badfc079f7be46fea4969ccf37
+          ref: c62e6c877f769f33a9ffd6fe713811df75c794c6
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "04c189fccfaa56badfc079f7be46fea4969ccf37"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "c62e6c877f769f33a9ffd6fe713811df75c794c6"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5
+      - name: Карта типов фактического Core для штатных compiler entries
+        run: quarto run tools/native-core-import-map.ts .ci-deps/core .ci-deps/pl-native-imports.json
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
         with:
           deno-version: v2.7.14
@@ -134,8 +136,8 @@ jobs:
         run: |
           export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
           bash tools/check-java.sh
-      - run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts tests/manual-mixed.test.ts tests/materialized-student.test.ts tests/native-seed-policy.test.ts tests/git-transport.test.ts tests/publication-conditions.test.ts tests/publication-conditions-entry.test.ts tests/public-cases.test.ts tests/body-projection.test.ts tests/java-build.test.ts tests/whole-bank.test.ts
+      - run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts tests/manual-mixed.test.ts tests/functional-selected-files.test.ts tests/native-seed-policy.test.ts tests/git-transport.test.ts tests/publication-conditions.test.ts tests/public-tests.test.ts tests/body-projection.test.ts tests/java-build.test.ts tests/whole-bank.test.ts
       - name: Атомарный экспорт между файловыми системами
-        run: PL_EXDEV_TEST_DIR=/dev/shm deno test --no-config -A --filter "across output filesystems" tests/export-course.test.ts
+        run: PL_EXDEV_TEST_DIR=/dev/shm deno test --no-config --import-map .ci-deps/pl-native-imports.json -A --filter "functional export v5" tests/export-course.test.ts
       - name: Профили исходников Java, starter/API/Gradle и native delivery
-        run: deno test --no-config --allow-read --allow-write --allow-run --allow-env tests/java-build.test.ts tests/native-contract-batch.test.ts tests/native-batch-checkpoint.test.ts tests/native-reuse-refusal.test.ts tests/native-selection.test.ts tests/native-origin-scope.test.ts tests/native-verification-inventory.test.ts tests/native-seed-policy.test.ts tests/native-auxiliary.test.ts
+        run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/java-build.test.ts tests/native-contract-batch.test.ts tests/native-batch-checkpoint.test.ts tests/native-selection.test.ts tests/native-origin-scope.test.ts tests/native-verification-inventory.test.ts tests/native-seed-policy.test.ts tests/native-auxiliary.test.ts

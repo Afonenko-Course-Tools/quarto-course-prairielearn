@@ -44,7 +44,9 @@ Deno.test("delivery4 Workspace использует настоящий seed и e
     const output = Deno.env.get("PL_DELIVERY4_FIXTURES")
       ? Deno.env.get("PL_DELIVERY4_FIXTURES") + "/workspace"
       : root + "/out";
-    await Deno.mkdir(output.slice(0, output.lastIndexOf("/")), {recursive: true});
+    await Deno.mkdir(output.slice(0, output.lastIndexOf("/")), {
+      recursive: true,
+    });
     await exportCourse({
       courseId: "synthetic",
       projectRoot: root,
@@ -80,13 +82,12 @@ Deno.test("delivery4 Workspace использует настоящий seed и e
         }],
       },
       checks: {
-        schemaVersion: 1,
+        schemaVersion: 3,
         courseId: "synthetic",
         bookRoot: "tasks",
-        sourceSnapshotHash: "a".repeat(64),
-        inventoryHash: "b".repeat(64),
         projects: [],
       },
+      nativeInputs: {},
       registry: { schemaVersion: 1, profiles: {} },
       config,
       instance: "test",
@@ -97,7 +98,7 @@ Deno.test("delivery4 Workspace использует настоящий seed и e
     });
     const d = JSON.parse(await Deno.readTextFile(output + "/delivery.json"));
     if (
-      d.schemaVersion !== 4 ||
+      d.schemaVersion !== 5 ||
       d.gradingPayloads["synthetic/" + id].kind !== "workspace"
     ) throw Error("Workspace binding потерян");
   } finally {

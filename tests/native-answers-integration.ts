@@ -192,22 +192,21 @@ await Core.withCurrentNativeOperation({
   } catch {}
   if (cached) throw Error("DTO validation created business authority");
   for (
-    const readSet of [[], ["configuration"], [
-      "configuration",
-      "assessment",
-      "projectChecks",
-      "projectChecks",
-    ]]
+    const nativeMetadata of [
+      undefined,
+      { foreign: {} },
+      { readSet: ["configuration"], values: {} },
+    ]
   ) {
     const bad = structuredClone(input);
-    bad.nativeMetadata.readSet = readSet;
+    bad.nativeMetadata = nativeMetadata;
     let refused = false;
     try {
       await external.validate(bad);
     } catch {
       refused = true;
     }
-    if (!refused) throw Error("Incomplete/duplicate metadata readSet accepted");
+    if (!refused) throw Error("Missing/unknown native metadata or old envelope accepted");
   }
 
   if (
