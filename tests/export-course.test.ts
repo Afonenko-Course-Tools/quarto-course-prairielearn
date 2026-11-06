@@ -395,6 +395,36 @@ Deno.test("functional export v5 передаёт выбранные байты, 
       result.files.every((file: unknown) => typeof file === "string"),
       "Functional file list must contain names",
     );
+    const assessment = JSON.parse(
+      await Deno.readTextFile(
+        input.output +
+          "/courseInstances/pilot/assessments/sec-lab/infoAssessment.json",
+      ),
+    );
+    assert(
+      assessment.text.includes("Подготовка к работе"),
+      "Публичное введение потеряно",
+    );
+    assert(
+      !assessment.text.includes("Выполните не менее") &&
+        !assessment.text.includes("Частичный результат"),
+      "Exporter повторяет правило выполнения во введении",
+    );
+    assert(
+      assessment.zones[0].questions[0].preferences.courseRequirement ===
+          "required" &&
+        assessment.zones[0].questions[0].points === 2.5 &&
+        assessment.zones[0].questions[0].maxPoints === 6 &&
+        assessment.maxPoints === 12,
+      "Native requirement или веса изменены",
+    );
+    assert(
+      result.works[0].completion.atLeast === 1 &&
+        result.works[0].completion.requiredSlotIds[0] ===
+          "demo/sec-lab/exr-a" &&
+        result.works[0].policy.pass["at-least"] === 1,
+      "Метаданные pass изменены",
+    );
     const questionDir = input.output + "/questions/demo/exr-a";
     const html = await Deno.readTextFile(questionDir + "/question.html");
     assert(
