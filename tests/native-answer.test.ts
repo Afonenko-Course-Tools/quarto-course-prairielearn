@@ -1,3 +1,5 @@
+import { AnswerFactsSchema } from "course-core/public.ts";
+import { nativeAnswerBinding } from "../_extensions/course-prairielearn/application/native-delivery.ts";
 import type { NativeAdapterValidationInput } from "course-core/public.ts";
 import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 function fixtureSlots(a: any) {
@@ -75,16 +77,31 @@ const forms: NonNullable<
   options: ["Мяу", "Гав"],
   key: { pairs: { "Кошка": "Мяу", "Собака": "Гав" } },
 }, { type: "single-choice", count: 3, correct: 1 }];
+forms.push(...[1, 2].map((count) => ({
+  type: "multipart" as const,
+  parts: Array.from({ length: count }, (_, i) => ({
+    type: "manual" as const,
+    name: "reason-" + i,
+    label: "Объяснение " + i,
+    submission: "text" as const,
+  })),
+})));
 for (const answer of forms) {
   Deno.test(
-    "native canonical " + answer.type +
+    "native canonical " + answer.type + (answer.type === "multipart"
+      ? " " + answer.parts.map((p) =>
+        p.type
+      ).join("+")
+      : "") +
       " exports private grading and finite equal leaves",
     async () => {
       const root = await Deno.makeTempDir({ prefix: "pl-answer-" });
       try {
         const id = "exr-answer",
           key = "fixture/" + id,
-          manual = answer.type === "manual",
+          manual = answer.type === "manual" ||
+            answer.type === "multipart" &&
+              answer.parts.every((p) => p.type === "manual"),
           pkg: PublicBodyPackage = {
             schema: "course-body-package-v2",
             owner: "fixture",
@@ -119,6 +136,24 @@ for (const answer of forms) {
             }],
             resources: [],
           };
+        AnswerFactsSchema.parse(answer);
+        const method = manual
+          ? "manual"
+          : answer.type === "multipart"
+          ? "mixed"
+          : "external";
+        const nativeBinding = nativeAnswerBinding(
+          "fixture",
+          method,
+          answer,
+          fixtureSlots(answer),
+        );
+        if (
+          nativeBinding.upstreamGradingMethod !==
+            (manual ? "Manual" : "Internal")
+        ) {
+          throw Error("Producer изменил native метод");
+        }
         const prepared = await exportPrairieLearn(pkg, {
           projectRoot: root,
           projects: {},
@@ -141,6 +176,46 @@ for (const answer of forms) {
           if (!(error instanceof Deno.errors.NotFound)) throw error;
         }
         await prepared!.publish();
+        for (
+          const wrongMethod of ["manual", "mixed", "external"].filter((
+            candidate,
+          ) => manual ? candidate !== "manual" : candidate === "manual")
+        ) {
+          let refused = false;
+          try {
+            await exportPrairieLearn(pkg, {
+              projectRoot: root,
+              projects: {},
+              nativeAnswers: { [id]: answer },
+            }, {
+              questions: {
+                [id]: {
+                  topic: "Java",
+                  files: [],
+                  grading: wrongMethod === "external"
+                    ? "external"
+                    : { method: wrongMethod },
+                },
+              },
+            }, root + "/wrong");
+          } catch (error) {
+            refused = String(error).includes(
+              "Метод оценивания не соответствует форме ответа",
+            );
+          }
+          if (!refused) {
+            throw Error(
+              "Несовместимый grading принят: " + wrongMethod,
+            );
+          }
+          try {
+            await Deno.lstat(root + "/wrong");
+            throw Error("Несовместимый grading опубликовал файлы");
+          } catch (error) {
+            if (!(error instanceof Deno.errors.NotFound)) throw error;
+          }
+        }
+
         const policy = manual
           ? { "auto-points": 0, "manual-points": 20 }
           : answer.type === "multipart"
@@ -166,11 +241,6 @@ for (const answer of forms) {
             },
           },
         };
-        const method = manual
-          ? "manual"
-          : answer.type === "multipart"
-          ? "mixed"
-          : "external";
         const config = {
           delivery: {
             book: "tasks",
@@ -234,7 +304,10 @@ for (const answer of forms) {
         });
         const evidence = Deno.env.get("PL_DELIVERY4_FIXTURES");
         if (evidence) {
-          await copyTree(root + "/course", evidence + "/" + answer.type);
+          const form = manual && answer.type === "multipart"
+            ? "multipart-manual-" + answer.parts.length
+            : answer.type;
+          await copyTree(root + "/course", evidence + "/" + form);
         }
         const courseInfo = JSON.parse(
           await Deno.readTextFile(
@@ -242,7 +315,8 @@ for (const answer of forms) {
           ),
         );
         if (
-          courseInfo.gradingMethod !== (manual ? "Manual" : "Internal")
+          courseInfo.gradingMethod !== (manual ? "Manual" : "Internal") ||
+          courseInfo.partialCredit !== !manual
         ) throw Error("course exporter lost native form");
         const base = root + "/out/questions/" + key,
           info = JSON.parse(await Deno.readTextFile(base + "/info.json")),
@@ -250,18 +324,36 @@ for (const answer of forms) {
         if (
           !infoQuestion(info) ||
           info.gradingMethod !== (manual ? "Manual" : "Internal") ||
+          info.partialCredit !== !manual ||
           info.externalGradingOptions
         ) throw Error("native answer requires fake external runtime");
         if (
           html.includes("734129") || html.includes('correct="true"') ||
           html.includes("pl-file-upload")
         ) throw Error("answer key/upload leaked to UI");
+        if (manual) {
+          const names = answer.type === "multipart"
+            ? answer.parts.map((p) => p.name)
+            : ["answer"];
+          for (const name of names) {
+            if (!html.includes('file-name="' + name + '.html"')) {
+              throw Error(
+                "Нет ручного поля: " + name,
+              );
+            }
+          }
+          if (html.includes("pl-string-input")) {
+            throw Error(
+              "Ручной ответ получил автоматическое поле",
+            );
+          }
+        }
         const run = await new Deno.Command("python3", {
           args: [
             "-I",
             "-B",
             "-c",
-            `import importlib.util,json,sys,math\nspec=importlib.util.spec_from_file_location('question',sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\na=json.loads(sys.argv[2]);d={'params':{},'correct_answers':{},'submitted_answers':{},'partial_scores':{},'score':0,'feedback':{},'format_errors':{}};m.generate(d)\nif a['type']=='manual': assert not d['correct_answers'];sys.exit(0)\nanswers={'numeric':{'answer':'734129.05'},'multipart':{'first':'7','second':'0'},'matching':{'match-0':'Мяу','match-1':'ошибка'},'single-choice':{'answer':'2'}}[a['type']];d['submitted_answers']=answers;m.grade(d);expected=0.5 if a['type'] in ('multipart','matching') else 1\nassert d['score']==expected,(d,expected)\nassert len(d['partial_scores'])==(2 if a['type'] in ('multipart','matching') else 1)\nfor bad in ('NaN','Infinity','',None,True,{},[]):\n d['submitted_answers']={k:bad for k in answers};m.grade(d);assert math.isfinite(d['score']) and d['score']==0,d\n`,
+            `import importlib.util,json,sys,math\nspec=importlib.util.spec_from_file_location('question',sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\na=json.loads(sys.argv[2]);d={'params':{},'correct_answers':{},'submitted_answers':{},'partial_scores':{},'score':0,'feedback':{},'format_errors':{}};m.generate(d)\nif a['type']=='manual' or (a['type']=='multipart' and all(p['type']=='manual' for p in a['parts'])): assert not d['correct_answers'];m.grade(d);assert not d['partial_scores'];sys.exit(0)\nanswers={'numeric':{'answer':'734129.05'},'multipart':{'first':'7','second':'0'},'matching':{'match-0':'Мяу','match-1':'ошибка'},'single-choice':{'answer':'2'}}[a['type']];d['submitted_answers']=answers;m.grade(d);expected=0.5 if a['type'] in ('multipart','matching') else 1\nassert d['score']==expected,(d,expected)\nassert len(d['partial_scores'])==(2 if a['type'] in ('multipart','matching') else 1)\nfor bad in ('NaN','Infinity','',None,True,{},[]):\n d['submitted_answers']={k:bad for k in answers};m.grade(d);assert math.isfinite(d['score']) and d['score']==0,d\n`,
             base + "/server.py",
             JSON.stringify(answer),
           ],

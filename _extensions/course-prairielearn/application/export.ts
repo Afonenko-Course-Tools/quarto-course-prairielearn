@@ -660,7 +660,9 @@ export async function exportPrairieLearn(
           "answer",
         );
       }
-      const manualAnswer = answer.type === "manual";
+      const manualAnswer = answer.type === "manual" ||
+        answer.type === "multipart" &&
+          answer.parts.every((part: { type: string }) => part.type === "manual");
       const method = gradingMethod(b.grading).method;
       if (manualAnswer !== (method === "manual")) {
         questionFail(

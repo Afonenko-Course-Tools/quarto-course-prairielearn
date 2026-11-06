@@ -629,7 +629,7 @@ export async function exportCourse(
           await Deno.readTextFile(join(partial, base, "info.json")),
         );
         info.partialCredit = input.nativeAnswers?.[q.id]
-          ? input.nativeAnswers[q.id].type !== "manual"
+          ? info.gradingMethod !== "Manual"
           : c
           ? c.scoring.mode !== "all-pass"
           : false;
