@@ -298,7 +298,16 @@ assessment используют modern `accessControl`. Только защит�
 Instance.studentLabels объявляет только labels защит со стабильными instance-scoped
 UUID. Обычная лабораторная доступна enrolled Student в опубликованной instance
 без выбора защиты; её native default release1970/due:null и delivery policy не
-содержат assignment label. Авторские inherited assignment defaults нормализуются
+содержат assignment label. Для `lab` каждое существующее правило assessment получает
+`afterComplete.questions.hidden: false` и `afterComplete.score.hidden: false`.
+После закрытия владелец сохраняет просмотр условий, своих ответов и личных
+файлов в пределах штатных файловых прав. Закрытый assessment instance остаётся
+закрытым: native authz устанавливает `submittable: false`, новые сдачи запрещены.
+Даты, default/label overrides и правила остальных видов работ сохраняются.
+Это фиксированная политика экспорта лабораторных; общего authoring passthrough
+для `accessControl` нет.
+
+Авторские inherited assignment defaults нормализуются
 как раньше, но label применяется только к защите. Bridge предоставляет доступ штатным enrollment/label API,
 без staff/admin роли и без правки опубликованной source policy. `selfEnrollment.enabled` и попытки
 `triesPerVariant` вычисляются из деклараций. Native `maxPoints` равен числу всех
