@@ -79,8 +79,8 @@ export function gradingMethod(value: unknown): { method: "external" | "manual" |
   }
   return { method };
 }
-export function declarations(raw: any, key: string) {
-  closed(raw, ["delivery", "question-defaults"], [
+export function declarations(value: unknown, key: string) {
+  const raw = closed(value, ["delivery", "question-defaults"], [
     "assessment-defaults",
     "seed-targets",
   ]);
@@ -95,39 +95,52 @@ export function declarations(raw: any, key: string) {
   if (raw["seed-targets"] !== undefined) {
     NativeSeedTargetsSchema.parse(raw["seed-targets"]);
   }
-  closed(raw.delivery, ["book", "course", "instances"]);
-  const course = raw.delivery.course;
-  closed(course, ["name", "title", "timezone", "topics"]);
+  const delivery = closed(raw.delivery, ["book", "course", "instances"]);
+  const course = closed(delivery.course, [
+    "name",
+    "title",
+    "timezone",
+    "topics",
+  ]);
   for (const f of ["name", "title", "timezone"]) {
     if (typeof course[f] !== "string" || !course[f].trim()) {
       throw new Error("PL course " + f + " required");
     }
   }
   try {
-    new Intl.DateTimeFormat("en", { timeZone: course.timezone });
+    new Intl.DateTimeFormat("en", { timeZone: course.timezone as string });
   } catch {
     throw new Error("PL timezone invalid");
   }
   if (!Array.isArray(course.topics) || !course.topics.length) {
     throw new Error("PL topics required");
   }
-  for (const topic of course.topics) {
-    closed(topic, ["name", "color", "description"]);
+  for (const value of course.topics) {
+    const topic = closed(value, ["name", "color", "description"]);
     if (Object.values(topic).some((v) => typeof v !== "string" || !v)) {
       throw new Error("PL topic invalid");
     }
   }
   if (
-    !object(raw.delivery.instances) ||
-    !Object.hasOwn(raw.delivery.instances, key) ||
+    !object(delivery.instances) ||
+    !Object.hasOwn(delivery.instances, key) ||
     !/^[a-z0-9][a-z0-9-]*$/.test(key)
   ) throw new Error("PL instance missing");
-  for (
-    const [id, v] of Object.entries(raw.delivery.instances) as [string, any][]
-  ) {
-    closed(v, ["title", "self-enrollment", "works", "publishing"]);
-    closed(v.publishing, ["start-date", "end-date"]);
-    const dates = [v.publishing["start-date"], v.publishing["end-date"]];
+  type Instance = {
+    title: string;
+    "self-enrollment": boolean;
+    works: string[];
+    publishing: { "start-date": string; "end-date": string };
+  };
+  for (const [id, value] of Object.entries(delivery.instances)) {
+    const v = closed(value, [
+      "title",
+      "self-enrollment",
+      "works",
+      "publishing",
+    ]);
+    const publishing = closed(v.publishing, ["start-date", "end-date"]);
+    const dates = [publishing["start-date"], publishing["end-date"]];
     const timestamp =
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
     if (
@@ -138,7 +151,7 @@ export function declarations(raw: any, key: string) {
             0,
             19,
           ) !== date.slice(0, 19)
-      ) || Date.parse(dates[0]) >= Date.parse(dates[1])
+      ) || Date.parse(dates[0] as string) >= Date.parse(dates[1] as string)
     ) {
       throw new Error(
         "PL instance publishing requires ordered explicit timestamps with offsets",
@@ -148,19 +161,26 @@ export function declarations(raw: any, key: string) {
       !/^[a-z0-9][a-z0-9-]*$/.test(id) || typeof v.title !== "string" ||
       !v.title || typeof v["self-enrollment"] !== "boolean" ||
       !Array.isArray(v.works) || !v.works.length ||
-      new Set(v.works).size !== v.works.length || v.works.some((w: any) =>
+      new Set(v.works).size !== v.works.length || v.works.some((w: unknown) =>
         typeof w !== "string" || !/^sec-[a-z0-9-]+$/.test(w)
       )
     ) {
       throw new Error("PL instance invalid");
     }
   }
+  const defaults = question(raw["question-defaults"]);
   return {
-    raw,
-    book: raw.delivery.book,
-    course,
-    instance: raw.delivery.instances[key],
-    defaults: question(raw["question-defaults"]),
+    raw: raw as typeof raw & {
+      delivery: typeof delivery & { instances: Record<string, Instance> };
+      "question-defaults": Record<string, unknown>;
+    },
+    book: delivery.book,
+    course: course as {
+      name: string; title: string; timezone: string;
+      topics: {name: string; color: string; description: string}[];
+    },
+    instance: delivery.instances[key] as Instance,
+    defaults,
   };
 }
 

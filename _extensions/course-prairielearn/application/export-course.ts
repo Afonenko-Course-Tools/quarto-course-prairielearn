@@ -22,16 +22,27 @@ import {
 import { declarations, gradingMethod, question } from "./declarations.ts";
 import type { materializeNativeQuestion } from "./native-materialize.ts";
 import type { StudentArtifact } from "./export.ts";
-import type { NativeProjectFact } from "course-core/public.ts";
+import type {
+  AnswerSpec,
+  NativeAdapterValidationInput,
+  NativeProjectFact,
+  NativeResponseSlot,
+} from "course-core/public.ts";
+import type { RuntimeProfile } from "./runtime-descriptor.ts";
+import type { AssessmentPolicySchema } from "./native-business.ts";
 import type { NativeCourseChecks } from "./native-check-inventory.ts";
 import { isDeepStrictEqual } from "node:util";
 import { canonical, safePath } from "./source-selection.ts";
 /** Один matcher для раннего native context и окончательной сборки. */
-export function nativeUnitMenus(
-  works: any[],
-  assessments: any[],
-): Map<string, any[]> {
-  const unitMenus = new Map<string, any[]>();
+type MenuWork = Pick<
+  NonNullable<NativeAdapterValidationInput["assessment"]>,
+  "id" | "slots"
+>;
+export function nativeUnitMenus<T extends MenuWork>(
+  works: readonly MenuWork[],
+  assessments: readonly T[],
+): Map<string, T[]> {
+  const unitMenus = new Map<string, T[]>();
   for (const work of works) {
     if (!work.id.startsWith("sec-unit-")) continue;
     const expected = "exr-" + work.id.slice("sec-unit-".length);
@@ -47,14 +58,14 @@ export function nativeUnitMenus(
           work.id,
       );
     }
-    const menus = assessments.filter((menu: any) =>
+    const menus = assessments.filter((menu) =>
       menu.id !== work.id &&
-      menu.slots.some((member: any) =>
+      menu.slots.some((member) =>
         member.assignment.requirement === "optional" &&
         member.candidates.includes(expected)
       )
     );
-    if (new Set(menus.map((menu: any) => menu.id)).size !== menus.length) {
+    if (new Set(menus.map((menu) => menu.id)).size !== menus.length) {
       throw Error("PL неоднозначный источник контекста меню: " + work.id);
     }
     unitMenus.set(work.id, menus);
@@ -128,10 +139,35 @@ async function sameQuestionFiles(
   }
   return true;
 }
+type ExportAssessment =
+  & Pick<
+    NonNullable<NativeAdapterValidationInput["assessment"]>,
+    "id" | "title" | "kind" | "slots" | "relatedExercise"
+  >
+  & {
+    source: string;
+    extensions: {
+      prairielearn: ReturnType<typeof AssessmentPolicySchema.parse>;
+    };
+  };
+type ExportExercise =
+  & Pick<NativeAdapterValidationInput["declarations"][number], "id">
+  & {
+    target: string;
+    // Авторские значения повторно проверяет существующий question() reader.
+    extensions?: {
+      prairielearn?: Partial<
+        Record<"topic" | "submission" | "grading" | "single-variant", unknown>
+      >;
+    };
+  };
 export interface ExportCourseContent {
-  assessments: any[];
-  exercises: any[];
-  projects?: any[];
+  assessments: ExportAssessment[];
+  exercises: ExportExercise[];
+  projects?: Pick<
+    NativeProjectFact,
+    "exerciseId" | "bankMember" | "projectRoot" | "check"
+  >[];
 }
 type NativeSelection = NonNullable<
   Awaited<ReturnType<typeof materializeNativeQuestion>>["selection"]
@@ -151,8 +187,16 @@ export async function exportCourse(
     projectRoot: string;
     content: ExportCourseContent;
     checks: NativeCourseChecks;
-    config: any;
-    registry: any;
+    config: unknown;
+    registry: {
+      schemaVersion: number;
+      profiles?: Record<
+        string,
+        Pick<RuntimeProfile, "mode"> & Partial<RuntimeProfile> & {
+          image?: string;
+        }
+      >;
+    };
     instance: string;
     output: string;
     checksOutput: string;
@@ -162,8 +206,8 @@ export async function exportCourse(
     nativeBody?: boolean;
     nativeAuxiliary?: NativeAuxiliary;
     nativeInputs: Record<string, NativeCompilerInput>;
-    nativeAnswers?: Record<string, any>;
-    nativeResponseSlots?: Record<string, any[]>;
+    nativeAnswers?: Record<string, AnswerSpec>;
+    nativeResponseSlots?: Record<string, NativeResponseSlot[]>;
     studentArtifact: (
       fact: Pick<NativeProjectFact, "exerciseId">,
     ) => Promise<StudentArtifact>;
@@ -185,7 +229,7 @@ export async function exportCourse(
   await absent(out);
   await absent(privateOut);
   const works = d.instance.works.map((id: string) => {
-    const work = content.assessments.find((w: any) => w.id === id);
+    const work = content.assessments.find((w) => w.id === id);
     if (!work) throw new Error("PL selected work missing: " + id);
     if (!work.extensions.prairielearn) {
       throw new Error("PL selected work requires policy");
@@ -207,7 +251,7 @@ export async function exportCourse(
   for (const exercise of content.exercises) {
     methods[exercise.id] = gradingMethod(
       exercise.extensions?.prairielearn?.grading ??
-        input.config["question-defaults"].grading,
+        d.raw["question-defaults"].grading,
     ).method;
   }
   for (const work of works) validateGradingComponents(work, methods);
@@ -267,11 +311,14 @@ export async function exportCourse(
         studentLabels: await Promise.all(
           [
             ...new Set(
-              works.filter((w: any) => w.relatedExercise).map((w: any) =>
-                w.extensions.prairielearn.assignment?.["student-label"]
+              works.filter((w) => w.relatedExercise).map((w) =>
+                ((assignment) =>
+                  assignment && "student-label" in assignment
+                    ? assignment["student-label"]
+                    : undefined)(w.extensions.prairielearn.assignment)
               ),
             ),
-          ].map(async (name: any) => {
+          ].map(async (name) => {
             if (typeof name !== "string" || !name) {
               throw new Error("PL resolved assignment label required");
             }
@@ -379,25 +426,26 @@ export async function exportCourse(
       }
       const overview = { html: overviewParts.join("\n") };
       for (const q of p.questions) {
-        const e = content.exercises.find((e: any) => e.id === q.id);
+        const e = content.exercises.find((e) => e.id === q.id);
         if (e?.target !== "prairielearn") {
           throw new Error("PL selected member target mismatch");
         }
         const settings = question({
           topic: e.extensions?.prairielearn?.topic ?? d.defaults.topic,
           submission: e.extensions?.prairielearn?.submission ??
-            input.config["question-defaults"].submission,
+            d.raw["question-defaults"].submission,
           ...(e.extensions?.prairielearn?.grading !== undefined
             ? { grading: e.extensions.prairielearn.grading }
-            : input.config["question-defaults"].grading
-            ? { grading: input.config["question-defaults"].grading }
+            : d.raw["question-defaults"].grading
+            ? { grading: d.raw["question-defaults"].grading }
             : {}),
           ...(Object.hasOwn(e.extensions?.prairielearn ?? {}, "single-variant")
-            ? { "single-variant": e.extensions.prairielearn["single-variant"] }
-            : Object.hasOwn(input.config["question-defaults"], "single-variant")
             ? {
-              "single-variant":
-                input.config["question-defaults"]["single-variant"],
+              "single-variant": e.extensions?.prairielearn?.["single-variant"],
+            }
+            : Object.hasOwn(d.raw["question-defaults"], "single-variant")
+            ? {
+              "single-variant": d.raw["question-defaults"]["single-variant"],
             }
             : {}),
         });
@@ -412,7 +460,7 @@ export async function exportCourse(
           );
           continue;
         }
-        const artifactFact = content.projects?.find((f: any) =>
+        const artifactFact = content.projects?.find((f) =>
           f.exerciseId === q.id && f.bankMember
         );
         if (!artifactFact) {
@@ -420,7 +468,7 @@ export async function exportCourse(
         }
         studentArtifacts[q.id] = await input.studentArtifact(artifactFact);
         if (method === "manual") {
-          const fact = content.projects?.find((f: any) =>
+          const fact = content.projects?.find((f) =>
             f.exerciseId === q.id && f.bankMember
           );
           if (!fact || fact.check || !safePath(fact.projectRoot)) {
@@ -534,7 +582,7 @@ export async function exportCourse(
         binding.questions[q.id] = {
           ...settings,
           submission: selectedSubmission,
-          files: sources.map((s: any) => s.name),
+          files: sources.map((s) => s.name),
           ...(descriptor.additionalJavaSources
             ? { additionalJavaSources: descriptor.additionalJavaSources }
             : {}),
@@ -682,7 +730,11 @@ export async function exportCourse(
                 "access/" + input.instance + "/" + work.id,
                 courseUuid,
               ),
-              labels: [policy.assignment["student-label"]],
+              labels: [
+                policy.assignment && "student-label" in policy.assignment
+                  ? policy.assignment["student-label"]
+                  : undefined,
+              ],
               dateControl: {
                 release: { date: "1970-01-01T00:00:00" },
                 due: { date: null },
@@ -729,7 +781,7 @@ export async function exportCourse(
       bookRoot: input.checks.bookRoot,
       questions: Object.keys(questions).sort(),
       gradingPayloads: questions,
-      works: works.map((w: any) => ({
+      works: works.map((w) => ({
         id: w.id,
         slots: qualifiedSlots(input.courseId, w),
         policy: Object.fromEntries(

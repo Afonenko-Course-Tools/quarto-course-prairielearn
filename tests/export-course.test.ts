@@ -1,3 +1,7 @@
+import type { ExportCourseContent } from "../_extensions/course-prairielearn/application/export-course.ts";
+type CourseFixtureInput = Parameters<typeof exportCourse>[0] & {
+  config: ReturnType<typeof declarations>["raw"];
+};
 import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import { NativeProjectCheckSchema } from "../_extensions/course-prairielearn/application/native-checks.ts";
 import { runtimeDescriptor } from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
@@ -104,7 +108,9 @@ Deno.test("closed delivery defaults and selected instance", () => {
       unknown: true,
     }]
   ) {
-    const raw = structuredClone(d.raw);
+    const raw: {
+      delivery: { instances: Record<string, { publishing: unknown }> };
+    } = structuredClone(d.raw);
     raw.delivery.instances.pilot.publishing = publishing;
     let rejected = false;
     try {
@@ -209,7 +215,7 @@ Deno.test("functional export v5 передаёт выбранные байты, 
         requirement: "required",
         workMode: "individual",
       };
-    const work = {
+    const work: ExportCourseContent["assessments"][number] = {
       id: "sec-lab",
       source: "lab.qmd",
       kind: "lab",
@@ -338,7 +344,7 @@ Deno.test("functional export v5 передаёт выбранные байты, 
       contractFixtures: [],
       readiness: { ready: true, missing: [] },
     };
-    const input: Parameters<typeof exportCourse>[0] = {
+    const input: CourseFixtureInput = {
       courseId: "demo",
       projectRoot: root,
       content: {
@@ -566,7 +572,7 @@ Deno.test("additional Java policy rejects present null/false and closed-field de
 /** Небольшая настоящая поставка: без Core operation и запуска runtime. */
 async function inventoryCourseFixture(
   run: (
-    input: Parameters<typeof exportCourse>[0],
+    input: CourseFixtureInput,
     root: string,
   ) => Promise<void>,
 ) {
@@ -577,7 +583,9 @@ async function inventoryCourseFixture(
       requirement: "required",
       workMode: "individual",
     } as const;
-    const works = ["sec-first", "sec-second"].map((id) => ({
+    const works = ["sec-first", "sec-second"].map((
+      id,
+    ): ExportCourseContent["assessments"][number] => ({
       id,
       source: id + ".qmd",
       kind: "lab",
@@ -628,7 +636,7 @@ async function inventoryCourseFixture(
       contractFixtures: [],
       readiness: { ready: true, missing: [] },
     };
-    const input: Parameters<typeof exportCourse>[0] = {
+    const input: CourseFixtureInput = {
       courseId: "demo",
       projectRoot: root,
       content: {

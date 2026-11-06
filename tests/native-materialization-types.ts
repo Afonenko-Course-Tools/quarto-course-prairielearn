@@ -77,26 +77,23 @@ type _Inventory = Require<
 type _Check = Require<
   Exact<NonNullable<Projection["project"]["check"]>, NativeProjectCheck>
 >;
-type _AuthoredFeedback = Require<
+// Старый feedback DSL удалён; runtime descriptor получает только действующие поля.
+type _NoAuthoredFeedback = Require<
   Exact<
-    NonNullable<Parameters<typeof runtimeDescriptor>[0]["feedback"]>,
-    { requirement: string; "what-check": string }
+    Extract<"feedback", keyof Parameters<typeof runtimeDescriptor>[0]>,
+    never
   >
 >;
-type _RuntimeFeedback = Require<
-  Exact<
-    NonNullable<Descriptor["feedback"]>,
-    { requirement: string; whatCheck: string }
-  >
+type _NoRuntimeFeedback = Require<
+  Exact<Extract<"feedback", keyof Descriptor>, never>
 >;
-type _ProjectedFeedback = Require<
+type _NoProjectedFeedback = Require<
   Exact<
-    NonNullable<
-      Awaited<
-        ReturnType<typeof selectNativeCompilerInputs>
-      >["descriptor"]["feedback"]
+    Extract<
+      "feedback",
+      keyof Awaited<ReturnType<typeof selectNativeCompilerInputs>>["descriptor"]
     >,
-    NonNullable<Descriptor["feedback"]>
+    never
   >
 >;
 type _Sources = Require<
