@@ -1,6 +1,6 @@
 import type * as CorePublic from "course-core/public.ts";
 import type { CheckedNativeProjectFact } from "../_extensions/course-prairielearn/application/native-check-projection.ts";
-import type { nativeProjectWitness } from "../_extensions/course-prairielearn/application/native-provenance.ts";
+import type { nativeProjectRows } from "../_extensions/course-prairielearn/application/native-provenance.ts";
 import { captureNativeAuxiliary } from "../_extensions/course-prairielearn/application/native-auxiliary.ts";
 import { withNativeProjectPlans } from "../_extensions/course-prairielearn/application/native-course.ts";
 import { hostDelta, observeNativeHost } from "./native-host-observer.ts";
@@ -217,28 +217,17 @@ references: [{id: fixture-book, type: book, title: Публичная книга
         },
         check: decodeNativeCheck(policy, "native"),
       };
-      const witness: Awaited<ReturnType<typeof nativeProjectWitness>> = {
-        identity: operation.identity,
-        ownerInputs: ["bank.qmd"],
-        capturedInputs: ["bank.qmd"],
-        projects: [{
-          source: "bank.qmd",
-          format: "html",
-          fact,
-          declaration: {
-            source: "bank.qmd",
-            id: "exr-p",
-            project: "/projects/p",
-            format: "html",
-          },
-          materialization: undefined,
-        }],
-      };
+      const projectRows: ReturnType<typeof nativeProjectRows> = [{
+        source: "bank.qmd",
+        format: "html",
+        fact,
+        materialization: undefined,
+      }];
       const planned = await withNativeProjectPlans(
         Core,
         root,
         operation.identity.profiles,
-        witness,
+        projectRows,
         async (projectPlans) => {
           const pair = projectPlans[0];
           const condition = operation.condition({

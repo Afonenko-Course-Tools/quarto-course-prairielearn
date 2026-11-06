@@ -13,7 +13,7 @@ import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import { captureNativeAuxiliary } from "./native-auxiliary.ts";
 import { dirname, join, resolve } from "node:path";
 import { createNativeAdapter } from "./native-adapter.ts";
-import { nativeProjectWitness } from "./native-provenance.ts";
+import { nativeProjectRows } from "./native-provenance.ts";
 import type { NativeEntryOptions } from "./native-entry.ts";
 import { canonical } from "./source-selection.ts";
 import { decodeNativeCheck } from "./native-checks.ts";
@@ -42,7 +42,7 @@ export async function withNativeProjectPlans<T>(
   Core: typeof CorePublic,
   root: string,
   profiles: string[],
-  witness: Awaited<ReturnType<typeof nativeProjectWitness>>,
+  projectRows: ReturnType<typeof nativeProjectRows>,
   use: (
     plans: NativeAssignmentProjectPlans[],
     checkpoint: () => Promise<void>,
@@ -50,7 +50,7 @@ export async function withNativeProjectPlans<T>(
   operation: NativeOperation,
 ): Promise<NativeProjectPlansResult<T>> {
   const formats = [
-    ...new Set(witness.projects.map((p) => p.format)),
+    ...new Set(projectRows.map((p) => p.format)),
   ];
   const requests = formats.map((format) => ({
     owner: root,
@@ -58,7 +58,7 @@ export async function withNativeProjectPlans<T>(
     format,
     directories: [
       ...new Set(
-        witness.projects.filter((p) => p.format === format).map((p) =>
+        projectRows.filter((p) => p.format === format).map((p) =>
           p.fact.projectRoot
         ),
       ),
@@ -118,7 +118,7 @@ export async function withNativeProjectPlans<T>(
         });
       }
       for (
-        const row of witness.projects.filter((p) => p.format === request.format)
+        const row of projectRows.filter((p) => p.format === request.format)
       ) {
         const pair = pairs.get(row.fact.projectRoot);
         if (!pair) throw Error("PL.SELECTION_INVALID: missing project pair");
@@ -157,7 +157,7 @@ export async function withNativeAssignments<T>(
     prepared: {
       adapter: NativeAdapter;
       proof: Awaited<ReturnType<NativeAdapter["validateCourse"]>>;
-      witness: Awaited<ReturnType<typeof nativeProjectWitness>>;
+      projectRows: ReturnType<typeof nativeProjectRows>;
       projectPlans: NativeAssignmentDeliveryOptions["projectPlans"];
       deliveries: NativeDelivered[];
       checkpoint: () => Promise<void>;
@@ -172,16 +172,12 @@ export async function withNativeAssignments<T>(
   });
   const release = { expectedSources: selection.expectedSources };
   const proof = await adapter.validateCourse(operation, release);
-  const witness = await nativeProjectWitness(
-    Core,
-    await operation.assignmentProvenance(),
-    { identity: descriptor.identity, sources: selection.expectedSources },
-  );
+  const projectRows = nativeProjectRows(await operation.assignmentProvenance());
   return await withNativeProjectPlans(
     Core,
     descriptor.root,
     descriptor.identity.profiles,
-    witness,
+    projectRows,
     async (projectPlans, checkpoint) => {
       const deliveries: NativeDelivered[] = [];
       for (const assessment of selection.assessments) {
@@ -205,7 +201,7 @@ export async function withNativeAssignments<T>(
       return await use({
         adapter,
         proof,
-        witness,
+        projectRows,
         projectPlans,
         deliveries,
         checkpoint,
@@ -216,10 +212,10 @@ export async function withNativeAssignments<T>(
 }
 /** Full captured check coverage, not an assumption about instance naming. */
 export function assertNativeChecksCoverage(
-  witness: Awaited<ReturnType<typeof nativeProjectWitness>>,
+  projectRows: ReturnType<typeof nativeProjectRows>,
   projects: readonly import("./native-check-inventory.ts").NativeCheckProject[],
 ) {
-  const expected = witness.projects.filter((p) => p.fact.check).map((
+  const expected = projectRows.filter((p) => p.fact.check).map((
     p,
   ) => p.source + "\0" + p.fact.exerciseId).sort();
   const actual = projects.map((p) => p.source + "\0" + p.exerciseId).sort();
@@ -281,7 +277,7 @@ export async function prepareNativeCourse(
       ...input,
       references: references.references,
     }, async (prepared) => {
-      const { adapter, witness, projectPlans, deliveries, checkpoint } =
+      const { adapter, projectRows, projectPlans, deliveries, checkpoint } =
         prepared;
       const courseId = deliveries[0]?.publicPackage.owner;
       if (
@@ -291,7 +287,7 @@ export async function prepareNativeCourse(
       const content: any = {
         assessments: [],
         exercises: [],
-        projects: witness.projects.map((p) => p.fact),
+        projects: projectRows.map((p) => p.fact),
       };
       for (const source of selection.expectedSources) {
         const value = adapter.validatedInput(source),
@@ -424,7 +420,7 @@ export async function prepareNativeCourse(
           if (artifacts[q.id]) {
             continue;
           }
-          const facts = witness.projects.filter((p) =>
+          const facts = projectRows.filter((p) =>
             p.source === q.source && p.fact.exerciseId === q.id
           );
           const pairs = projectPlans.filter((p) =>
@@ -496,7 +492,7 @@ export async function prepareNativeCourse(
         if (!options.checksOutput) {
           throw Error("PL.INPUT_INVALID: course checks-output required");
         }
-        assertNativeChecksCoverage(witness, projects);
+        assertNativeChecksCoverage(projectRows, projects);
         const checks = nativeChecksManifest({
           courseId,
           bookRoot: options.book,

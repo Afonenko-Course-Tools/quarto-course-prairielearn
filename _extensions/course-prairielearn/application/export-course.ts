@@ -20,6 +20,7 @@ import {
   uuid,
 } from "./export.ts";
 import { declarations, gradingMethod, question } from "./declarations.ts";
+import type { CheckedNativeProjectFact } from "./native-check-projection.ts";
 import type { materializeNativeQuestion } from "./native-materialize.ts";
 import type { StudentArtifact } from "./export.ts";
 import type {
@@ -165,7 +166,7 @@ export interface ExportCourseContent {
   assessments: ExportAssessment[];
   exercises: ExportExercise[];
   projects?: Pick<
-    NativeProjectFact,
+    CheckedNativeProjectFact,
     "exerciseId" | "bankMember" | "projectRoot" | "check"
   >[];
 }

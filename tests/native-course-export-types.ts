@@ -3,6 +3,7 @@ import type { materializeNativeQuestion } from "../_extensions/course-prairielea
 import type {
   exportCourse,
   NativeCompilerInput,
+  ExportCourseContent,
 } from "../_extensions/course-prairielearn/application/export-course.ts";
 import type {
   ProjectContext,
@@ -19,6 +20,10 @@ type Exact<A, B> = IsAny<A> extends true ? false
 type Require<T extends true> = T;
 type Materialized = Awaited<ReturnType<typeof materializeNativeQuestion>>;
 type ExportInput = Parameters<typeof exportCourse>[0];
+type _NormalizedCourseCheck = Require<Exact<
+  NonNullable<ExportCourseContent["projects"]>[number]["check"],
+  NativeProjectCheck | undefined
+>>;
 
 declare const materialized: Materialized;
 declare const selection: NonNullable<Materialized["selection"]>;

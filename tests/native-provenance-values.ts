@@ -1,13 +1,10 @@
 // Только public DTO/value controls: не operation/lease/A1/profile positive.
-import type * as CorePublic from "course-core/public.ts";
-import { pathToFileURL } from "node:url";
-const Core: typeof CorePublic = await import(
-  pathToFileURL(Deno.args[0] + "/_extensions/course-core/public.ts").href
-);
-import type { NativeOperationIdentity } from "course-core/public.ts";
-import {
-  nativeProjectWitness,
-} from "../_extensions/course-prairielearn/application/native-provenance.ts";
+import type {
+  NativeAssignmentProvenance,
+  NativeOperationIdentity,
+  NativeProjectFact,
+} from "course-core/public.ts";
+import { nativeProjectRows } from "../_extensions/course-prairielearn/application/native-provenance.ts";
 const identity: NativeOperationIdentity = {
   operation: "22222222-2222-4222-8222-222222222222",
   profiles: ["full"],
@@ -15,7 +12,11 @@ const identity: NativeOperationIdentity = {
   runtime: "quarto-1.11.5",
 };
 const inputs = ["work.qmd", "hidden.qmd"];
-const fact = (source: string, id: string, bankMember: boolean) => ({
+const fact = (
+  source: string,
+  id: string,
+  bankMember: boolean,
+): NativeProjectFact => ({
   exerciseId: id,
   source,
   projectRoot: "projects/" + id,
@@ -33,7 +34,7 @@ const fact = (source: string, id: string, bankMember: boolean) => ({
 });
 const a = fact("work.qmd", "exr-visible", true),
   b = fact("hidden.qmd", "exr-hidden", false);
-const value = {
+const value: NativeAssignmentProvenance = {
   schema: "course-native-assignment-provenance-v1",
   identity,
   ownerInputs: inputs,
@@ -53,54 +54,48 @@ const value = {
     source: a.source,
     format: "html",
     projects: [a],
-    projectMaterializations: { [a.exerciseId]: a.materialization },
+    projectMaterializations: {},
   }, {
     source: b.source,
     format: "revealjs",
     projects: [b],
-    projectMaterializations: { [b.exerciseId]: b.materialization },
+    projectMaterializations: {},
   }],
 };
-const expected = { identity, sources: inputs };
-const witness = await nativeProjectWitness(Core, value, expected);
+const rows = nativeProjectRows(value);
 if (
-  witness.projects.length !== 2 || witness.projects[1].fact.bankMember ||
-  witness.projects[1].format !== "revealjs" ||
-  witness.projects[0].materialization?.includeGit !== true ||
-  "sourceSnapshotHash" in witness ||
-  "inventoryHash" in witness
-) throw Error("native scope/trace/materialization lost or aliased");
+  rows.length !== 2 || rows[1].fact.bankMember ||
+  rows[1].format !== "revealjs" ||
+  rows[0].materialization?.includeGit !== true
+) throw Error("typed hidden/nonbank/format/materialization projection lost");
+// Изменение normalized PL policy не должно менять captured Core facts.
+rows[0].materialization!.commonFiles[0].target = "tests/Changed.java";
+if (
+  value.documents[0].projects[0].materialization!.commonFiles[0].target !==
+    "tests/File.java"
+) {
+  throw Error("PL projection aliases typed Core materialization");
+}
 let controls = 0;
 for (
-  const mutate of [
-    (p: typeof value) =>
-      p.identity.operation = "33333333-3333-4333-8333-333333333333",
-    (p: typeof value) => p.capturedInputs.pop(),
-    (p: typeof value) => p.documents.pop(),
-    (p: typeof value) => p.projects.pop(),
-    (p: typeof value) => p.documents[1].projects = [],
-    (p: typeof value) => p.projects[1].format = "html",
-  ]
+  const path of ["../private", "/outside", "C:/outside", "a\\b", "a/../b", ""]
 ) {
   const bad = structuredClone(value);
-  mutate(bad);
+  bad.documents[1].projects[0].projectRoot = path;
   let refused = false;
   try {
-    await nativeProjectWitness(Core, bad, expected);
-  } catch {
-    refused = true;
+    nativeProjectRows(bad);
+  } catch (error) {
+    refused = String(error).includes("PL.PROJECT_INVALID");
   }
-  if (!refused) throw Error("invalid public DTO accepted");
+  if (!refused) throw Error("unsafe typed project path accepted");
   controls++;
 }
-console.log(JSON.stringify(
-  {
-    status: "PUBLIC_DTO_ONLY_NOT_NATIVE_POSITIVE",
-    controls,
-    projects: 2,
-    hiddenNonbankRetained: true,
-    formats: ["html", "revealjs"],
-  },
-  null,
-  2,
-));
+console.log(JSON.stringify({
+  status: "TYPED_PROJECTION_ONLY_NOT_NATIVE_POSITIVE",
+  controls,
+  projects: rows.length,
+  hiddenNonbankRetained: true,
+  formats: rows.map((row) => row.format),
+  inputIsolation: true,
+}));
