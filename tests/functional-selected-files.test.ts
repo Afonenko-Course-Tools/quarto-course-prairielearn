@@ -1,7 +1,10 @@
 import * as Core from "course-core/public.ts";
 import { Buffer } from "node:buffer";
 import { isDeepStrictEqual } from "node:util";
-import { selectNativeCompilerInputs } from "../_extensions/course-prairielearn/application/native-selection.ts";
+import {
+  selectNativeCompilerInputs,
+  selectNativeStarterSources,
+} from "../_extensions/course-prairielearn/application/native-selection.ts";
 import { projectNativeChecks } from "../_extensions/course-prairielearn/application/native-check-projection.ts";
 import { nativeChecksManifest } from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
 import { NativeProjectCheckSchema } from "../_extensions/course-prairielearn/application/native-checks.ts";
@@ -186,4 +189,46 @@ Deno.test("checks v3 переносит полный действительны�
     checks.projects[0].references[0].sources.length === 1,
     "Эталон потерян",
   );
+});
+
+Deno.test("предварительный full starter использует тот же selector и не получает private роли", async () => {
+  const value = fixture();
+  const preliminary = await selectNativeStarterSources(
+    value.full.files.filter((f) => f.reason === "starter"),
+    value.check.sourceProfile,
+    { javaRelease: 25, sourceExtensions: [".java"] },
+  );
+  const final = await selectNativeCompilerInputs(value);
+  assert(
+    isDeepStrictEqual(preliminary, final.sources),
+    "full/student starter selection differs",
+  );
+  for (
+    const mutation of [
+      (files: typeof value.student.files) => {
+        files[0].reason = "testset:contract";
+      },
+      (files: typeof value.student.files) => {
+        files[0].bytes = new Uint8Array([255]);
+      },
+      (files: typeof value.student.files) => {
+        files[0].bytes = bytes("class X {}\0");
+      },
+      (files: typeof value.student.files) => {
+        files[0].bytes = new Uint8Array(1048577);
+      },
+    ]
+  ) {
+    const files = structuredClone(value.student.files);
+    mutation(files);
+    let rejected = false;
+    try {
+      await selectNativeStarterSources(files, value.check.sourceProfile, {
+        javaRelease: 25,
+      });
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, "source role/UTF8/limit violation accepted");
+  }
 });

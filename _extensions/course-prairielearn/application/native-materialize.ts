@@ -2,7 +2,12 @@ import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
-import { applicationJavaTarget, describeSubmission, fileSubmission } from "./submission.ts";
+import {
+  applicationJavaTarget,
+  describeSubmission,
+  fileSubmission,
+} from "./submission.ts";
+import { selectNativeStarterSources } from "./native-selection.ts";
 import { projectNativeChecks } from "./native-check-projection.ts";
 import type { CheckedNativeProjectFact } from "./native-check-projection.ts";
 import type * as CorePublic from "course-core/public.ts";
@@ -175,11 +180,8 @@ export async function materializeNativeQuestion(
 ) {
   const { Core, pair, condition } = input;
   const initial = describeSubmission(input.settings.submission, []);
-  const student = await Core.materializeProject(
-    pair.student,
-    condition,
-    await input.bindings(pair.student, condition, initial),
-  );
+  // Full остаётся private inventory; только настоящие starter roles нужны
+  // для предварительных имён сдачи. Окончательный student проверяет сам Core.
   const full = input.fact.check
     ? await Core.materializeProject(
       pair.full,
@@ -187,37 +189,84 @@ export async function materializeNativeQuestion(
       await input.bindings(pair.full, condition, initial),
     )
     : undefined;
-  let checked;
-  if (input.fact.check) {
-    checked = await projectNativeChecks({
-      ...input,
-      student,
-      full,
-      studentPlan: pair.student,
-      fullPlan: pair.full,
+  const preliminary = input.fact.check && full
+    ? await selectNativeStarterSources(
+      Core.ArtifactFilesSchema.parse(full).files.filter((file) =>
+        file.reason === "starter"
+      ),
+      input.fact.check.sourceProfile,
+      input.runtime,
+    )
+    : undefined;
+  const student = preliminary ? undefined : await Core.materializeProject(
+    pair.student,
+    condition,
+    await input.bindings(pair.student, condition, initial),
+  );
+  const summarize = (
+    sourceMappings: SubmissionInstructions["files"],
+    archive?: string,
+  ) => {
+    const javaFiles = sourceMappings.length &&
+      sourceMappings.every((file) => file.name.endsWith(".java"));
+    const selectedSubmission =
+      input.settings.submission.mode !== "workspace" && javaFiles
+        ? fileSubmission(
+          sourceMappings.map((file) => file.name),
+          input.settings.submission.mode === "editor"
+            ? input.settings.submission.aceMode
+            : undefined,
+        )
+        : input.settings.submission;
+    return describeSubmission(selectedSubmission, sourceMappings, {
+      archive: archive ??
+        (javaFiles && selectedSubmission.mode === "upload" &&
+            selectedSubmission.layout === "zip"
+          ? "solution.zip"
+          : undefined),
     });
-  }
-  const sourceMappings = checked?.selection.sources.map(file => ({ name: file.name, starterPath: file.target })) ??
-    student.files.filter(file => input.settings.submission.mode !== "workspace" && file.reason === "starter" && applicationJavaTarget(file.target)).map(file => ({ name: file.target, starterPath: file.target }));
-  const javaFiles = sourceMappings.length && sourceMappings.every(file => file.name.endsWith(".java"));
-  const selectedSubmission = input.settings.submission.mode !== "workspace" && javaFiles
-    ? fileSubmission(sourceMappings.map(file => file.name), input.settings.submission.mode === "editor" ? input.settings.submission.aceMode : undefined)
-    : input.settings.submission;
-  const submission = describeSubmission(selectedSubmission, sourceMappings, {
-    archive: checked?.selection.descriptor.additionalJavaSources?.archive ??
-      (javaFiles && selectedSubmission.mode === "upload" && selectedSubmission.layout === "zip" ? "solution.zip" : undefined),
-  });
+  };
+  const sourceMappings = preliminary?.map((file) => ({
+    name: file.name,
+    starterPath: file.target,
+  })) ??
+    student!.files.filter((file) =>
+      input.settings.submission.mode !== "workspace" &&
+      file.reason === "starter" && applicationJavaTarget(file.target)
+    ).map((file) => ({ name: file.target, starterPath: file.target }));
+  const preliminaryArchive = input.fact.check?.["additional-java-sources"]
+    ?.archive;
+  const submission = summarize(sourceMappings, preliminaryArchive);
   const final = await Core.materializeProject(
     pair.student,
     condition,
     await input.bindings(pair.student, condition, submission),
   );
-  if (checked) {
-    for (const f of checked.selection.sources) {
-      const actual = final.files.find((file) => file.target === f.target);
-      if (
-        !actual || !isDeepStrictEqual(actual.bytes, f.bytes)
-      ) throw Error("PL.SELECTION_CHANGED: final starter");
+  let checked;
+  if (input.fact.check) {
+    checked = await projectNativeChecks({
+      ...input,
+      student: final,
+      full,
+      studentPlan: pair.student,
+      fullPlan: pair.full,
+    });
+    if (!isDeepStrictEqual(checked.selection.sources, preliminary)) {
+      throw Error("PL.SELECTION_CHANGED: final starter");
+    }
+    const actualSubmission = summarize(
+      checked.selection.sources.map((file) => ({
+        name: file.name,
+        starterPath: file.target,
+      })),
+      checked.selection.descriptor.additionalJavaSources?.archive,
+    );
+    if (
+      checked.selection.descriptor.additionalJavaSources?.archive !==
+        preliminaryArchive ||
+      !isDeepStrictEqual(actualSubmission, submission)
+    ) {
+      throw Error("PL.SELECTION_CHANGED: final submission");
     }
   }
   if (

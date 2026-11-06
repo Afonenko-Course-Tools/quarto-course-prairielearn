@@ -4,6 +4,7 @@ import { safePath } from "./source-selection.ts";
 import { runtimeDescriptor } from "./runtime-descriptor.ts";
 import type * as Core from "course-core/public.ts";
 import type { ArtifactFile, ProjectPlan } from "course-core/public.ts";
+import type { NativeProjectCheck } from "./native-checks.ts";
 import type { RuntimeProfile } from "./runtime-descriptor.ts";
 
 type File = Omit<ArtifactFile, "audience">;
@@ -11,6 +12,107 @@ type CoreBoundary = Pick<
   typeof Core,
   "ArtifactFilesSchema" | "ProjectPlanSchema"
 >;
+const file = async (value: File, name: string) => {
+  if (
+    !safePath(name)
+  ) {
+    throw Error("PL.SELECTION_CHANGED: inventory bytes");
+  }
+  const bytes = new Uint8Array(value.bytes);
+  return {
+    name,
+    bytes,
+    target: value.target,
+    reason: value.reason,
+  };
+};
+const under = (target: string, root: string) =>
+  target.startsWith(root + "/") ? target.slice(root.length + 1) : undefined;
+function select(
+  files: File[],
+  root: string,
+  patterns: string[],
+  role: (file: File) => boolean,
+  label: string,
+) {
+  if (!safePath(root) || /[*?\[\]{}]/.test(root) || !patterns.length) {
+    throw Error(
+      "PL.SELECTION_INVALID: explicit " + label + " root/include required",
+    );
+  }
+  const chosen = new Map<string, File>();
+  for (const pattern of patterns) {
+    if (!safePath(pattern)) throw Error("PL.SELECTION_INVALID: unsafe glob");
+    const matches = files.filter((f) => {
+      const path = under(f.target, root);
+      return path !== undefined && matchesGlob(path, pattern);
+    });
+    if (!matches.length) {
+      throw Error(
+        "PL.SELECTION_MIGRATION_REQUIRED: no A1 target for " + label + " " +
+          root + "/" + pattern,
+      );
+    }
+    for (const f of matches) {
+      if (!role(f)) {
+        throw Error("PL.SELECTION_INVALID: foreign planned role " + f.reason);
+      }
+      chosen.set(f.target, f);
+    }
+  }
+  return [...chosen.values()].sort((a, b) => a.target.localeCompare(b.target));
+}
+/** Общий выбор настоящих starter-файлов: audience проверяет вызывающая граница. */
+export async function selectNativeStarterSources(
+  files: File[],
+  profile: NativeProjectCheck["sourceProfile"],
+  runtimeProfile: RuntimeProfile,
+) {
+  const sourceRecords = select(
+    files,
+    profile.root,
+    profile.include,
+    (f) => f.reason === "starter",
+    "source",
+  );
+  const sources = await Promise.all(
+    sourceRecords.map((f) => file(f, under(f.target, profile.root)!)),
+  );
+  validateSources(sources, runtimeProfile);
+  return sources;
+}
+function validateSources(
+  sources: Awaited<ReturnType<typeof selectNativeStarterSources>>,
+  runtimeProfile: RuntimeProfile,
+) {
+  const extensions = runtimeProfile?.sourceExtensions ?? [".java"];
+  if (
+    !Array.isArray(extensions) || !extensions.length ||
+    runtimeProfile?.javaRelease !== undefined &&
+      extensions.some((e: string) => e !== ".java") ||
+    extensions.some((e) =>
+      typeof e !== "string" || !/^\.[a-z][a-z0-9]*$/.test(e)
+    )
+  ) throw Error("PL.SELECTION_INVALID: runtime extensions");
+  const files = sources;
+  if (
+    !files.length || files.length > 128 ||
+    files.reduce((n, f) => n + f.bytes.length, 0) > 4194304
+  ) {
+    throw Error("PL.SELECTION_INVALID: source count/total bytes");
+  }
+  for (const source of files) {
+    if (
+      !extensions.some((e: string) => source.name.endsWith(e)) ||
+      source.bytes.length > 1048576
+    ) throw Error("PL.SELECTION_INVALID: non-source student target");
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(
+      source.bytes,
+    );
+    if (text.includes("\0")) throw Error("PL.SELECTION_INVALID: NUL source");
+  }
+}
+
 /** Pure consumer of actual checked A1 plan inventories. It never discovers files
  * or interprets metadata. Authored roots/globs keep their exact target meaning.
  */
@@ -34,98 +136,11 @@ export async function selectNativeCompilerInputs(options: {
     student.exerciseId !== full.exerciseId ||
     studentPlan.input !== fullPlan.input
   ) throw Error("PL.SELECTION_INVALID: inventories/plan identity mismatch");
-  const file = async (value: File, name: string) => {
-    if (
-      !safePath(name)
-    ) {
-      throw Error("PL.SELECTION_CHANGED: inventory bytes");
-    }
-    const bytes = new Uint8Array(value.bytes);
-    return {
-      name,
-      bytes,
-      target: value.target,
-      reason: value.reason,
-    };
-  };
-  const under = (target: string, root: string) =>
-    target.startsWith(root + "/") ? target.slice(root.length + 1) : undefined;
-  function select(
-    files: File[],
-    root: string,
-    patterns: string[],
-    role: (file: File) => boolean,
-    label: string,
-  ) {
-    if (!safePath(root) || /[*?\[\]{}]/.test(root) || !patterns.length) {
-      throw Error(
-        "PL.SELECTION_INVALID: explicit " + label + " root/include required",
-      );
-    }
-    const chosen = new Map<string, File>();
-    for (const pattern of patterns) {
-      if (!safePath(pattern)) throw Error("PL.SELECTION_INVALID: unsafe glob");
-      const matches = files.filter((f) => {
-        const path = under(f.target, root);
-        return path !== undefined && matchesGlob(path, pattern);
-      });
-      if (!matches.length) {
-        throw Error(
-          "PL.SELECTION_MIGRATION_REQUIRED: no A1 target for " + label + " " +
-            root + "/" + pattern,
-        );
-      }
-      for (const f of matches) {
-        if (!role(f)) {
-          throw Error("PL.SELECTION_INVALID: foreign planned role " + f.reason);
-        }
-        chosen.set(f.target, f);
-      }
-    }
-    return [...chosen.values()].sort((a, b) =>
-      a.target.localeCompare(b.target)
-    );
-  }
-  const sourceRecords = select(
+  const sources = await selectNativeStarterSources(
     student.files,
-    check.sourceProfile.root,
-    check.sourceProfile.include,
-    (f) => f.reason === "starter",
-    "source",
+    check.sourceProfile,
+    options.runtimeProfile,
   );
-  const sources = await Promise.all(
-    sourceRecords.map((f) =>
-      file(f, under(f.target, check.sourceProfile.root)!)
-    ),
-  );
-  const extensions = options.runtimeProfile?.sourceExtensions ?? [".java"];
-  if (
-    !Array.isArray(extensions) || !extensions.length ||
-    options.runtimeProfile?.javaRelease !== undefined &&
-      extensions.some((e: string) => e !== ".java") ||
-    extensions.some((e) =>
-      typeof e !== "string" || !/^\.[a-z][a-z0-9]*$/.test(e)
-    )
-  ) throw Error("PL.SELECTION_INVALID: runtime extensions");
-  function validateSources(files: typeof sources) {
-    if (
-      !files.length || files.length > 128 ||
-      files.reduce((n, f) => n + f.bytes.length, 0) > 4194304
-    ) {
-      throw Error("PL.SELECTION_INVALID: source count/total bytes");
-    }
-    for (const source of files) {
-      if (
-        !extensions.some((e: string) => source.name.endsWith(e)) ||
-        source.bytes.length > 1048576
-      ) throw Error("PL.SELECTION_INVALID: non-source student target");
-      const text = new TextDecoder("utf-8", { fatal: true }).decode(
-        source.bytes,
-      );
-      if (text.includes("\0")) throw Error("PL.SELECTION_INVALID: NUL source");
-    }
-  }
-  validateSources(sources);
   function trustedRole(f: File) {
     return f.reason.startsWith("testset:")
       ? fullPlan.testsets.includes(f.reason.slice(8))
@@ -208,7 +223,7 @@ export async function selectNativeCompilerInputs(options: {
       records.map((f) => file(f, under(f.target, ref.root)!)),
     );
     // Вспомогательные классы эталона принадлежат той же проверенной A1 solution group.
-    validateSources(files);
+    validateSources(files, options.runtimeProfile);
     references.push({
       ...ref,
       group,

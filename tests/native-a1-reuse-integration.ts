@@ -249,6 +249,8 @@ references: [{id: fixture-book, type: book, title: Публичная книга
           expiredPair = pair;
           expiredCondition = condition;
           // Explicit test policy/facts, not assignmentProvenance/qualified assignment.
+          const materializeStart = observer.snapshot();
+          const materializeTime = performance.now();
           const materialized = await materializeNativeQuestion({
             Core,
             operation,
@@ -269,6 +271,25 @@ references: [{id: fixture-book, type: book, title: Публичная книга
             adapter,
             expectedSources: ["bank.qmd"],
           });
+          const materializeCost = hostDelta(
+            materializeStart,
+            observer.snapshot(),
+          );
+          console.log(
+            "MATERIALIZE_CHILDREN " + JSON.stringify({
+              milliseconds: Math.round(performance.now() - materializeTime),
+              commands: materializeCost.commands,
+            }),
+          );
+          const pandocChildren = materializeCost.commands.filter((
+            child: { command: string; args: string[] },
+          ) => child.args[0] === "pandoc" || /\/pandoc$/.test(child.command));
+          if (pandocChildren.length !== 4) {
+            throw Error(
+              "checked materialization must use two Pandoc passes: " +
+                pandocChildren.length,
+            );
+          }
           const html = await renderPublicBody(
             {
               owner: "native",
@@ -349,9 +370,10 @@ references: [{id: fixture-book, type: book, title: Публичная книга
       }
       checks[0].projectContextMetrics = planned.projectContextMetrics;
       const cost = planned.projectContextMetrics.final;
+      console.log("MATERIALIZE_LOADER_COST " + JSON.stringify(cost));
       if (
         cost.yamlFileReads < 1 || cost.directoryLayers < 1 ||
-        !Object.isFrozen(cost)
+        !Object.isFrozen(planned.projectContextMetrics)
       ) throw Error("loader cost observations missing");
       checks.push({ operationMetrics: operation.metrics });
     },

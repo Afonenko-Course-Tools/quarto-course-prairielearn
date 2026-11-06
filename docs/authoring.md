@@ -705,3 +705,21 @@ identity, proof cache keys, QRC/registry/standalone bindings, selection и bytes
 
 Изменение пока Source-only: unit counts не подтверждают скорость whole-course
 export, Native qualification, prior P или готовность выпуска.
+
+## Повторное использование materialization при checked export
+
+Для проверяемого проекта адаптер сначала получает настоящий private `full`
+комплект. Общий selector выбирает из его starter-файлов предварительные имена
+и bytes сдачи с прежними root/include, UTF-8 и size limits. По ним адаптер
+вычисляет итоговую инструкцию и один раз материализует настоящий `student`
+комплект через Core. Все окончательные проверки student/full plans, private
+ролей, compiler inputs, references и verification-tests выполняются на этих
+настоящих комплектах. Имена, target, роли и bytes выбранных исходников, имя
+additional-Java архива и итоговая инструкция должны совпасть с предварительным
+расчётом до упаковки. `full` не превращается в student inventory.
+
+В этом пути два materialization вместо трёх; без Markdown fragments это четыре
+Pandoc child вместо шести. Для непроверяемого проекта сохраняется прежняя
+последовательность student-проходов. Full может отказать раньше student, чем
+в прежнем порядке, но результат не упаковывается до всех окончательных проверок.
+Публичный Core API и правила выбора editor/upload/ZIP не меняются.
