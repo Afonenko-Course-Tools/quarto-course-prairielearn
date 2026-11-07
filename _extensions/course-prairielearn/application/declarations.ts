@@ -62,12 +62,13 @@ export function publicationQuestion(v: unknown) {
 }
 export function question(v: unknown) {
   const { submission, grading, topic, singleVariant } = readQuestion(v, true);
+  if (topic === undefined || submission === undefined) throw Error("PL question requires topic and submission");
   return {
-    topic: topic!,
+    topic,
     ...(grading.method !== "external" ? { grading } : {}),
     ...(singleVariant !== undefined ? { singleVariant } : {}),
     ...(submission?.mode === "workspace" ? { singleVariant: true } : {}),
-    submission: submission!,
+    submission,
   };
 }
 export function gradingMethod(value: unknown): { method: "external" | "manual" | "mixed" } {
@@ -102,25 +103,20 @@ export function declarations(value: unknown, key: string) {
     "timezone",
     "topics",
   ]);
-  for (const f of ["name", "title", "timezone"]) {
-    if (typeof course[f] !== "string" || !course[f].trim()) {
-      throw new Error("PL course " + f + " required");
-    }
-  }
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: course.timezone as string });
-  } catch {
-    throw new Error("PL timezone invalid");
-  }
-  if (!Array.isArray(course.topics) || !course.topics.length) {
-    throw new Error("PL topics required");
-  }
-  for (const value of course.topics) {
+  const requiredText = (value: unknown, field: string): string => {
+    if (typeof value !== "string" || !value.trim()) throw new Error("PL course " + field + " required");
+    return value;
+  };
+  const name = requiredText(course.name, "name"), title = requiredText(course.title, "title"), timezone = requiredText(course.timezone, "timezone");
+  const book = requiredText(delivery.book, "book");
+  try { new Intl.DateTimeFormat("en", {timeZone:timezone}); }
+  catch { throw new Error("PL timezone invalid"); }
+  if (!Array.isArray(course.topics) || !course.topics.length) throw new Error("PL topics required");
+  const topics = course.topics.map((value: unknown) => {
     const topic = closed(value, ["name", "color", "description"]);
-    if (Object.values(topic).some((v) => typeof v !== "string" || !v)) {
-      throw new Error("PL topic invalid");
-    }
-  }
+    if (typeof topic.name !== "string" || !topic.name || typeof topic.color !== "string" || !topic.color || typeof topic.description !== "string" || !topic.description) throw new Error("PL topic invalid");
+    return {name:topic.name,color:topic.color,description:topic.description};
+  });
   if (
     !object(delivery.instances) ||
     !Object.hasOwn(delivery.instances, key) ||
@@ -132,6 +128,8 @@ export function declarations(value: unknown, key: string) {
     works: string[];
     publishing: { "start-date": string; "end-date": string };
   };
+  const instances: Record<string, Instance> = {};
+  const textList = (value: unknown): value is string[] => Array.isArray(value) && value.every((v: unknown) => typeof v === "string");
   for (const [id, value] of Object.entries(delivery.instances)) {
     const v = closed(value, [
       "title",
@@ -140,46 +138,31 @@ export function declarations(value: unknown, key: string) {
       "publishing",
     ]);
     const publishing = closed(v.publishing, ["start-date", "end-date"]);
-    const dates = [publishing["start-date"], publishing["end-date"]];
+    const start = publishing["start-date"], end = publishing["end-date"];
     const timestamp =
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
-    if (
-      dates.some((date) =>
-        typeof date !== "string" || !timestamp.test(date) ||
-        !Number.isFinite(Date.parse(date)) ||
-        new Date(Date.parse(date.slice(0, 19) + "Z")).toISOString().slice(
-            0,
-            19,
-          ) !== date.slice(0, 19)
-      ) || Date.parse(dates[0] as string) >= Date.parse(dates[1] as string)
-    ) {
-      throw new Error(
-        "PL instance publishing requires ordered explicit timestamps with offsets",
-      );
-    }
+    const validDate = (date: unknown): date is string => typeof date === "string" && timestamp.test(date) && Number.isFinite(Date.parse(date)) && new Date(Date.parse(date.slice(0,19) + "Z")).toISOString().slice(0,19) === date.slice(0,19);
+    if (!validDate(start) || !validDate(end) || Date.parse(start) >= Date.parse(end)) throw new Error("PL instance publishing requires ordered explicit timestamps with offsets");
     if (
       !/^[a-z0-9][a-z0-9-]*$/.test(id) || typeof v.title !== "string" ||
       !v.title || typeof v["self-enrollment"] !== "boolean" ||
-      !Array.isArray(v.works) || !v.works.length ||
+      !textList(v.works) || !v.works.length ||
       new Set(v.works).size !== v.works.length || v.works.some((w: unknown) =>
         typeof w !== "string" || !/^sec-[a-z0-9-]+$/.test(w)
       )
     ) {
       throw new Error("PL instance invalid");
     }
+    instances[id] = {title:v.title, "self-enrollment":v["self-enrollment"], works:v.works, publishing:{"start-date":start,"end-date":end}};
   }
+  const instance = instances[key];
+  if (!instance) throw new Error("PL instance missing");
   const defaults = question(raw["question-defaults"]);
   return {
-    raw: raw as typeof raw & {
-      delivery: typeof delivery & { instances: Record<string, Instance> };
-      "question-defaults": Record<string, unknown>;
-    },
-    book: delivery.book,
-    course: course as {
-      name: string; title: string; timezone: string;
-      topics: {name: string; color: string; description: string}[];
-    },
-    instance: delivery.instances[key] as Instance,
+    raw: {...raw, delivery:{...delivery,book,course:{name,title,timezone,topics},instances}, "question-defaults":closed(raw["question-defaults"], ["topic","submission"], ["grading","single-variant"])},
+    book,
+    course: {name,title,timezone,topics},
+    instance,
     defaults,
   };
 }

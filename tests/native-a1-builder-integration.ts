@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import type * as CorePublic from "course-core/public.ts";
 import type { CheckedNativeProjectFact } from "../_extensions/course-prairielearn/application/native-check-projection.ts";
 import {
@@ -11,7 +12,7 @@ import { pathToFileURL } from "node:url";
 import { materializeNativeQuestion } from "../_extensions/course-prairielearn/application/native-materialize.ts";
 import { nativeChecksManifest } from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
 import { decodeNativeCheck } from "../_extensions/course-prairielearn/application/native-checks.ts";
-const core = join(Deno.args[0], "_extensions/course-core"),
+const core = join(required(Deno.args[0]), "_extensions/course-core"),
   pl = join(Deno.cwd(), "_extensions/course-prairielearn"),
   Core: typeof CorePublic = await import(
     pathToFileURL(join(core, "public.ts")).href
@@ -192,11 +193,11 @@ ${privateMarker}
   // Fixture installation only: immutable public Download with matching public Core schema.
   for (
     const [source, target] of [[core, join(out, "course-core")], [
-      Deno.args[1],
+      required(Deno.args[1]),
       join(out, "project-download"),
     ]]
   ) {
-    const r = await new Deno.Command("cp", { args: ["-R", source, target] })
+    const r = await new Deno.Command("cp", { args: ["-R", required(source), required(target)] })
       .output();
     if (!r.success) throw Error("fixture copy failed");
   }
@@ -248,10 +249,10 @@ ${privateMarker}
         const pair = {
           source: "bank.qmd",
           exerciseId: "exr-p",
-          student: await Core.planProject(group.contexts[0], {
+          student: await Core.planProject(required(required(group).contexts[0]), {
             audience: "student",
           }),
-          full: await Core.planProject(group.contexts[0], { audience: "full" }),
+          full: await Core.planProject(required(required(group).contexts[0]), { audience: "full" }),
         };
         const condition = operation.condition({
           source: "bank.qmd",
@@ -281,7 +282,7 @@ ${privateMarker}
           pair,
           condition,
           fact,
-          settings: adapter.business("bank.qmd").questions["exr-p"],
+          settings: required(adapter.business("bank.qmd").questions["exr-p"]),
           courseId: "native",
           runtime: {
             mode: "implementation",
@@ -315,7 +316,7 @@ ${privateMarker}
           source.endsWith(".png")
         );
         assert(imageSources.length === 1, "Ожидался один observed PNG source");
-        const imageSource = imageSources[0];
+        const imageSource = required(imageSources[0]);
         // Настоящая public ordinary resource capability, не assignment proof.
         const observed = await operation.resourceFiles({
           files: [{ source: imageSource, target: imageSource }],
@@ -380,8 +381,8 @@ ${privateMarker}
           "Нет PNG в PL clientFiles или README inventory",
         );
         assert(
-          sameBytes(clientPng.data, observed.files[0].bytes) &&
-            sameBytes(inventoryPng.bytes, observed.files[0].bytes),
+          sameBytes(clientPng.data, required(observed.files[0]).bytes) &&
+            sameBytes(inventoryPng.bytes, required(observed.files[0]).bytes),
           "PL clientFiles/README PNG отличаются от observed Native bytes",
         );
         if (!html.html.includes("fixture-book")) {
@@ -398,8 +399,8 @@ ${privateMarker}
         );
         assert(
           selection.sources.length === 1 &&
-            selection.sources[0].name === "Main.java" &&
-            new TextDecoder().decode(selection.sources[0].bytes) ===
+            required(selection.sources[0]).name === "Main.java" &&
+            new TextDecoder().decode(required(selection.sources[0]).bytes) ===
               "public class Main {public static int value(){return 0;}}",
           "Cell изменила выбранный starter Java source",
         );
@@ -407,7 +408,7 @@ ${privateMarker}
           !p.trustedTests.some((f) => f.target === "src/api/java/Api.java")
         ) throw Error("shared API target not preserved");
         if (
-          p.references[0].targets.join(",") !==
+          required(p.references[0]).targets.join(",") !==
             "author/example/src/main/java/Helper.java,author/example/src/main/java/Main.java"
         ) throw Error("reference targets/helpers changed");
         if (
@@ -460,13 +461,13 @@ ${privateMarker}
             table: nodes(condition.body, "Table"),
             image: nodes(condition.body, "Image"),
             imageSource,
-            pngBytes: observed.files[0].bytes.length,
+            pngBytes: required(observed.files[0]).bytes.length,
             clientFile: clientPng.name,
             uuid: expectedUuid,
             selectedJavaSources: selection.sources.map((file) => file.name),
           },
           project: p,
-          contextMetrics: group.metrics,
+          contextMetrics: required(group).metrics,
           studentPlanMetrics: Core.projectPlanMetrics(pair.student),
           fullPlanMetrics: Core.projectPlanMetrics(pair.full),
         });

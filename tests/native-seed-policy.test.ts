@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import {
   assertNativeSeedTargets,
   decodeNativeBusiness,
@@ -15,6 +16,9 @@ function bad(f: () => unknown) {
   }
   assert(rejected, "Ожидаемый отказ отсутствует");
 }
+import type { decodeNativeMaterialization } from "../_extensions/course-prairielearn/application/native-materialization.ts";
+type CommonFiles = ReturnType<typeof decodeNativeMaterialization>["projects"][string]["common-files"];
+const emptyCommonFiles = (): CommonFiles => [];
 const raw = (targets: unknown = { "exr-repo": "versioning/project" }) => ({
   config: {
     "seed-targets": targets,
@@ -25,11 +29,11 @@ const raw = (targets: unknown = { "exr-repo": "versioning/project" }) => ({
     },
   },
   materialization: {
-    projects: { "exr-repo": { "include-git": true, "common-files": [] } },
+    projects: { "exr-repo": { "include-git": true, "common-files": emptyCommonFiles() } },
   },
   declarations: [{ id: "exr-repo", attributes: { project: "project" } }],
 });
-function business(value: any = raw()) {
+function business(value: ReturnType<typeof raw> = raw()) {
   return decodeNativeBusiness(value, {
     origin: { source: "bank.qmd" },
     course: { id: "fixture" },
@@ -74,14 +78,14 @@ Deno.test("C seed-targets проверяет полный authenticated business
   bad(() =>
     assertNativeSeedTargets([{ ...b, seedTargets: { "exr-missing": "work" } }])
   );
-  bad(() => assertNativeSeedTargets([{ ...b, materialization: undefined }]));
+  bad(() => { const missing = structuredClone(b); Reflect.deleteProperty(missing, "materialization"); assertNativeSeedTargets([missing]); });
   bad(() =>
     assertNativeSeedTargets([{
       ...b,
       questions: {
         ...b.questions,
         "exr-repo": {
-          ...b.questions["exr-repo"],
+          ...required(b.questions["exr-repo"]),
           submission: {
             mode: "workspace",
             workspaceOptions: {
@@ -113,7 +117,7 @@ Deno.test("C seed-targets проверяет полный authenticated business
 });
 
 Deno.test("Повторная raw-проверка сохраняет source для owner-relative common-files", () => {
-  const value: any = raw();
+  const value = raw();
   value.materialization.projects["exr-repo"]["common-files"] = [{
     source: "/common/work-environment/count.fish",
     target: "student/survey/tools/count.fish",
@@ -123,13 +127,13 @@ Deno.test("Повторная raw-проверка сохраняет source д�
   bad(() => validateNativeRaw(value));
   for (const source of ["index.qmd", "labs/work-environment.qmd"]) {
     const actual = validateNativeRaw(value, { source });
-    assert(actual.materialization?.projects["exr-repo"]["common-files"][0].source ===
+    assert(required(required(actual.materialization?.projects["exr-repo"])["common-files"][0]).source ===
       "common/work-environment/count.fish", "Потерян owner-relative путь");
     assert(JSON.stringify(value) === before, "Изменён raw source");
   }
-  value.materialization.projects["exr-repo"]["common-files"][0].source = "../common/tool.fish";
-  assert(validateNativeRaw(value, { source: "labs/work.qmd" }).materialization?.projects["exr-repo"]["common-files"][0].source ===
+  required(value.materialization.projects["exr-repo"]["common-files"][0]).source = "../common/tool.fish";
+  assert(required(required(validateNativeRaw(value, { source: "labs/work.qmd" }).materialization?.projects["exr-repo"])["common-files"][0]).source ===
     "common/tool.fish", "Потерян document-relative путь");
-  value.materialization.projects["exr-repo"]["common-files"][0].source = "../../escape";
+  required(value.materialization.projects["exr-repo"]["common-files"][0]).source = "../../escape";
   bad(() => validateNativeRaw(value, { source: "labs/work.qmd" }));
 });

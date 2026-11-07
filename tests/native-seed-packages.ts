@@ -1,4 +1,5 @@
-import type { PublicBodyPackage } from "course-core/body-export/model.ts";
+import type { PublicBodyPackage } from "course-core/public.ts";
+import { required, record } from "./fixture-values.ts";
 import { workspaceSeed } from "../_extensions/course-prairielearn/application/workspace-seed.ts";
 // Реальные pinned recipe/Python/Git и C packages; Body/config — explicit harness, не assignment/P.
 import { assert, fixture } from "./native-auxiliary-fixtures.ts";
@@ -8,8 +9,8 @@ import { exportPrairieLearn } from "../_extensions/course-prairielearn/applicati
 import { captureNativeAuxiliary } from "../_extensions/course-prairielearn/application/native-auxiliary.ts";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
-const output = Deno.args[0], download = Deno.args[1], only = Deno.args[2];
-const { zip } = await import(
+const output = required(Deno.args[0]), download = required(Deno.args[1]), only = Deno.args[2];
+const { zip }: Pick<typeof import("project-download/public.ts"), "zip"> = await import(
   pathToFileURL(join(download, "_extensions/project-download/public.ts")).href
 );
 const rows = [];
@@ -18,7 +19,7 @@ for (
     ["restore-selected-state", "workspace", "actual-restore-workspace"],
     ["github-ssh", "upload", "actual-github-upload"],
     ["github-ssh", "workspace", "conditional-github-workspace-harness"],
-  ]
+  ] satisfies [string, string, string][]
 ) {
   if (only && only !== label) continue;
   const f = await fixture(recipe);
@@ -27,7 +28,7 @@ for (
       key = "fixture/" + id,
       settings = mode === "workspace" ? f.options.settings : { mode: "upload" };
     if (mode === "workspace") {
-      (settings as any).workspaceOptions.image =
+      record(record(settings).workspaceOptions).image =
         "ghcr.io/example/sp-git-workspace@sha256:" + "a".repeat(64);
     }
     const auxiliary = captureNativeAuxiliary(f.options.assertCurrent);
@@ -104,7 +105,7 @@ for (
         kind: work.kind,
         title: work.title,
         slots: [{
-          ...work.slots[0],
+          ...required(work.slots[0]),
           id: "fixture/sec-work/" + id,
           candidates: [key],
         }],
@@ -205,7 +206,7 @@ for (
       mode,
       label,
       initial: artifact.initial,
-      files: artifact.files.map(({ bytes, ...f }: any) => f),
+      files: artifact.files.map(({ bytes, ...f }) => f),
       courseOut,
       standalone,
       deliveryVersion: delivery.schemaVersion,

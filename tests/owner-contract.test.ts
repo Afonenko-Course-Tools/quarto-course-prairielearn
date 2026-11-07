@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import { strict as assert } from "node:assert";
 import * as Owner from "../_extensions/course-prairielearn/application/declarations.ts";
 import {
@@ -145,7 +146,7 @@ Deno.test("Старые отрицательные политики остают
       ...base.config["question-defaults"], unknown: true,
     } } },
     { ...base, declarations: [{ ...declarations[0], attributes: {
-      ...declarations[0].attributes, "prairielearn-submit": "upload",
+      ...required(declarations[0]).attributes, "prairielearn-submit": "upload",
     } }] },
   ];
   for (const mutant of mutants) {
@@ -155,7 +156,12 @@ Deno.test("Старые отрицательные политики остают
   delete r.config["assessment-defaults"].attempts;
   assert.throws(() => decodeNativeBusiness(r, input()));
   const wrong = input();
-  wrong.assessment.slots[0].candidates = ["exr-missing"];
+  required(wrong.assessment.slots[0]).candidates = ["exr-missing"];
+  assert.throws(
+    () => decodeNativeBusiness(raw(), wrong),
+    /PL.SLOTS_INVALID/,
+  );
+  required(wrong.assessment.slots[0]).id = "exr-missing";
   assert.throws(
     () => decodeNativeBusiness(raw(), wrong),
     /PL.ASSESSMENT_UNQUALIFIED/,
@@ -178,10 +184,10 @@ Deno.test("Явный layout загрузки сохраняет разрешё�
   const value = raw();
   value.config["question-defaults"].submission = { mode: "upload", layout: "files-or-zip" };
   const local = structuredClone(input());
-  local.declarations[0].attributes = { ...local.declarations[0].attributes, "prairielearn-submission-layout": "zip" };
+  required(local.declarations[0]).attributes = { ...required(local.declarations[0]).attributes, "prairielearn-submission-layout": "zip" };
   value.declarations = local.declarations;
   const result = decodeNativeBusiness(value, local);
-  assert.deepEqual(result.questions["exr-one"].submission, { mode: "upload", layout: "zip" });
+  assert.deepEqual(required(result.questions["exr-one"]).submission, { mode: "upload", layout: "zip" });
   for (const submission of [{ mode: "editor", layout: "zip" }, { mode: "workspace", layout: "zip" }, { mode: "upload", layout: "unknown" }]) {
     assert.throws(() => Owner.question({ topic: "Java", submission }));
   }

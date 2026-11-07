@@ -2,8 +2,8 @@ import type { NativeAdapterValidationInput } from "course-core/public.ts";
 /** Реально читаемые поля Core input; schema/authenticity остаются у Core boundary.
  * Полный preprojection input структурно совместим без копирования/приведения. */
 export type NativeBusinessInput = Pick<NativeAdapterValidationInput, "declarations"> & {
-  assessment?: Pick<NonNullable<NativeAdapterValidationInput["assessment"]>, "id" | "kind" | "slots">;
-  origin?: Pick<NativeAdapterValidationInput["origin"], "source">;
+  assessment?: Pick<NonNullable<NativeAdapterValidationInput["assessment"]>, "id" | "kind" | "slots"> | undefined;
+  origin?: Pick<NativeAdapterValidationInput["origin"], "source"> | undefined;
   course: Partial<NativeAdapterValidationInput["course"]>;
 };
 import {
@@ -141,13 +141,14 @@ function readNativeRaw(
     const delivery = config.delivery;
     const instances = object(delivery) ? delivery.instances : undefined;
     const keys = Object.keys(object(instances) ? instances : {});
-    if (!keys.length) throw Error("PL.DECLARATION_INVALID: пустые instances");
+    const firstKey = keys[0];
+    if (firstKey === undefined) throw Error("PL.DECLARATION_INVALID: пустые instances");
     declarations({
       ...config,
       "assessment-defaults": config["assessment-defaults"] === undefined
         ? undefined
         : nativePolicy(config["assessment-defaults"]),
-    }, keys[0]);
+    }, firstKey);
   }
   if (config["question-defaults"] !== undefined) {
     parseQuestion(config["question-defaults"]);
@@ -215,9 +216,7 @@ function decodeBusiness<
   parseQuestion: (value: unknown) => Q,
   completeGrading: boolean,
 ) {
-  const { raw, config, defaults, materialization } = readNativeRaw(value, {
-    source: input.origin?.source,
-  }, parseQuestion);
+  const { raw, config, defaults, materialization } = readNativeRaw(value, input.origin ? {source: input.origin.source} : {}, parseQuestion);
   const questions: Record<
     string,
     Q & {
@@ -228,7 +227,8 @@ function decodeBusiness<
     if (!raw.declarations.some((d) => d.id === declaration.id)) {
       throw Error("PL.CAPTURE_CHANGED: декларация отсутствует в raw каноне");
     }
-    const original = raw.declarations.find((d) => d.id === declaration.id)!;
+    const original = raw.declarations.find((d) => d.id === declaration.id);
+    if (!original) throw Error("PL.CAPTURE_CHANGED: декларация отсутствует в raw каноне");
     if (Boolean(original.answer) !== Boolean(declaration.answer)) {
       throw Error("PL.ANSWER_UNQUALIFIED: raw/native answer mismatch");
     }
@@ -353,7 +353,10 @@ export function assertNativeSeedTargets(
           "PL.SEED_TARGET_INVALID: неизвестный или неоднозначный project ID",
         );
       }
-      const owner = owners[0], settings = owner.questions[id];
+      const owner = owners[0];
+      if (!owner) throw Error("PL.SEED_TARGET_INVALID: missing owner");
+      const settings = owner.questions[id];
+      if (!settings) throw Error("PL.SEED_TARGET_INVALID: missing settings");
       if (
         owner.seedTargets[id] !== target ||
         owner.materialization?.projects[id]?.["include-git"] !== true

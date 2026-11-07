@@ -1,5 +1,7 @@
+import { required, record, string, array, fixtureAt } from "./fixture-values.ts";
 import type { ExportCourseContent } from "../_extensions/course-prairielearn/application/export-course.ts";
-type CourseFixtureInput = Parameters<typeof exportCourse>[0] & {
+type CourseFixtureInput = Omit<Parameters<typeof exportCourse>[0], "deferPublish"> & {
+  deferPublish?: false;
   config: ReturnType<typeof declarations>["raw"];
 };
 import type { PublicBodyPackage } from "course-core/body-export/model.ts";
@@ -111,7 +113,7 @@ Deno.test("closed delivery defaults and selected instance", () => {
     const raw: {
       delivery: { instances: Record<string, { publishing: unknown }> };
     } = structuredClone(d.raw);
-    raw.delivery.instances.pilot.publishing = publishing;
+    required(raw.delivery.instances.pilot).publishing = publishing;
     let rejected = false;
     try {
       declarations(raw, "pilot");
@@ -123,7 +125,7 @@ Deno.test("closed delivery defaults and selected instance", () => {
   assert(d.instance.works[0] === "sec-lab", "work lost");
   const semester = structuredClone(d.raw);
   semester.delivery.instances["2026-2027-s1"] = structuredClone(
-    semester.delivery.instances.pilot,
+    required(semester.delivery.instances.pilot),
   );
   const next = declarations(semester, "2026-2027-s1");
   assert(
@@ -146,7 +148,7 @@ Deno.test("closed delivery defaults and selected instance", () => {
   ) {
     const unsafe = structuredClone(d.raw);
     unsafe.delivery.instances[key] = structuredClone(
-      unsafe.delivery.instances.pilot,
+      required(unsafe.delivery.instances.pilot),
     );
     let rejected = false;
     try {
@@ -178,7 +180,7 @@ import { readFile } from "node:fs/promises";
 Deno.test("functional export v5 передаёт выбранные байты, точные имена и только публичные файлы", async () => {
   const root = await Deno.makeTempDir(
     Deno.env.get("PL_EXDEV_TEST_DIR")
-      ? { dir: Deno.env.get("PL_EXDEV_TEST_DIR") }
+      ? { dir: required(Deno.env.get("PL_EXDEV_TEST_DIR")) }
       : {},
   );
   await Deno.mkdir(root + "/project");
@@ -395,34 +397,35 @@ Deno.test("functional export v5 передаёт выбранные байты, 
       result.files.every((file: unknown) => typeof file === "string"),
       "Functional file list must contain names",
     );
-    const assessment = JSON.parse(
+    const assessment = record(JSON.parse(
       await Deno.readTextFile(
         input.output +
           "/courseInstances/pilot/assessments/sec-lab/infoAssessment.json",
       ),
-    );
+    ));
     assert(
-      assessment.text.includes("Подготовка к работе"),
+      string(assessment.text).includes("Подготовка к работе"),
       "Публичное введение потеряно",
     );
     assert(
-      !assessment.text.includes("Выполните не менее") &&
-        !assessment.text.includes("Частичный результат"),
+      !string(assessment.text).includes("Выполните не менее") &&
+        !string(assessment.text).includes("Частичный результат"),
       "Exporter повторяет правило выполнения во введении",
     );
     assert(
-      assessment.zones[0].questions[0].preferences.courseRequirement ===
+      fixtureAt(assessment, ["zones", 0, "questions", 0, "preferences", "courseRequirement"]) ===
           "required" &&
-        assessment.zones[0].questions[0].points === 2.5 &&
-        assessment.zones[0].questions[0].maxPoints === 6 &&
+        fixtureAt(assessment, ["zones", 0, "questions", 0, "points"]) === 2.5 &&
+        fixtureAt(assessment, ["zones", 0, "questions", 0, "maxPoints"]) === 6 &&
         assessment.maxPoints === 12,
       "Native requirement или веса изменены",
     );
+    const deliveredWork = required(result.works[0]);
     assert(
-      result.works[0].completion.atLeast === 1 &&
-        result.works[0].completion.requiredSlotIds[0] ===
+      deliveredWork.completion.atLeast === 1 &&
+        deliveredWork.completion.requiredSlotIds[0] ===
           "demo/sec-lab/exr-a" &&
-        result.works[0].policy.pass["at-least"] === 1,
+        record(deliveredWork.policy.pass)["at-least"] === 1,
       "Метаданные pass изменены",
     );
     const questionDir = input.output + "/questions/demo/exr-a";
@@ -467,7 +470,7 @@ Deno.test("functional export v5 передаёт выбранные байты, 
       }], ["missing-tests", (value: typeof input) => {
         value.nativeInputs = {
           "exr-a": {
-            ...input.nativeInputs["exr-a"],
+            ...required(input.nativeInputs["exr-a"]),
             tests: [],
           },
         };
@@ -811,30 +814,30 @@ for (
     async () => {
       await inventoryCourseFixture(async (input, root) => {
         const work = input.content.assessments[0];
-        work.kind = kind;
+        required(work).kind = kind;
         if (defense) {
-          work.relatedExercise = "exr-a";
-          work.extensions.prairielearn.assignment = {
+          required(work).relatedExercise = "exr-a";
+          required(work).extensions.prairielearn.assignment = {
             "student-label": "defense",
           };
         }
-        input.config.delivery.instances.pilot.works = [work.id];
+        required(input.config.delivery.instances.pilot).works = [required(work).id];
         const body = input.body;
         input.body = async (id) => {
           const pkg = await body(id);
-          pkg.works[0].kind = kind;
+          required(pkg.works[0]).kind = kind;
           if (kind === "test" || kind === "practical") {
-            pkg.questions[0].statementVisibility = "restricted";
+            required(pkg.questions[0]).statementVisibility = "restricted";
           }
           return pkg;
         };
         await exportCourse(input);
-        const info = JSON.parse(
+        const info = record(JSON.parse(
           await Deno.readTextFile(
-            root + "/out/courseInstances/pilot/assessments/" + work.id +
+            root + "/out/courseInstances/pilot/assessments/" + required(work).id +
               "/infoAssessment.json",
           ),
-        );
+        ));
         const afterComplete = {
           questions: { hidden: false },
           score: { hidden: false },
@@ -848,7 +851,7 @@ for (
             },
           }, {
             uuid: await identity(
-              "access/pilot/" + work.id,
+              "access/pilot/" + required(work).id,
               await identity("course/demo"),
             ),
             labels: ["defense"],
@@ -884,7 +887,7 @@ for (
 
 Deno.test("inventory: уникальный вопрос не перечитывается ради списка имён", async () => {
   await inventoryCourseFixture(async (input) => {
-    input.config.delivery.instances.pilot.works = ["sec-first"];
+    required(input.config.delivery.instances.pilot).works = ["sec-first"];
     const read = Deno.readFile;
     const calls: { name: string; bytes: number }[] = [];
     Deno.readFile = async (path, options) => {
@@ -926,12 +929,12 @@ Deno.test("inventory: уникальный вопрос не перечитыв�
       JSON.stringify(result.files) === JSON.stringify(names.sort()),
       "Список delivery не совпадает с реальными файлами",
     );
-    const info = JSON.parse(
+    const info = record(JSON.parse(
       await Deno.readTextFile(input.output + "/questions/demo/exr-a/info.json"),
-    );
+    ));
     assert(
       info.partialCredit === true &&
-        info.preferences.courseRequirement.default === "required",
+        fixtureAt(info, ["preferences", "courseRequirement", "default"]) === "required",
       "Финальные настройки вопроса потеряны",
     );
     assert(
@@ -1030,7 +1033,7 @@ for (
               visibility: "public",
               data: btoa("<svg>1</svg>"),
             }];
-            value.questions[0].condition = [{
+            required(value.questions[0]).condition = [{
               t: "Para",
               c: [{
                 t: "Image",
@@ -1050,23 +1053,24 @@ for (
               });
             }
             if (conflict === "starter") {
-              input.nativeInputs["exr-a"].sources[0].bytes[0] ^= 1;
+              const bytes = required(required(input.nativeInputs["exr-a"]).sources[0]).bytes;
+              bytes[0] = required(bytes[0]) ^ 1;
             }
             if (conflict === "resource") {
-              value.resources[0].data = btoa("<svg>2</svg>");
+              required(value.resources[0]).data = btoa("<svg>2</svg>");
             }
             if (conflict === "resource-binding") {
-              value.resources[0].effectiveBase = root + "/other";
+              required(value.resources[0]).effectiveBase = root + "/other";
             }
             if (conflict === "private-test") {
-              input.nativeInputs["exr-a"]
-                .tests[0].bytes[0] ^= 1;
+              const bytes = required(required(input.nativeInputs["exr-a"]).tests[0]).bytes;
+              bytes[0] = required(bytes[0]) ^ 1;
             }
             if (conflict === "public-question") {
-              value.questions[0].source = "other.qmd";
+              required(value.questions[0]).source = "other.qmd";
             }
             if (conflict === "source-map") {
-              input.checks.projects[0].sources[0].target =
+              required(required(input.checks.projects[0]).sources[0]).target =
                 "student/other/A.java";
             }
             if (
@@ -1139,7 +1143,7 @@ for (const location of ["question", "course"] as const) {
           return await body(id);
         };
         if (location === "course") {
-          input.config.delivery.instances.pilot.works = ["sec-first"];
+          required(input.config.delivery.instances.pilot).works = ["sec-first"];
         }
         let error: unknown;
         try {
@@ -1162,9 +1166,8 @@ for (const location of ["question", "course"] as const) {
 
 Deno.test("inventory: fresh output повторно проверяется перед публикацией", async () => {
   await inventoryCourseFixture(async (input, root) => {
-    input.config.delivery.instances.pilot.works = ["sec-first"];
-    input.deferPublish = true;
-    const prepared = await exportCourse(input);
+    required(input.config.delivery.instances.pilot).works = ["sec-first"];
+    const prepared = await exportCourse({...input, deferPublish: true});
     await Deno.symlink(root + "/project", input.output);
     let error: unknown;
     try {

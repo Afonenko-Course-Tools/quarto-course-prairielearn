@@ -1,8 +1,9 @@
+import { required, record, string, array, fixtureAt } from "./fixture-values.ts";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { cpSync } from "node:fs";
 const repo = dirname(dirname(fileURLToPath(import.meta.url))),
-  core = join(Deno.args[0], "_extensions/course-core");
+  core = join(required(Deno.args[0]), "_extensions/course-core");
 // Только собственная cpSync fixture: readonly Core source не изменяется.
 async function writableFixtureDirectories(path: string) {
   const stat=await Deno.lstat(path);
@@ -66,7 +67,7 @@ for (const command of ["export-course", "export"]) {
         wrapper,
         `import {pathToFileURL} from 'node:url';const receipt=${
           JSON.stringify(receipt)
-        };const state={children:0,ambient:0,error:''};const save=()=>Deno.writeTextFileSync(receipt,JSON.stringify(state));save();const Actual=Deno.Command;(Deno as any).Command=new Proxy(Actual,{construct(){state.children++;save();throw Error('UNEXPECTED_NATIVE_CHILD')}});const wrap=(..._args:any[])=>{state.ambient++;save();return (v:any)=>v};(globalThis as any)[Symbol.for('course.performance.agent.v1')]={abiVersion:1,metrics:{wrapSync:wrap,wrapAsync:wrap,wrapWalk:wrap,childEnv:wrap}};Deno.env.set('COURSE_PERF_MODE','summary');const entry=Deno.args.shift()!;try{await import(pathToFileURL(entry).href)}catch(error){state.error=String(error);save();Deno.exitCode=1}`,
+        };const state={children:0,ambient:0,error:''};const save=()=>Deno.writeTextFileSync(receipt,JSON.stringify(state));save();const Actual=Deno.Command;Deno.Command=new Proxy(Actual,{construct(){state.children++;save();throw Error('UNEXPECTED_NATIVE_CHILD')}});const wrap=(..._args:unknown[])=>{state.ambient++;save();return (v:unknown)=>v};Reflect.set(globalThis,Symbol.for('course.performance.agent.v1'),{abiVersion:1,metrics:{wrapSync:wrap,wrapAsync:wrap,wrapWalk:wrap,childEnv:wrap}});Deno.env.set('COURSE_PERF_MODE','summary');const entry=Deno.args.shift()!;try{await import(pathToFileURL(entry).href)}catch(error){state.error=String(error);save();Deno.exitCode=1}`,
       );
       const entry = join(
         repo,
@@ -94,7 +95,7 @@ for (const command of ["export-course", "export"]) {
         stderr: "piped",
         env: { COURSE_PERF_MODE: "" },
       }).output();
-      const state = JSON.parse(await Deno.readTextFile(receipt));
+      const state = record(JSON.parse(await Deno.readTextFile(receipt)));
       if (child.success || state.children || state.ambient) {
         throw Error(
           command + "/" + control + " crossed inert gate: " +
@@ -103,7 +104,7 @@ for (const command of ["export-course", "export"]) {
         );
       }
       if (
-        !state.error.includes("BODY.PRODUCER_INPUT_UNQUALIFIED")
+        !string(state.error).includes("BODY.PRODUCER_INPUT_UNQUALIFIED")
       ) throw Error("wrong public gate refusal: " + JSON.stringify(state));
       for (
         const path of [

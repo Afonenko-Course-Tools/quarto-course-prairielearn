@@ -1,3 +1,4 @@
+import { record, string, array, fixtureAt } from "./fixture-values.ts";
 import { body, seed, workspaceOptions } from "./workspace-transport.test.ts";
 import { exportCourse } from "../_extensions/course-prairielearn/application/export-course.ts";
 Deno.test("delivery4 Workspace использует настоящий seed и existing course builder", async () => {
@@ -96,10 +97,10 @@ Deno.test("delivery4 Workspace использует настоящий seed и e
       body: async () => body,
       studentArtifact: async () => artifact,
     });
-    const d = JSON.parse(await Deno.readTextFile(output + "/delivery.json"));
+    const d = record(JSON.parse(await Deno.readTextFile(output + "/delivery.json")));
     if (
       d.schemaVersion !== 5 ||
-      d.gradingPayloads["synthetic/" + id].kind !== "workspace"
+      fixtureAt(d, ["gradingPayloads", "synthetic/" + id, "kind"]) !== "workspace"
     ) throw Error("Workspace binding потерян");
   } finally {
     await Deno.remove(root, { recursive: true });

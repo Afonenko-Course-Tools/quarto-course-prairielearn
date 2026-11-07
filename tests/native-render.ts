@@ -1,3 +1,4 @@
+import { record, string, array, fixtureAt } from "./fixture-values.ts";
 // A native process exit is the authority for consuming this run's results.
 import { join } from "stdlib/path";
 export async function renderNative(
@@ -42,49 +43,49 @@ export async function renderNative(
     ok = validated.success;
   }
   if (ok) {
-    const pointer = JSON.parse(
+    const pointer = record(JSON.parse(
       await Deno.readTextFile(
         join(source, "_generated/course-spec/active-native-run.json"),
       ),
-    );
-    const run = JSON.parse(
+    ));
+    const run = record(JSON.parse(
       await Deno.readTextFile(
         join(source, "_generated/course-spec/native-run.json"),
       ),
-    );
+    ));
     if (
-      run.schema !== "course-native-run-v1" || !run.profiles.includes(profile)
+      run.schema !== "course-native-run-v1" || !array(run.profiles).includes(profile)
     ) throw new Error("Native run context missing");
-    for (const entry of run.documents) {
+    for (const entry of array(run.documents).map(record)) {
       if (
-        entry.course.view !== profile ||
-        !entry.document.profiles.includes(profile)
+        record(entry.course).view !== profile ||
+        !array(record(entry.document).profiles).includes(profile)
       ) throw new Error("Mixed audience native document");
     }
     for await (
-      const entry of Deno.readDir(join(pointer.directory, "adapters"))
+      const entry of Deno.readDir(join(string(pointer.directory), "adapters"))
     ) {
       if (!entry.isDirectory) continue;
       for await (
         const file of Deno.readDir(
-          join(pointer.directory, "adapters", entry.name),
+          join(string(pointer.directory), "adapters", entry.name),
         )
       ) {
         if (
           !file.name.endsWith(".json") || file.name === "contract.json"
         ) continue;
-        const fragment = JSON.parse(
+        const fragment = record(JSON.parse(
           await Deno.readTextFile(
-            join(pointer.directory, "adapters", entry.name, file.name),
+            join(string(pointer.directory), "adapters", entry.name, file.name),
           ),
-        );
-        const document = run.documents.find((value: { source: string }) =>
+        ));
+        const document = array(run.documents).map(record).find(value =>
           value.source === fragment.source
         );
         if (
-          !document || fragment.course.view !== profile ||
-          JSON.stringify(Object.entries(fragment.document).sort()) !==
-            JSON.stringify(Object.entries(document.document).sort())
+          !document || record(fragment.course).view !== profile ||
+          JSON.stringify(Object.entries(record(fragment.document)).sort()) !==
+            JSON.stringify(Object.entries(record(document.document)).sort())
         ) {
           throw new Error(
             "Adapter context disagrees with current DocumentResult",
@@ -111,12 +112,12 @@ export async function selectedDocument(
 ) {
   const result = await renderNative(source, profile, input);
   if (!result.ok) throw new Error(result.text);
-  const run = JSON.parse(
+  const run = record(JSON.parse(
     await Deno.readTextFile(
       join(source, "_generated/course-spec/native-run.json"),
     ),
-  );
-  if (run.documents.length !== 1 || run.documents[0].source !== input) {
+  ));
+  if (array(run.documents).length !== 1 || record(array(run.documents)[0]).source !== input) {
     throw new Error("Selected native command consumed retained documents");
   }
   const invalid = await new Deno.Command(Deno.env.get("QUARTO") || "quarto", {

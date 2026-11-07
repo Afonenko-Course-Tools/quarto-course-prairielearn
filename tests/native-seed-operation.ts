@@ -1,9 +1,10 @@
+import { required, record, string, array, fixtureAt } from "./fixture-values.ts";
 import type * as CorePublic from "course-core/public.ts";
 // Настоящий ordinary Core/A1 → два seed artifacts одной операции. Не assignment/P.
 import { strict as assert } from "node:assert";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-const source = resolve(Deno.args[0]),
+const source = resolve(required(Deno.args[0])),
   repo = resolve(new URL("../", import.meta.url).pathname),
   root = await Deno.makeTempDir({ prefix: "c9-seed-op-" });
 const core = join(root, "_extensions/course-core"),
@@ -75,16 +76,16 @@ project-materialization:
     "index.qmd",
     '::: {#exr-gh project="/projects/github-ssh" prairielearn-submission=upload}\n## GitHub\nПолное условие GitHub.\n:::\n\n::: {#exr-rest project="/projects/restore-selected-state"}\n## Восстановление\nПолное условие восстановления.\n:::\n',
   );
-  const provenance = JSON.parse(
+  const provenance = record(JSON.parse(
     await Deno.readTextFile(
       new URL("./fixtures/git-recipes/provenance.json", import.meta.url),
     ),
-  );
-  for (const row of provenance.files) {
+  ));
+  for (const row of array(provenance.files).map(record)) {
     await put(
-      "projects/" + row.path,
+      "projects/" + string(row.path),
       await Deno.readFile(
-        new URL("./fixtures/git-recipes/" + row.path, import.meta.url),
+        new URL("./fixtures/git-recipes/" + string(row.path), import.meta.url),
       ),
     );
   }
@@ -163,8 +164,8 @@ project-materialization:
       });
       const request = { expectedSources: ["index.qmd"] };
       await adapter.validateCourse(observed, request);
-      const artifacts: any[] = [];
-      let batchFinal: any;
+      const artifacts: Record<string, unknown>[] = [];
+      let batchFinal: CorePublic.NativeOperationProjectContextBatch | undefined;
       await op.withProjectContracts([{
         owner: root,
         profiles: op.identity.profiles,
@@ -188,8 +189,8 @@ project-materialization:
             "2f12c0ccccc3c10c483502559fa7efee33a52607",
           ]] as const
         ) {
-          const context = batch.groups[0].contexts[i],
-            plan = await Core.planProject(context, { audience: "student" }),
+          const context = required(batch.groups[0]).contexts[i],
+            plan = await Core.planProject(required(context), { audience: "student" }),
             condition = op.condition({
               source: "index.qmd",
               exerciseId: id,
@@ -204,16 +205,16 @@ project-materialization:
             source: "index.qmd",
             exerciseId: id,
             inventory,
-            zip: (files: any[]) => {
+            zip: (files) => {
               zips++;
               return zip(files);
             },
           });
           assert.equal(artifact.initial, expected);
           assert(
-            artifact.files.some((f: any) => f.name === target + "/.git/HEAD"),
+            artifact.files.some((f) => f.name === target + "/.git/HEAD"),
           );
-          assert(!artifact.files.some((f: any) => f.name === "seed_recipe.py"));
+          assert(!artifact.files.some((f) => f.name === "seed_recipe.py"));
           artifacts.push({
             id,
             target,
@@ -235,7 +236,7 @@ project-materialization:
           packaging: Deno.args[1]
             ? "real immutable Download ZIP"
             : "test callback only; no ZIP claim",
-          projectContexts: batchFinal.metrics,
+          projectContexts: required(batchFinal).metrics,
           operationMetrics: op.metrics,
           scope: "GENUINE_ORDINARY_NOT_ASSIGNMENT_P",
         },

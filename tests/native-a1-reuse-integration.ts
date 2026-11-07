@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import type * as CorePublic from "course-core/public.ts";
 import type { CheckedNativeProjectFact } from "../_extensions/course-prairielearn/application/native-check-projection.ts";
 import type { nativeProjectRows } from "../_extensions/course-prairielearn/application/native-provenance.ts";
@@ -11,7 +12,7 @@ import { pathToFileURL } from "node:url";
 import { materializeNativeQuestion } from "../_extensions/course-prairielearn/application/native-materialize.ts";
 import { nativeChecksManifest } from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
 import { decodeNativeCheck } from "../_extensions/course-prairielearn/application/native-checks.ts";
-const core = join(Deno.args[0], "_extensions/course-core"),
+const core = join(required(Deno.args[0]), "_extensions/course-core"),
   pl = join(Deno.cwd(), "_extensions/course-prairielearn"),
   Core: typeof CorePublic = await import(
     pathToFileURL(join(core, "public.ts")).href
@@ -21,13 +22,14 @@ const core = join(Deno.args[0], "_extensions/course-core"),
 const root = await Deno.makeTempDir({ prefix: "c4-reuse-a1-" }),
   out = await Deno.makeTempDir({ prefix: "c4-reuse-a1-download-" });
 const artifactOut = await Deno.makeTempDir({ prefix: "c4-reuse-artifacts-" });
-const checks: any[] = [];
-let success = false, expiredPair: any, expiredCondition: any;
-let observer: any,
-  captureStart: any,
-  captureFinal: any,
-  parentStart: any,
-  parentFinal: any;
+const checks: Record<string, unknown>[] = [];
+let success = false;
+let expiredPair: CorePublic.NativeAssignmentProjectPlans | undefined;
+let expiredCondition: CorePublic.MaterializableCondition | undefined;
+let observer: ReturnType<typeof observeNativeHost> | undefined;
+type HostSnapshot = ReturnType<ReturnType<typeof observeNativeHost>["snapshot"]>;
+let captureStart: HostSnapshot | undefined, captureFinal: HostSnapshot | undefined,
+  parentStart: HostSnapshot | undefined, parentFinal: HostSnapshot | undefined;
 async function put(path: string, text: string) {
   await Deno.mkdir(dirname(join(root, path)), { recursive: true });
   const bytes = new TextEncoder().encode(text);
@@ -154,11 +156,11 @@ references: [{id: fixture-book, type: book, title: Публичная книга
   // Fixture installation only: immutable public Download with matching public Core schema.
   for (
     const [source, target] of [[core, join(out, "course-core")], [
-      Deno.args[1],
+      required(Deno.args[1]),
       join(out, "project-download"),
     ]]
   ) {
-    const r = await new Deno.Command("cp", { args: ["-R", source, target] })
+    const r = await new Deno.Command("cp", { args: ["-R", required(source), required(target)] })
       .output();
     if (!r.success) throw Error("fixture copy failed");
   }
@@ -167,11 +169,11 @@ references: [{id: fixture-book, type: book, title: Публичная книга
     pathToFileURL(join(out, "project-download/public.ts")).href
   );
   observer = observeNativeHost();
-  captureStart = observer.snapshot();
+  captureStart = required(observer).snapshot();
   await Core.withNativeCaptureScope(
     { root, projection: "student", outputDirectory: join(root, "_site") },
     { expectedSources: ["bank.qmd"] },
-    async (scope: any) => {
+    async (scope) => {
       await scope.captureInputs(["bank.qmd"], async (token: string) => {
         const result = await new Deno.Command("quarto", {
           args: ["render", "bank.qmd"],
@@ -189,9 +191,9 @@ references: [{id: fixture-book, type: book, title: Публичная книга
       });
     },
   );
-  captureFinal = observer.snapshot();
+  captureFinal = required(observer).snapshot();
   const candidate = await readNativeAdapterExpectation(Core, root);
-  parentStart = observer.snapshot();
+  parentStart = required(observer).snapshot();
   await Core.withCurrentNativeOperation(
     candidate.expectation,
     async (operation) => {
@@ -229,7 +231,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
         operation.identity.profiles,
         projectRows,
         async (projectPlans) => {
-          const pair = projectPlans[0];
+          const pair = required(projectPlans[0]);
           const condition = operation.condition({
             source: "bank.qmd",
             exerciseId: "exr-p",
@@ -238,7 +240,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
           expiredPair = pair;
           expiredCondition = condition;
           // Explicit test policy/facts, not assignmentProvenance/qualified assignment.
-          const materializeStart = observer.snapshot();
+          const materializeStart = required(observer).snapshot();
           const materializeTime = performance.now();
           const materialized = await materializeNativeQuestion({
             Core,
@@ -246,7 +248,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
             pair,
             condition,
             fact,
-            settings: adapter.business("bank.qmd").questions["exr-p"],
+            settings: required(adapter.business("bank.qmd").questions["exr-p"]),
             courseId: "native",
             runtime: {
               mode: "implementation",
@@ -262,7 +264,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
           });
           const materializeCost = hostDelta(
             materializeStart,
-            observer.snapshot(),
+            required(observer).snapshot(),
           );
           console.log(
             "MATERIALIZE_CHILDREN " + JSON.stringify({
@@ -302,16 +304,16 @@ references: [{id: fixture-book, type: book, title: Публичная книга
           const p = materialized.project;
           if (!p) throw Error("selected project missing");
           if (
-            !p.trustedTests.some((f: any) =>
+            !p.trustedTests.some((f) =>
               f.target === "src/api/java/Api.java"
             )
           ) throw Error("shared API target not preserved");
           if (
-            p.references[0].targets.join(",") !==
+            required(p.references[0]).targets.join(",") !==
               "author/example/src/main/java/Helper.java,author/example/src/main/java/Main.java"
           ) throw Error("reference targets/helpers changed");
           if (
-            materialized.files.some((f: any) =>
+            materialized.files.some((f) =>
               /Api.java|OfficialTest.java|Helper.java|author\//.test(f.name)
             )
           ) throw Error("student privacy leaked");
@@ -336,13 +338,13 @@ references: [{id: fixture-book, type: book, title: Публичная книга
           checks.push({
             project: p,
 
-            studentPlanMetrics: Core.projectPlanMetrics(pair.student),
-            fullPlanMetrics: Core.projectPlanMetrics(pair.full),
+            studentPlanMetrics: Core.projectPlanMetrics(required(pair).student),
+            fullPlanMetrics: Core.projectPlanMetrics(required(pair).full),
           });
           let rejected = false;
           try {
             await Core.materializeProject(
-              structuredClone(pair.student),
+              structuredClone(required(pair).student),
               condition,
               { submission: { files: [], instructions: "Сдайте файлы." } },
             );
@@ -357,7 +359,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
       if (!planned?.projectContextMetrics) {
         throw Error("REUSE_FINAL_METRICS_MISSING");
       }
-      checks[0].projectContextMetrics = planned.projectContextMetrics;
+      required(checks[0]).projectContextMetrics = planned.projectContextMetrics;
       const cost = planned.projectContextMetrics.final;
       console.log("MATERIALIZE_LOADER_COST " + JSON.stringify(cost));
       if (
@@ -367,15 +369,15 @@ references: [{id: fixture-book, type: book, title: Публичная книга
       checks.push({ operationMetrics: operation.metrics });
     },
   );
-  parentFinal = observer.snapshot();
+  parentFinal = required(observer).snapshot();
   const positiveHost = {
-    capture: hostDelta(captureStart, captureFinal),
-    parentIncludingFinal: hostDelta(parentStart, parentFinal),
-    whole: hostDelta(captureStart, parentFinal),
+    capture: hostDelta(required(captureStart), required(captureFinal)),
+    parentIncludingFinal: hostDelta(required(parentStart), required(parentFinal)),
+    whole: hostDelta(required(captureStart), required(parentFinal)),
   };
   let expired = "";
   try {
-    await Core.materializeProject(expiredPair.student, expiredCondition, {
+    await Core.materializeProject(required(expiredPair).student, required(expiredCondition), {
       submission: { files: [], instructions: "Сдайте файлы." },
     });
   } catch (e) {
@@ -407,7 +409,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
     console.error("Preserved failing fixture " + root);
     if (observer) {
       console.error(
-        JSON.stringify({ failedHostObservation: observer.snapshot() }),
+        JSON.stringify({ failedHostObservation: required(observer).snapshot() }),
       );
     }
   }

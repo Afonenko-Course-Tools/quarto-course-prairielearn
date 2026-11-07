@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import * as Core from "course-core/public.ts";
 import { strict as assert } from "node:assert";
 import { join } from "node:path";
@@ -27,8 +28,8 @@ Deno.test("настоящий batch каталогов сохраняет пор
       profiles: [],
       format: "html",
     }], async ([batch]) => {
-      assert.equal(batch.contexts.length, 2);
-      for (const [index, context] of batch.contexts.entries()) {
+      assert.equal(required(batch).contexts.length, 2);
+      for (const [index, context] of required(batch).contexts.entries()) {
         assert.equal(
           context.input,
           join(root, "projects", index === 0 ? "a" : "b"),
@@ -42,8 +43,8 @@ Deno.test("настоящий batch каталогов сохраняет пор
         assert.equal(student.audience, "student");
         assert.equal(full.audience, "full");
       }
-      assert(batch.metrics.yamlFileReads >= 3);
-      assert(batch.metrics.directoryLayers >= 2);
+      assert(required(batch).metrics.yamlFileReads >= 3);
+      assert(required(batch).metrics.directoryLayers >= 2);
     });
   } finally {
     await Deno.remove(root, { recursive: true });

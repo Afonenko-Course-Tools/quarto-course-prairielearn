@@ -19,6 +19,8 @@ jobs:
   check:
     name: Проверка (${{ matrix.quarto }})
     runs-on: ubuntu-latest
+    env:
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/course-pl-cache
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -29,6 +31,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Подготовить доступный кеш Quarto
+        run: |
+          mkdir -p -- "$XDG_CACHE_HOME"
+          test -w "$XDG_CACHE_HOME"
       - name: Проверить точный commit исходников
         env:
           EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -40,13 +46,13 @@ jobs:
         with:
           repository: Afonenko-Course-Tools/quarto-course
           # Core 9: независимо проверенный исходный код; полный hosted CI и выпуск отдельно.
-          ref: c62e6c877f769f33a9ffd6fe713811df75c794c6
+          ref: 8aba3b47df161c98645f3fc268adefc2e96ef8d3
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "c62e6c877f769f33a9ffd6fe713811df75c794c6"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "8aba3b47df161c98645f3fc268adefc2e96ef8d3"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -63,19 +69,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: 798f8c0d9f87fd5dcfe9ee85b79df57e647d2f3c
+          ref: 0b62c6501d716a634e0d1e3fcc3d21e41142b5a1
           path: .ci-deps/qrc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-publish
-          ref: e0efd6b5428412500569d0da5a5e0b33d62a5663
+          ref: 21abbbe40a66cbdc1f0185d09b9f6710e20f140b
           path: .ci-deps/site
           persist-credentials: false
-      - name: Проверить закреплённые QRC и Site
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-project-download
+          ref: a621ec302a701d7409616f47675d2df0afb87aca
+          path: .ci-deps/download
+          persist-credentials: false
+      - name: Проверить закреплённые QRC, Site и Download
         run: |
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "798f8c0d9f87fd5dcfe9ee85b79df57e647d2f3c"
-          test "$(git -C .ci-deps/site rev-parse HEAD)" = "e0efd6b5428412500569d0da5a5e0b33d62a5663"
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "0b62c6501d716a634e0d1e3fcc3d21e41142b5a1"
+          test "$(git -C .ci-deps/site rev-parse HEAD)" = "21abbbe40a66cbdc1f0185d09b9f6710e20f140b"
+          test "$(git -C .ci-deps/download rev-parse HEAD)" = "a621ec302a701d7409616f47675d2df0afb87aca"
       - name: Настоящие закрытые answers, HTML/Reveal и grading composition
         run: quarto run tests/native-answers-integration.ts .ci-deps/core --author
       - name: Отказ несовместимого cross-document grading
@@ -90,17 +103,23 @@ jobs:
         run: |
           quarto --version
       - name: Проверка правил PrairieLearn и сборка примера student/full
-        run: quarto run tests/check.ts .ci-deps/core
+        run: quarto run tests/check.ts .ci-deps/core .ci-deps/qrc .ci-deps/download
 
   java-delivery:
     name: Installed native questions and Java/Gradle
     runs-on: ubuntu-latest
+    env:
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/course-pl-cache
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Подготовить доступный кеш Quarto
+        run: |
+          mkdir -p -- "$XDG_CACHE_HOME"
+          test -w "$XDG_CACHE_HOME"
       - name: Проверить точный commit исходников
         env:
           EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -110,18 +129,34 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: c62e6c877f769f33a9ffd6fe713811df75c794c6
+          ref: 8aba3b47df161c98645f3fc268adefc2e96ef8d3
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "c62e6c877f769f33a9ffd6fe713811df75c794c6"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "8aba3b47df161c98645f3fc268adefc2e96ef8d3"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-reference-catalog
+          ref: 0b62c6501d716a634e0d1e3fcc3d21e41142b5a1
+          path: .ci-deps/qrc
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-project-download
+          ref: a621ec302a701d7409616f47675d2df0afb87aca
+          path: .ci-deps/download
+          persist-credentials: false
+      - name: Проверить закреплённые QRC и Download
+        run: |
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "0b62c6501d716a634e0d1e3fcc3d21e41142b5a1"
+          test "$(git -C .ci-deps/download rev-parse HEAD)" = "a621ec302a701d7409616f47675d2df0afb87aca"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5
       - name: Карта типов фактического Core для штатных compiler entries
-        run: quarto run tools/native-core-import-map.ts .ci-deps/core .ci-deps/pl-native-imports.json
+        run: quarto run tools/native-core-import-map.ts .ci-deps/core .ci-deps/pl-native-imports.json .ci-deps/qrc .ci-deps/download
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
         with:
           deno-version: v2.7.14
@@ -141,3 +176,104 @@ jobs:
         run: PL_EXDEV_TEST_DIR=/dev/shm deno test --no-config --import-map .ci-deps/pl-native-imports.json -A --filter "functional export v5" tests/export-course.test.ts
       - name: Профили исходников Java, starter/API/Gradle и native delivery
         run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/java-build.test.ts tests/native-contract-batch.test.ts tests/native-batch-checkpoint.test.ts tests/native-selection.test.ts tests/native-origin-scope.test.ts tests/native-verification-inventory.test.ts tests/native-seed-policy.test.ts tests/native-auxiliary.test.ts
+
+  static:
+    name: Строгая проверка собственного кода
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/course-pl-cache
+      PERFORMANCE: ${{ github.workspace }}/.ci-deps/performance
+      COURSE_PERFORMANCE_SOURCE: ${{ github.workspace }}/.ci-deps/performance
+      LUA_LANGUAGE_SERVER: ${{ github.workspace }}/.ci/luals/bin/lua-language-server
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Подготовить доступный кеш Quarto
+        run: |
+          mkdir -p -- "$XDG_CACHE_HOME"
+          test -w "$XDG_CACHE_HOME"
+      - name: Проверить точный commit исходников
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-course
+          ref: 8aba3b47df161c98645f3fc268adefc2e96ef8d3
+          path: .ci-deps/core
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-reference-catalog
+          ref: 0b62c6501d716a634e0d1e3fcc3d21e41142b5a1
+          path: .ci-deps/qrc
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-project-download
+          ref: a621ec302a701d7409616f47675d2df0afb87aca
+          path: .ci-deps/download
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-course-performance
+          ref: 0781f03a11f461691d7ce116f2c53bb5d8af68d7
+          path: .ci-deps/performance
+          persist-credentials: false
+      - name: Проверить закреплённые исходники статических проверок
+        run: |
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "8aba3b47df161c98645f3fc268adefc2e96ef8d3"
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "0b62c6501d716a634e0d1e3fcc3d21e41142b5a1"
+          test "$(git -C .ci-deps/download rev-parse HEAD)" = "a621ec302a701d7409616f47675d2df0afb87aca"
+          test "$(git -C "$PERFORMANCE" rev-parse HEAD)" = "0781f03a11f461691d7ce116f2c53bb5d8af68d7"
+      - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
+        with:
+          version: 1.11.5
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.7.14
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        id: python
+        with:
+          python-version: '3.12'
+      - name: Карта типов фактических публичных providers
+        run: quarto run tools/native-core-import-map.ts .ci-deps/core .ci-deps/pl-native-imports.json .ci-deps/qrc .ci-deps/download
+      - name: Полный строгий TS graph и запрет explicit any
+        run: |
+          timeout --kill-after=3s 180s deno run --no-config -A tools/check-types.ts .ci-deps/pl-native-imports.json
+          deno run --no-config -A tools/check-types.ts --lint
+      - name: Установить закреплённые зависимости CJS-проверки
+        run: npm ci --ignore-scripts
+      - name: Строгая проверка собственного CJS
+        run: npm run typecheck:tools -- --pretty false
+      - name: Строгая проверка четырёх собственных Python-файлов
+        run: npm exec --yes --package=pyright@1.1.414 -- pyright --project pyrightconfig.json --pythonpath "${{ steps.python.outputs.python-path }}" --outputjson
+      - name: Единственная установка canonical LuaLS
+        run: bash "$PERFORMANCE/tools/setup-lua-ci.sh" "$GITHUB_WORKSPACE/.ci/luals"
+      - name: Строгая проверка двух собственных Lua-файлов
+        run: timeout --kill-after=3s 60s quarto run "$PERFORMANCE/tools/check-lua.ts" --root "$GITHUB_WORKSPACE" --server "$LUA_LANGUAGE_SERVER" --scope _extensions/course-prairielearn/observability/bridge.lua --scope _extensions/course-prairielearn/filter.lua
+      - name: Установить закреплённый ShellCheck
+        run: |
+          tool_dir="$RUNNER_TEMP/shellcheck-0.11.0"
+          mkdir -- "$tool_dir"
+          curl --fail --location --silent --show-error \
+            https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz \
+            --output "$tool_dir/archive.tar.xz"
+          printf '%s  %s\n' 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198 "$tool_dir/archive.tar.xz" | sha256sum --check --status
+          tar -xJf "$tool_dir/archive.tar.xz" --directory "$tool_dir" --strip-components=1
+          "$tool_dir/shellcheck" --version
+          printf '%s\n' "$tool_dir" >> "$GITHUB_PATH"
+      - name: Синтаксис и строгая проверка shell по каждому диалекту
+        run: |
+          bash -n tools/check-java.sh
+          sh -n examples/java-gradle/bank/projects/clamp/tests/grade.sh
+          shellcheck --norc --enable=all --severity=style --shell=bash tools/check-java.sh
+          shellcheck --norc --enable=all --severity=style --shell=sh examples/java-gradle/bank/projects/clamp/tests/grade.sh

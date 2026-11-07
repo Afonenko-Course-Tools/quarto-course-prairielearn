@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 // Только public DTO/value controls: не operation/lease/A1/profile positive.
 import type {
   NativeAssignmentProvenance,
@@ -39,14 +40,14 @@ const value: NativeAssignmentProvenance = {
 };
 const rows = nativeProjectRows(value);
 if (
-  rows.length !== 2 || rows[1].fact.bankMember ||
-  rows[1].format !== "revealjs" ||
-  rows[0].materialization?.includeGit !== true
+  rows.length !== 2 || required(rows[1]).fact.bankMember ||
+  required(rows[1]).format !== "revealjs" ||
+  required(rows[0]).materialization?.includeGit !== true
 ) throw Error("typed hidden/nonbank/format/materialization projection lost");
 // Изменение normalized PL policy не должно менять captured Core facts.
-rows[0].materialization!.commonFiles[0].target = "tests/Changed.java";
+required(required(required(rows[0]).materialization).commonFiles[0]).target = "tests/Changed.java";
 if (
-  value.documents[0].projects[0].materialization!.commonFiles[0].target !==
+  required(required(required(required(value.documents[0]).projects[0]).materialization).commonFiles[0]).target !==
     "tests/File.java"
 ) {
   throw Error("PL projection aliases typed Core materialization");
@@ -56,7 +57,7 @@ for (
   const path of ["../private", "/outside", "C:/outside", "a\\b", "a/../b", ""]
 ) {
   const bad = structuredClone(value);
-  bad.documents[1].projects[0].projectRoot = path;
+  required(required(bad.documents[1]).projects[0]).projectRoot = path;
   let refused = false;
   try {
     nativeProjectRows(bad);

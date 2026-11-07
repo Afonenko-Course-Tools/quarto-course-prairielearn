@@ -132,9 +132,12 @@ export const NativeProjectChecksSchema = z.strictObject({
 });
 export type NativeProjectCheck = z.output<typeof NativeProjectCheckSchema>;
 /** Только PL policy inheritance. Native metadata inheritance уже выполнил Quarto. */
-function merge(base: any, local: any): any {
-  if (!local || typeof local !== "object" || Array.isArray(local)) return local;
-  const out = { ...base };
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function merge(base: unknown, local: unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = isRecord(base) ? { ...base } : {};
+  if (!isRecord(local)) return out;
   for (const [k, v] of Object.entries(local)) {
     out[k] = v && typeof v === "object" && !Array.isArray(v) && out[k] &&
         typeof out[k] === "object" && !Array.isArray(out[k])
@@ -143,9 +146,9 @@ function merge(base: any, local: any): any {
   }
   return out;
 }
-export function nativeCheckScalars(value: unknown): any {
-  const out = structuredClone(value) as any;
-  function visit(v: any, key = ""): any {
+export function nativeCheckScalars(value: unknown): unknown {
+  const out: unknown = structuredClone(value);
+  function visit(v: unknown, key = ""): unknown {
     if (Array.isArray(v)) return v.map((x) => visit(x, key));
     if (v && typeof v === "object") {
       return Object.fromEntries(
@@ -185,7 +188,9 @@ export function decodeNativeCheck(raw: unknown, profile: string) {
     { scoring: { mode: "weighted" } },
     merge(config.defaults, config.profiles[profile]),
   );
-  const sourceProfile = config["source-profiles"][check["source-profile"]];
+  const sourceProfileId = check["source-profile"];
+  const sourceProfile = typeof sourceProfileId === "string"
+    ? config["source-profiles"][sourceProfileId] : undefined;
   if (!sourceProfile) {
     throw Error("PL.PROJECT_CHECK_INVALID: unknown source profile");
   }

@@ -1,14 +1,169 @@
 {
   "repository": "https://github.com/BSU-RFCT-Afonenko-Courses/System-Practice",
-  "commit": "8c8622d7be5043f32a611717064bc642a346f1e0",
-  "functions": {
-    "git_env": "tools/build_git_materials.py",
-    "git": "tools/build_git_materials.py",
-    "put": "tools/build_git_materials.py",
-    "commit": "tools/build_git_materials.py",
-    "initialize": "tools/build_git_materials.py",
-    "normalize": "tools/build_git_materials.py",
-    "target": "tools/build_materials.py",
-    "safe_archive_name": "tools/system_support.py"
+  "commit": "6b4ffbe35a018678a0bf6bb3e7f99bcf794bf204",
+  "tree": "8f1ca0cb57e1a2ef479138117619948a4de7ebeb",
+  "modules": {
+    "build_git_materials.py": {
+      "sha256": "91806e0d7d7cade90ea6d22ab8a377eb9894693adb7f705202867a7c3f47662e",
+      "size": 3003,
+      "imports": [
+        "from collections.abc import Mapping",
+        "from typing import TypedDict",
+        "from pathlib import Path, PurePosixPath",
+        "import os",
+        "import shutil",
+        "import subprocess",
+        "from system_support import safe_archive_name"
+      ],
+      "symbols": {
+        "GitState": {
+          "kind": "ClassDef",
+          "sourcePath": "tools/build_git_materials.py",
+          "sourceBlob": "23c83cb8ce31a2fde038c815dd8d9e9495e89ae5",
+          "sourceBlobSha256": "6c5fadfb6a816e0c14fa66bede1f6fae390fd4fbbe0dcc93f5300b8a70426306",
+          "sourceSegmentSha256": "0544d506ae03831b1d0951f492825b892852ef62077e036df0a479902cd80fe6",
+          "sourceStartLine": 11,
+          "sourceEndLine": 14
+        },
+        "target": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/build_materials.py",
+          "sourceBlob": "840d4107e6720c78a37b1be4d343a5ce6438f16b",
+          "sourceBlobSha256": "3fb3d1010028a25f9343f2f85661ec03eba71fa03f0627fdd934b0235e726fb9",
+          "sourceSegmentSha256": "83f39f5eccf084f08e09fcfb32dc5138a959f63876c613f70b03e62f47a81315",
+          "sourceStartLine": 17,
+          "sourceEndLine": 27
+        },
+        "git_env": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/build_git_materials.py",
+          "sourceBlob": "23c83cb8ce31a2fde038c815dd8d9e9495e89ae5",
+          "sourceBlobSha256": "6c5fadfb6a816e0c14fa66bede1f6fae390fd4fbbe0dcc93f5300b8a70426306",
+          "sourceSegmentSha256": "e521eb0437ba98a2c6264d1565169aabcf82c8d3f97d9984613087beca3b602f",
+          "sourceStartLine": 22,
+          "sourceEndLine": 25
+        },
+        "git": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/build_git_materials.py",
+          "sourceBlob": "23c83cb8ce31a2fde038c815dd8d9e9495e89ae5",
+          "sourceBlobSha256": "6c5fadfb6a816e0c14fa66bede1f6fae390fd4fbbe0dcc93f5300b8a70426306",
+          "sourceSegmentSha256": "b6714969c96bf246eaaa1e562cce4ad43679cdbce388083da7e9a236d30c70de",
+          "sourceStartLine": 28,
+          "sourceEndLine": 31
+        },
+        "put": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/build_git_materials.py",
+          "sourceBlob": "23c83cb8ce31a2fde038c815dd8d9e9495e89ae5",
+          "sourceBlobSha256": "6c5fadfb6a816e0c14fa66bede1f6fae390fd4fbbe0dcc93f5300b8a70426306",
+          "sourceSegmentSha256": "880e622c31d3485419b912ffadb23aff7986196df1e89353c6aaab6827e80f75",
+          "sourceStartLine": 34,
+          "sourceEndLine": 36
+        },
+        "commit": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/build_git_materials.py",
+          "sourceBlob": "23c83cb8ce31a2fde038c815dd8d9e9495e89ae5",
+          "sourceBlobSha256": "6c5fadfb6a816e0c14fa66bede1f6fae390fd4fbbe0dcc93f5300b8a70426306",
+          "sourceSegmentSha256": "9c74d029d3e4c184e41c62a58990a9a710563ea4cff642432686ee3a2aa38d08",
+          "sourceStartLine": 39,
+          "sourceEndLine": 41
+        },
+        "initialize": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/build_git_materials.py",
+          "sourceBlob": "23c83cb8ce31a2fde038c815dd8d9e9495e89ae5",
+          "sourceBlobSha256": "6c5fadfb6a816e0c14fa66bede1f6fae390fd4fbbe0dcc93f5300b8a70426306",
+          "sourceSegmentSha256": "eeb1286712589107fc47de575eca1ed523107d21761d7cb1ca9f9df5eb65f7c0",
+          "sourceStartLine": 44,
+          "sourceEndLine": 46
+        },
+        "normalize": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/build_git_materials.py",
+          "sourceBlob": "23c83cb8ce31a2fde038c815dd8d9e9495e89ae5",
+          "sourceBlobSha256": "6c5fadfb6a816e0c14fa66bede1f6fae390fd4fbbe0dcc93f5300b8a70426306",
+          "sourceSegmentSha256": "e2fdf521d02f7960d138c8a907bb6dee1a158badd3725dcff0b539fbad6fe607",
+          "sourceStartLine": 49,
+          "sourceEndLine": 54
+        }
+      }
+    },
+    "system_support.py": {
+      "sha256": "b044227ac25614c2c43094ef74507ef83010b56e01a3e82b32ffa3d16261513f",
+      "size": 1403,
+      "imports": [
+        "from collections.abc import Mapping",
+        "from typing import TypeGuard",
+        "from pathlib import Path, PurePosixPath",
+        "import json"
+      ],
+      "symbols": {
+        "ArchiveError": {
+          "kind": "ClassDef",
+          "sourcePath": "tools/system_support.py",
+          "sourceBlob": "a378ef9a1e9b7d39a6a7681e92a1f6d449e46880",
+          "sourceBlobSha256": "cd92952d075a179a0008b191c63b066bc4a6018194bfe39e5e0aceeb5f66cfeb",
+          "sourceSegmentSha256": "469390c82d54fe8a4e5752ffce7af82240c3aa641e829c929b49d8189dafe168",
+          "sourceStartLine": 101,
+          "sourceEndLine": 102
+        },
+        "safe_archive_name": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/system_support.py",
+          "sourceBlob": "a378ef9a1e9b7d39a6a7681e92a1f6d449e46880",
+          "sourceBlobSha256": "cd92952d075a179a0008b191c63b066bc4a6018194bfe39e5e0aceeb5f66cfeb",
+          "sourceSegmentSha256": "da2b3d597e96e268890637e48719e5155ea41aea296d126bf585c9b4e3cf0a31",
+          "sourceStartLine": 110,
+          "sourceEndLine": 115
+        },
+        "read_json": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/system_support.py",
+          "sourceBlob": "a378ef9a1e9b7d39a6a7681e92a1f6d449e46880",
+          "sourceBlobSha256": "cd92952d075a179a0008b191c63b066bc4a6018194bfe39e5e0aceeb5f66cfeb",
+          "sourceSegmentSha256": "9b8dcee2fe81a40987af62a379c4cd22dc0e10c29cddc5d018b09e5830d84e99",
+          "sourceStartLine": 15,
+          "sourceEndLine": 16
+        },
+        "_object_container": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/system_support.py",
+          "sourceBlob": "a378ef9a1e9b7d39a6a7681e92a1f6d449e46880",
+          "sourceBlobSha256": "cd92952d075a179a0008b191c63b066bc4a6018194bfe39e5e0aceeb5f66cfeb",
+          "sourceSegmentSha256": "030a9d71799dbbe22772b411098cabe32de508085f71f99d78d652542ae4c2f1",
+          "sourceStartLine": 19,
+          "sourceEndLine": 20
+        },
+        "json_object": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/system_support.py",
+          "sourceBlob": "a378ef9a1e9b7d39a6a7681e92a1f6d449e46880",
+          "sourceBlobSha256": "cd92952d075a179a0008b191c63b066bc4a6018194bfe39e5e0aceeb5f66cfeb",
+          "sourceSegmentSha256": "368c1d1b00b110742523a5c35191b35f67179ff18d64c88a5fef343eae356a36",
+          "sourceStartLine": 27,
+          "sourceEndLine": 35
+        },
+        "json_string": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/system_support.py",
+          "sourceBlob": "a378ef9a1e9b7d39a6a7681e92a1f6d449e46880",
+          "sourceBlobSha256": "cd92952d075a179a0008b191c63b066bc4a6018194bfe39e5e0aceeb5f66cfeb",
+          "sourceSegmentSha256": "d7b371c33676d92d1cef2610f4d8a1664a19cad120570035551d2e894a81e287",
+          "sourceStartLine": 38,
+          "sourceEndLine": 41
+        },
+        "json_texts": {
+          "kind": "FunctionDef",
+          "sourcePath": "tools/system_support.py",
+          "sourceBlob": "a378ef9a1e9b7d39a6a7681e92a1f6d449e46880",
+          "sourceBlobSha256": "cd92952d075a179a0008b191c63b066bc4a6018194bfe39e5e0aceeb5f66cfeb",
+          "sourceSegmentSha256": "530fcebe67ad421327b107e3cc1a0e0b0bcff42d611ec62a4cdf67de8b1efa3c",
+          "sourceStartLine": 50,
+          "sourceEndLine": 51
+        }
+      }
+    }
   }
 }

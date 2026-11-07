@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import { NativeProjectCheckSchema } from "../_extensions/course-prairielearn/application/native-checks.ts";
 import { runtimeDescriptor } from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
 const assert = (value: unknown) => {
@@ -83,7 +84,7 @@ Deno.test("текстовый ответ требует явное расшир�
     runtimeProfile: { sourceExtensions: [".fish"] },
   };
   const selected = await selectNativeCompilerInputs(input);
-  assert(selected.sources[0].name === "commands.fish");
+  assert(required(selected.sources[0]).name === "commands.fish");
   for (
     const runtimeProfile of [
       {},

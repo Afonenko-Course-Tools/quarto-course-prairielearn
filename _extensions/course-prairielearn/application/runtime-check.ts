@@ -7,9 +7,9 @@ export type RuntimeCheckInput =
   & {
     runtime: string;
     sourceProfile: { mode: string; root?: string; include?: string[] };
-    scoring?: { mode: string };
-    limits?: Omit<NonNullable<NativeProjectCheck["limits"]>, "networking"> & {
-      networking?: boolean;
-    };
-    "java-build"?: { kind: string; artifact: string; "main-class"?: string };
+    scoring?: { mode: string } | undefined;
+    limits?: (Omit<NonNullable<NativeProjectCheck["limits"]>, "networking"> & {
+      networking?: boolean | undefined;
+    }) | undefined;
+    "java-build"?: { kind: string; artifact: string; "main-class"?: string | undefined } | undefined;
   };

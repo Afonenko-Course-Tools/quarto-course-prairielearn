@@ -1,5 +1,7 @@
 import type * as CorePublic from "course-core/public.ts";
 import type {
+  AnswerFacts,
+  NativeResponseSlot,
   NativeAssignmentProjectPlans,
   NativeOperationProjectContextBatch,
   NativeOperationProjectContextMetrics,
@@ -9,7 +11,7 @@ import type {
   NativeAssignmentDeliveryOptions,
   NativeOperation,
 } from "course-core/public.ts";
-import type { PublicBodyPackage } from "course-core/body-export/model.ts";
+import type { PublicBodyPackage } from "course-core/public.ts";
 import { captureNativeAuxiliary } from "./native-auxiliary.ts";
 import { dirname, join, resolve } from "node:path";
 import { createNativeAdapter } from "./native-adapter.ts";
@@ -19,7 +21,7 @@ import { canonical } from "./source-selection.ts";
 import { decodeNativeCheck } from "./native-checks.ts";
 import { validateNativeRaw } from "./native-business.ts";
 import { nativeChecksManifest } from "./native-check-inventory.ts";
-import { exportCourse, nativeUnitMenus } from "./export-course.ts";
+import { type ExportCourseContent, exportCourse, nativeUnitMenus } from "./export-course.ts";
 import { exportPrairieLearn } from "./export.ts";
 import {
   checkedJSON,
@@ -27,6 +29,17 @@ import {
   nativeReferenceBindings,
   publicExtension,
 } from "./native-materialize.ts";
+const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+type RuntimeRegistry = Parameters<typeof exportCourse>[0]["registry"];
+function decodeRuntimeRegistry(value: unknown): RuntimeRegistry {
+  if (!record(value) || typeof value.schemaVersion !== "number" || ![1,2].includes(value.schemaVersion) || value.profiles !== undefined && !record(value.profiles)) throw Error("PL.RUNTIME_INVALID: registry version/profiles");
+  const profiles: NonNullable<RuntimeRegistry["profiles"]> = {};
+  for (const [name, profile] of Object.entries(value.profiles ?? {})) {
+    if (!record(profile) || profile.mode !== undefined && typeof profile.mode !== "string" || profile.javaRelease !== undefined && (typeof profile.javaRelease !== "number" || !Number.isInteger(profile.javaRelease)) || profile.sourceExtensions !== undefined && (!Array.isArray(profile.sourceExtensions) || !profile.sourceExtensions.every((x: unknown) => typeof x === "string")) || profile.image !== undefined && typeof profile.image !== "string") throw Error("PL.RUNTIME_INVALID: profile " + name);
+    profiles[name] = {...(typeof profile.mode === "string" ? {mode:profile.mode} : {}), ...(typeof profile.javaRelease === "number" ? {javaRelease:profile.javaRelease} : {}), ...(Array.isArray(profile.sourceExtensions) && profile.sourceExtensions.every((x: unknown) => typeof x === "string") ? {sourceExtensions:profile.sourceExtensions} : {}), ...(typeof profile.image === "string" ? {image:profile.image} : {})};
+  }
+  return {schemaVersion:value.schemaVersion, profiles};
+}
 type NativeAdapter = ReturnType<typeof createNativeAdapter>;
 type NativeDelivered = Awaited<ReturnType<NativeAdapter["assignmentDelivery"]>>;
 export type NativeProjectPlansResult<T> = {
@@ -92,8 +105,9 @@ export async function withNativeProjectPlans<T>(
     }
     const plans: NativeAssignmentProjectPlans[] = [];
     for (let index = 0; index < requests.length; index++) {
-      const request = requests[index],
-        contexts = batch.groups[index].contexts;
+      const request = requests[index], group = batch.groups[index];
+      if (!request || !group) throw Error("PL.PROVENANCE_CHANGED: A1 group coverage");
+      const contexts = group.contexts;
       if (contexts.length !== request.directories.length) {
         throw Error(
           "PL.PROVENANCE_CHANGED: A1 context coverage",
@@ -104,17 +118,17 @@ export async function withNativeProjectPlans<T>(
         Pick<NativeAssignmentProjectPlans, "student" | "full">
       >();
       for (let i = 0; i < request.directories.length; i++) {
-        const input = request.directories[i];
-        if (contexts[i].input !== join(root, input)) {
+        const input = request.directories[i], context = contexts[i];
+        if (input === undefined || !context || context.input !== join(root, input)) {
           throw Error(
             "PL.PROVENANCE_CHANGED: A1 input order",
           );
         }
         pairs.set(input, {
-          student: await Core.planProject(contexts[i], {
+          student: await Core.planProject(context, {
             audience: "student",
           }),
-          full: await Core.planProject(contexts[i], { audience: "full" }),
+          full: await Core.planProject(context, { audience: "full" }),
         });
       }
       for (
@@ -231,9 +245,10 @@ export function assertNativeChecksCoverage(
 }
 /** Existing question() consumes authored names; the private normalized settings
  * are converted exactly once, without reconstructing an answer/body. */
-export function authoredNativeSettings(value: any) {
+export function authoredNativeSettings(value: NonNullable<NativeDelivered["nativeSettings"][string]>) {
   const { singleVariant, grading, submission, ...rest } = value;
-  const { aceMode, ...sub } = submission;
+  const aceMode = submission.mode === "editor" ? submission.aceMode : undefined;
+  const sub = submission.mode === "editor" ? {mode:submission.mode} : submission;
   return {
     ...rest,
     submission: { ...sub, ...(aceMode ? { "ace-mode": aceMode } : {}) },
@@ -253,7 +268,7 @@ export async function prepareNativeCourse(
       assessments: { source: string; id: string }[];
     };
     options: NativeEntryOptions;
-    observedConfig: any;
+    observedConfig: unknown;
   },
 ) {
   const { Core, operation, descriptor, selection, options } = input;
@@ -284,7 +299,7 @@ export async function prepareNativeCourse(
         !courseId ||
         deliveries.some((d) => d.publicPackage.owner !== courseId)
       ) throw Error("PL.ASSIGNMENT_CHANGED: course owner");
-      const content: any = {
+      const content: ExportCourseContent = {
         assessments: [],
         exercises: [],
         projects: projectRows.map((p) => p.fact),
@@ -293,6 +308,7 @@ export async function prepareNativeCourse(
         const value = adapter.validatedInput(source),
           business = adapter.business(source);
         if (value.assessment) {
+          if (!business.assessment) throw Error("PL.ASSIGNMENT_CHANGED: missing assessment policy");
           content.assessments.push({
             ...value.assessment,
             source,
@@ -300,14 +316,14 @@ export async function prepareNativeCourse(
           });
         }
         for (const declaration of value.declarations) {
+          const questionSettings = business.questions[declaration.id];
+          if (!questionSettings) throw Error("PL.ASSIGNMENT_CHANGED: missing question policy");
           content.exercises.push({
             id: declaration.id,
-            source,
             target: "prairielearn",
-            project: declaration.attributes.project,
             extensions: {
               prairielearn: authoredNativeSettings(
-                business.questions[declaration.id],
+                questionSettings,
               ),
             },
           });
@@ -317,16 +333,16 @@ export async function prepareNativeCourse(
       const projects: NonNullable<Materialized["project"]>[] = [],
         nativeInputs: Record<string, NonNullable<Materialized["selection"]>> =
           {},
-        nativeAnswers: any = {},
-        nativeResponseSlots: any = {},
+        nativeAnswers: Record<string, AnswerFacts> = {},
+        nativeResponseSlots: Record<string, NativeResponseSlot[]> = {},
         artifacts: Record<string, Materialized> = {},
-        settings: any = {},
+        settings: NativeDelivered["nativeSettings"] = {},
         bodies = new Map<string, PublicBodyPackage>();
       // Введение каждого реально используемого меню готово до дорогих A1 ZIP.
       // Assignment membership проверяет Core по раннему observed context intent.
       if (options.instance) {
         const selectedWorks = selection.assessments.map((a) => {
-          const work = content.assessments.find((w: any) =>
+          const work = content.assessments.find((w) =>
             w.id === a.id && w.source === a.source
           );
           if (!work) {
@@ -337,7 +353,7 @@ export async function prepareNativeCourse(
           return work;
         });
         const menus = nativeUnitMenus(selectedWorks, content.assessments);
-        const needed = new Map<string, any>();
+        const needed = new Map<string, ExportCourseContent["assessments"][number]>();
         for (const group of menus.values()) {
           for (const menu of group) needed.set(menu.id, menu);
         }
@@ -357,7 +373,7 @@ export async function prepareNativeCourse(
           bodies.set(menu.id, delivered.publicPackage);
         }
       }
-      let registryInput: any;
+      let registryInput: RuntimeRegistry | undefined;
       const fence = async () => {
         await checkpoint();
       };
@@ -365,17 +381,14 @@ export async function prepareNativeCourse(
       // истёкший token, а не fallback или checkpoint следующей партии.
       liveFence = fence;
       const registry = async () => {
-        registryInput ??= await checkedJSON(
+        registryInput ??= decodeRuntimeRegistry((await checkedJSON(
           resolve(
             options.runtimeRegistry ??
               auxiliary.environment.PRAIRIELEARN_RUNTIME_REGISTRY ??
               join(options.root, "prairielearn/runtime-profiles.json"),
           ),
-        );
-        if (![1, 2].includes(registryInput.value.schemaVersion)) {
-          throw Error("PL.RUNTIME_INVALID: registry version");
-        }
-        return registryInput.value;
+        )).value);
+        return registryInput;
       };
       const materializationTotal = new Set(deliveries.flatMap((d) =>
         d.publicPackage.questions.filter((q) =>
@@ -386,13 +399,16 @@ export async function prepareNativeCourse(
       )).size;
       let materializationIndex = 0;
       for (const delivered of deliveries) {
+        const deliveredWork = delivered.publicPackage.works[0];
+        if (!deliveredWork) throw Error("PL.ASSIGNMENT_CHANGED: missing work");
         bodies.set(
-          delivered.publicPackage.works[0].id,
+          deliveredWork.id,
           delivered.publicPackage,
         );
         for (const q of delivered.publicPackage.questions) {
           const value = delivered.nativeSettings[q.id],
-            answer = delivered.nativeAnswers[q.id];
+            answer = delivered.nativeAnswers[q.id], condition = delivered.conditions[q.id];
+          if (!value || !condition) throw Error("PL.ASSIGNMENT_CHANGED: missing settings/condition");
           if (
             settings[q.id] && canonical(settings[q.id]) !== canonical(value)
           ) {
@@ -407,7 +423,7 @@ export async function prepareNativeCourse(
               throw Error("PL.ASSIGNMENT_CHANGED: repeated answer");
             }
             nativeAnswers[q.id] = answer;
-            const slots = delivered.conditions[q.id].responseSlots;
+            const slots = condition.responseSlots;
             if (
               nativeResponseSlots[q.id] &&
               canonical(nativeResponseSlots[q.id]) !== canonical(slots)
@@ -426,10 +442,11 @@ export async function prepareNativeCourse(
           const pairs = projectPlans.filter((p) =>
             p.source === q.source && p.exerciseId === q.id
           );
-          if (facts.length !== 1 || pairs.length !== 1) {
+          const row = facts[0], pair = pairs[0];
+          if (facts.length !== 1 || pairs.length !== 1 || !row || !pair) {
             throw Error("PL.PROVENANCE_CHANGED: selected project/plan");
           }
-          const fact = facts[0].fact,
+          const fact = row.fact,
             business = adapter.business(q.source),
             declaration = adapter.validatedInput(q.source).declarations.find((
               d,
@@ -441,7 +458,7 @@ export async function prepareNativeCourse(
             (!declaration || canonical(
                   decodeNativeCheck(
                     business.raw.projectChecks,
-                    declaration.attributes["project-check"],
+                    declaration.attributes["project-check"] ?? "",
                   ),
                 ) !== canonical(fact.check))
           ) throw Error("PL.CHECKS_CHANGED: Core/C policy parity");
@@ -461,13 +478,13 @@ export async function prepareNativeCourse(
             operation,
             checkpoint,
             auxiliary,
-            pair: pairs[0],
-            condition: delivered.conditions[q.id],
+            pair,
+            condition,
             fact,
-            materialization: facts[0].materialization,
+            ...(typeof row.materialization?.includeGit === "boolean" ? {materialization:{includeGit:row.materialization.includeGit}} : {}),
             settings: value,
             courseId,
-            runtime,
+            runtime: runtime ?? {},
             bindings: (plan, condition, submission) =>
               references.bindings(Core, plan, condition, submission),
             Download,
@@ -482,12 +499,13 @@ export async function prepareNativeCourse(
           artifacts[q.id] = materialized;
           if (materialized.project) {
             projects.push(materialized.project);
-            nativeInputs[q.id] = materialized.selection!;
+            if (!materialized.selection) throw Error("PL.SELECTION_INVALID: missing materialized selection");
+            nativeInputs[q.id] = materialized.selection;
           }
         }
       }
       await fence();
-      let result: any;
+      let result: Awaited<ReturnType<typeof exportCourse>> | Awaited<ReturnType<typeof exportPrairieLearn>>;
       if (options.instance) {
         if (!options.checksOutput) {
           throw Error("PL.INPUT_INVALID: course checks-output required");
@@ -498,9 +516,11 @@ export async function prepareNativeCourse(
           bookRoot: options.book,
           projects,
         });
+        const firstAssessment = selection.assessments[0];
+        if (!firstAssessment) throw Error("PL.NATIVE_INTENT_INCOMPLETE: missing assessment");
         const config = validateNativeRaw(
-          adapter.business(selection.assessments[0].source).raw,
-          { source: selection.assessments[0].source },
+          adapter.business(firstAssessment.source).raw,
+          { source: firstAssessment.source },
         )
           .config;
         result = await exportCourse({
@@ -509,7 +529,7 @@ export async function prepareNativeCourse(
           content,
           checks,
           config,
-          registry: registryInput?.value ?? { schemaVersion: 1, profiles: {} },
+          registry: registryInput ?? { schemaVersion: 1, profiles: {} },
           instance: options.instance,
           output,
           checksOutput: options.checksOutput,
@@ -523,15 +543,16 @@ export async function prepareNativeCourse(
             }
             return body;
           },
-          candidateImage: options.candidateImage,
+          ...(options.candidateImage ? {candidateImage:options.candidateImage} : {}),
           deferPublish: true,
           nativeInputs,
           nativeAnswers,
           nativeResponseSlots,
           nativeBody: true,
           nativeAuxiliary: auxiliary,
-          studentArtifact: async (fact) => artifacts[fact.exerciseId],
+          studentArtifact: async (fact) => { const artifact = artifacts[fact.exerciseId]; if (!artifact) throw Error("PL.SELECTION_INVALID: missing student artifact"); return artifact; },
         });
+        if (!result || !("discard" in result)) throw Error("PL.PUBLICATION_INVALID: missing staged output");
         save(result);
       } else {
         if (
@@ -548,13 +569,16 @@ export async function prepareNativeCourse(
           prefix: ".pl-native-inputs-",
         });
         try {
-          const paths: any = {};
-          for (const q of deliveries[0].publicPackage.questions) {
+          const paths: Record<string,string> = {};
+          const delivery = deliveries[0];
+          if (!delivery) throw Error("PL.NATIVE_INTENT_INCOMPLETE: missing delivery");
+          if (!record(binding.value) || !record(binding.value.questions)) throw Error("PL.BINDING_CHANGED: missing questions");
+          for (const q of delivery.publicPackage.questions) {
             const expected = settings[q.id],
-              provided = binding.value.questions?.[q.id],
+              provided = binding.value.questions[q.id],
               selected = nativeInputs[q.id];
             if (
-              !provided ||
+              !record(provided) ||
               canonical({
                   topic: provided.topic,
                   submission: provided.submission,
@@ -571,7 +595,9 @@ export async function prepareNativeCourse(
             }
             if (!selected) {
               // Genuine materialized bytes, а не повторное чтение owner/student.
-              for (const file of artifacts[q.id].files) {
+              const artifact = artifacts[q.id];
+              if (!artifact) throw Error("PL.SELECTION_INVALID: missing artifact");
+              for (const file of artifact.files) {
                 const path = join(scratch, q.id, "student", file.name);
                 await Deno.mkdir(dirname(path), { recursive: true });
                 await Deno.writeFile(path, file.bytes);
@@ -598,13 +624,13 @@ export async function prepareNativeCourse(
                 join(scratch, q.id, "tests/grading-job.json"),
                 JSON.stringify(selected.descriptor),
               );
-              const profile = registryInput.value.profiles[
-                projects.find((p) => p.exerciseId === q.id)!.check!.runtime
-              ];
+              const project = projects.find((p) => p.exerciseId === q.id);
+              const profile = project ? registryInput?.profiles?.[project.check.runtime] : undefined;
+              const external = provided.externalGradingOptions;
               if (
-                !profile.image ||
-                provided.externalGradingOptions?.image !== profile.image ||
-                provided.externalGradingOptions.enableNetworking !== false
+                !profile?.image || !record(external) ||
+                external.image !== profile.image ||
+                external.enableNetworking !== false
               ) {
                 throw Error(
                   "PL.RUNTIME_INVALID: exact registered image binding required",
@@ -613,7 +639,7 @@ export async function prepareNativeCourse(
             }
           }
           result = await exportPrairieLearn(
-            deliveries[0].publicPackage,
+            delivery.publicPackage,
             {
               projectRoot: scratch,
               projects: paths,
@@ -626,13 +652,15 @@ export async function prepareNativeCourse(
             binding.value,
             output,
           );
-          save(result);
+          if (!result || !("discard" in result)) throw Error("PL.PUBLICATION_INVALID: missing staged output");
+        save(result);
           await fence();
         } finally {
           await Deno.remove(scratch, { recursive: true });
         }
       }
       await fence();
+      if (!result || !("publish" in result) || !("discard" in result)) throw Error("PL.PUBLICATION_INVALID: missing staged output");
       return result;
     });
     return {

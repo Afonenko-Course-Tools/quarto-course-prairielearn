@@ -1,9 +1,14 @@
+import type { AnswerFacts, NativeResponseSlot } from "course-core/public.ts";
 import { nativeAnswerBinding } from "../_extensions/course-prairielearn/application/native-delivery.ts";
-const slot = { name: "answer", type: "numeric", anchor: "public-response" },
+const slot = {
+  name: "answer",
+  type: "numeric",
+  anchor: "public-response",
+} satisfies NativeResponseSlot,
   answer = {
     type: "numeric",
     key: { value: 734129, tolerance: { absolute: 0 } },
-  };
+  } satisfies AnswerFacts;
 Deno.test("native binding не переносит private key и закрывает несовместимые slots/method", () => {
   const good = nativeAnswerBinding(
     "00000000-0000-4000-8000-000000000000",
@@ -22,7 +27,7 @@ Deno.test("native binding не переносит private key и закрыва�
       ["external", [{ ...slot, key: 42 }]],
       ["external", [{ ...slot, name: "foreign" }]],
       ["external", [slot, slot]],
-    ] as any[]
+    ] satisfies [string, unknown][]
   ) {
     let refused = false;
     try {

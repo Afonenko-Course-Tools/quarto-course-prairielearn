@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import * as Core from "course-core/public.ts";
 import { Buffer } from "node:buffer";
 import { isDeepStrictEqual } from "node:util";
@@ -95,12 +96,12 @@ function fixture() {
 Deno.test("selected bytes сохраняют настоящие имена, роли и API без файловых origins", async () => {
   const f = fixture(), selection = await selectNativeCompilerInputs(f);
   assert(
-    selection.sources[0].name === "model/Study.java" &&
-      selection.sources[0].target === "src/main/java/model/Study.java",
+    required(selection.sources[0]).name === "model/Study.java" &&
+      required(selection.sources[0]).target === "src/main/java/model/Study.java",
     "Потеряно настоящее имя",
   );
   assert(
-    selection.tests.length === 2 && selection.references[0].available,
+    selection.tests.length === 2 && required(selection.references[0]).available,
     "Потерян полный проверяющий набор",
   );
   assert(
@@ -108,7 +109,7 @@ Deno.test("selected bytes сохраняют настоящие имена, ро
     "Допуск смешан с предметными тестами",
   );
   assert(
-    isDeepStrictEqual(selection.sources[0].bytes, f.student.files[0].bytes),
+    isDeepStrictEqual(required(selection.sources[0]).bytes, required(f.student.files[0]).bytes),
     "Байты заменены",
   );
   const forbidden =
@@ -117,10 +118,10 @@ Deno.test("selected bytes сохраняют настоящие имена, ро
     !forbidden.test(JSON.stringify(selection)),
     "Остался собственный сертификат состояния",
   );
-  f.student.files[0].bytes = bytes("// CURRENT ACTUAL BYTES");
+  required(f.student.files[0]).bytes = bytes("// CURRENT ACTUAL BYTES");
   const changed = await selectNativeCompilerInputs(f);
   assert(
-    new TextDecoder().decode(changed.sources[0].bytes) ===
+    new TextDecoder().decode(required(changed.sources[0]).bytes) ===
       "// CURRENT ACTUAL BYTES",
     "Новые выбранные байты отвергнуты из-за прежнего fingerprint",
   );
@@ -169,10 +170,10 @@ Deno.test("checks v3 переносит полный действительны�
   });
   assert(
     checks.schemaVersion === 3 &&
-      checks.projects[0].sources[0].name === "model/Study.java",
+      required(required(checks.projects[0]).sources[0]).name === "model/Study.java",
     "Нет нового функционального контракта",
   );
-  const row = checks.projects[0].trustedTests.find((x) =>
+  const row = required(checks.projects[0]).trustedTests.find((x) =>
     x.name.endsWith("Check.java")
   )!;
   assert(
@@ -186,7 +187,7 @@ Deno.test("checks v3 переносит полный действительны�
     "Старое доказательство осталось в DTO",
   );
   assert(
-    checks.projects[0].references[0].sources.length === 1,
+    required(required(checks.projects[0]).references[0]).sources.length === 1,
     "Эталон потерян",
   );
 });
@@ -206,16 +207,16 @@ Deno.test("предварительный full starter использует то
   for (
     const mutation of [
       (files: typeof value.student.files) => {
-        files[0].reason = "testset:contract";
+        required(files[0]).reason = "testset:contract";
       },
       (files: typeof value.student.files) => {
-        files[0].bytes = new Uint8Array([255]);
+        required(files[0]).bytes = new Uint8Array([255]);
       },
       (files: typeof value.student.files) => {
-        files[0].bytes = bytes("class X {}\0");
+        required(files[0]).bytes = bytes("class X {}\0");
       },
       (files: typeof value.student.files) => {
-        files[0].bytes = new Uint8Array(1048577);
+        required(files[0]).bytes = new Uint8Array(1048577);
       },
     ]
   ) {

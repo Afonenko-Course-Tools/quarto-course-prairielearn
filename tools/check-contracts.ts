@@ -1,7 +1,7 @@
 // Проверяет состав TS-контракта; не генерирует вторую схему/словарь.
 import { dirname, join } from "node:path";
 const root = dirname(dirname(new URL(import.meta.url).pathname));
-const contract = JSON.parse(
+const contract: unknown = JSON.parse(
   await Deno.readTextFile(
     join(root, "_extensions/course-prairielearn/contract.json"),
   ),

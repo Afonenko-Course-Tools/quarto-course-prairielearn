@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import assert from "node:assert/strict";
 import * as Core from "course-core/public.ts";
 import {
@@ -78,15 +79,15 @@ Deno.test("Прямая карта Core сохраняет все четыре P
     declarations: before.declarations,
   });
   const business = decodeNativeBusiness(raw, input);
-  assert.equal(business.questions["exr-repo"].topic, "Git");
-  assert.equal(business.questions["exr-repo"].grading.method, "manual");
+  assert.equal(required(business.questions["exr-repo"]).topic, "Git");
+  assert.equal(required(business.questions["exr-repo"]).grading.method, "manual");
   assert.equal(business.assessment?.attempts, 1);
   assert.equal(business.assessment?.pass["at-least"], 1);
   assert.equal(
-    business.materialization?.projects["exr-repo"]["common-files"][0].source,
+    required(required(required(business.materialization).projects["exr-repo"])["common-files"][0]).source,
     "common/tool.fish",
   );
-  assert.equal(business.materialization?.projects["exr-repo"]["include-git"], true);
+  assert.equal(required(required(business.materialization).projects["exr-repo"])["include-git"], true);
   assert.deepEqual(value, before);
 });
 
@@ -126,8 +127,8 @@ Deno.test("PL raw получает только answer marker и собстве�
     attributes: { "prairielearn-topic": "Ответ" },
     answer: true,
   }]);
-  assert.equal(input.declarations[0].answer?.type, "numeric");
+  assert.equal(required(input.declarations[0]).answer?.type, "numeric");
   assert(!JSON.stringify(raw).includes("431"));
-  input.declarations[0].attributes["prairielearn-topic"] = "Изменено";
+  required(input.declarations[0]).attributes["prairielearn-topic"] = "Изменено";
   assert(!JSON.stringify(raw).includes("Изменено"));
 });

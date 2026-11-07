@@ -71,7 +71,9 @@ export async function inspectPublication(publication: NativePublication) {
   return {
     course: structuredClone(publication.course),
     documents: sources.map((source) => {
-      const { input, business } = loaded.get(source)!;
+      const item = loaded.get(source);
+      if (!item) throw Error("PL.ASSESSMENT_INVALID: missing source");
+      const { input, business } = item;
       return {
         source,
         format: input.origin.format,

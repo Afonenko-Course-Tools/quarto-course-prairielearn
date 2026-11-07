@@ -1,9 +1,17 @@
+import { record, string, array, fixtureAt } from "./fixture-values.ts";
 import { AnswerFactsSchema } from "course-core/public.ts";
 import { nativeAnswerBinding } from "../_extensions/course-prairielearn/application/native-delivery.ts";
-import type { NativeAdapterValidationInput } from "course-core/public.ts";
+import type { AnswerFacts, NativeResponseSlot } from "course-core/public.ts";
 import type { PublicBodyPackage } from "course-core/body-export/model.ts";
-function fixtureSlots(a: any) {
-  const slot = (name: string, type: string, i: number, extra: any = {}) => ({
+function fixtureSlots(a: AnswerFacts): NativeResponseSlot[] {
+  const slot = (
+    name: string,
+    type: NativeResponseSlot["type"],
+    i: number,
+    extra: Partial<
+      Pick<NativeResponseSlot, "labelAnchor" | "ordinal" | "options">
+    > = {},
+  ): NativeResponseSlot => ({
     name,
     type,
     anchor: "fixture-response-" + i,
@@ -17,11 +25,11 @@ function fixtureSlots(a: any) {
     );
   }
   if (a.type === "matching") {
-    return a.prompts.map((_: any, i: number) =>
+    return a.prompts.map((_, i) =>
       slot("match-" + i, a.type, i, {
         ordinal: i,
         labelAnchor: "prompt-" + i,
-        options: a.options.map((_: any, j: number) => ({
+        options: a.options.map((_, j) => ({
           anchor: "option-" + j,
           ordinal: j,
         })),
@@ -29,7 +37,7 @@ function fixtureSlots(a: any) {
     );
   }
   if (a.type === "multipart") {
-    return a.parts.map((p: any, i: number) =>
+    return a.parts.map((p, i) =>
       slot(p.name, p.type, i, { labelAnchor: "part-" + i })
     );
   }
@@ -48,9 +56,7 @@ import {
 } from "../_extensions/course-prairielearn/application/export-course.ts";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 import { infoQuestion } from "../_extensions/course-prairielearn/application/native-validators.js";
-const forms: NonNullable<
-  NativeAdapterValidationInput["declarations"][number]["answer"]
->[] = [{ type: "manual", submission: "text" }, {
+const forms: AnswerFacts[] = [{ type: "manual", submission: "text" }, {
   type: "numeric",
   key: { value: 734129, tolerance: { absolute: 0.1 } },
 }, {
@@ -309,17 +315,17 @@ for (const answer of forms) {
             : answer.type;
           await copyTree(root + "/course", evidence + "/" + form);
         }
-        const courseInfo = JSON.parse(
+        const courseInfo = record(JSON.parse(
           await Deno.readTextFile(
             root + "/course/questions/" + key + "/info.json",
           ),
-        );
+        ));
         if (
           courseInfo.gradingMethod !== (manual ? "Manual" : "Internal") ||
           courseInfo.partialCredit !== !manual
         ) throw Error("course exporter lost native form");
         const base = root + "/out/questions/" + key,
-          info = JSON.parse(await Deno.readTextFile(base + "/info.json")),
+          info = record(JSON.parse(await Deno.readTextFile(base + "/info.json"))),
           html = await Deno.readTextFile(base + "/question.html");
         if (
           !infoQuestion(info) ||

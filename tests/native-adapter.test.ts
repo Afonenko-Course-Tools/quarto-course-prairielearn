@@ -1,8 +1,9 @@
+import { required } from "./fixture-values.ts";
 function assert(v: unknown, m: string): asserts v {
   if (!v) throw Error(m);
 }
 Deno.test("PL public owner business parser validates native Manual and assessment policy", async () => {
-  const api: Record<string, any> = await import(
+  const api = await import(
     "../_extensions/course-prairielearn/public.ts"
   );
   assert(
@@ -37,7 +38,7 @@ Deno.test("PL public owner business parser validates native Manual and assessmen
       "prairielearn-grading": "manual",
     },
   }];
-  const assessment = {
+  const assessment: NonNullable<Parameters<typeof api.decodeNativeBusiness>[1]["assessment"]> = {
     id: "sec-git",
     kind: "lab",
     slots: [{
@@ -53,11 +54,13 @@ Deno.test("PL public owner business parser validates native Manual and assessmen
     assessment,
   });
   assert(
-    result.questions["exr-git"].grading.method === "manual",
+    required(result.questions["exr-git"]).grading.method === "manual",
     "Manual lost",
   );
+  const normalizedAssignment = required(required(result.assessment).assignment);
   assert(
-    result.assessment.assignment["student-label"].startsWith("pl-"),
+    "student-label" in normalizedAssignment &&
+      normalizedAssignment["student-label"].startsWith("pl-"),
     "assignment mode not normalized",
   );
   let cross = "";
@@ -68,7 +71,7 @@ Deno.test("PL public owner business parser validates native Manual and assessmen
       assessment: {
         ...assessment,
         slots: [{
-          ...assessment.slots[0],
+          ...required(assessment.slots[0]),
           id: "exr-foreign",
           candidates: ["exr-foreign"],
         }],
@@ -113,7 +116,7 @@ Deno.test("PL public owner business parser validates native Manual and assessmen
   }
 });
 Deno.test("PL public native factory exposes executable validator and capture preparation", async () => {
-  const api: Record<string, any> = await import(
+  const api = await import(
     "../_extensions/course-prairielearn/public.ts"
   );
   assert(
@@ -157,22 +160,23 @@ Deno.test("native question-defaults Workspace carrier selects upload independent
     declarations,
   });
   assert(
-    result.questions["exr-native-0"].submission.mode === "upload",
+    required(result.questions["exr-native-0"]).submission.mode === "upload",
     "upload inherited Workspace fields",
   );
   assert(
-    Object.keys(result.questions["exr-native-0"].submission).join(",") ===
+    Object.keys(required(result.questions["exr-native-0"]).submission).join(",") ===
       "mode",
     "upload variant is not closed",
   );
+  const workspaceSubmission = required(result.questions["exr-native-1"]).submission;
   assert(
-    result.questions["exr-native-1"].submission.mode === "workspace" &&
-      result.questions["exr-native-1"].submission.workspaceOptions.port ===
+    workspaceSubmission.mode === "workspace" &&
+      workspaceSubmission.workspaceOptions.port ===
         8080,
     "explicit native options lost",
   );
   const broken = structuredClone(config);
-  delete (broken["question-defaults"].submission as any).workspaceOptions;
+  Reflect.deleteProperty(broken["question-defaults"].submission, "workspaceOptions");
   let refused = false;
   try {
     decodeNativeBusiness({ config: broken, declarations }, {

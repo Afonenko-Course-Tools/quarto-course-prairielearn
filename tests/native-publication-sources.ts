@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 // Genuine ordinary Core callback; не Cmain/assignment и не private DTO fixture.
 import { strict as assert } from 'node:assert';
 import { dirname, join, resolve } from 'node:path';
@@ -8,7 +9,7 @@ async function copy(source: string, target: string) {
   assert(!st.isSymlink);
   if (st.isDirectory) {
     await Deno.mkdir(target, { recursive: true });
-    for await (const child of Deno.readDir(source)) await copy(join(source, child.name), join(target, child.name));
+    for await (const child of Deno.readDir(source)) await copy(join(required(source), child.name), join(target, child.name));
   } else {
     assert(st.isFile);
     await Deno.copyFile(source, target);
@@ -24,7 +25,7 @@ export async function runPublicationCases(coreSource: string) {
     for (const variant of ['missing-visible', 'missing-hidden', 'valid']) {
       const root = await Deno.makeTempDir({ dir: parent, prefix: variant + '-' });
       for (const [source, name] of [[coreSource, 'course-core'], [repo, 'course-prairielearn']]) {
-        await copy(join(source, '_extensions', name), join(root, '_extensions', name));
+        await copy(join(required(source), '_extensions', required(name)), join(root, '_extensions', required(name)));
       }
       const put = async (path: string, text: string) => { await Deno.mkdir(dirname(join(root, path)), { recursive: true }); await Deno.writeTextFile(join(root, path), text); };
       await put('project/starter.txt', 'STARTER_PUBLIC\n');
@@ -101,4 +102,4 @@ PRIVATE_STATEMENT
     if (!output) await Deno.remove(parent, { recursive: true });
   }
 }
-if (import.meta.main) await runPublicationCases(resolve(Deno.args[0]));
+if (import.meta.main) await runPublicationCases(resolve(required(Deno.args[0])));

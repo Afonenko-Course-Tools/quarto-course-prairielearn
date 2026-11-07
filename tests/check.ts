@@ -2,6 +2,8 @@
 import { dirname, resolve } from "node:path";
 import { writeNativeCoreImportMap } from "../tools/native-core-import-map.ts";
 const core = Deno.args[0];
+const qrc = Deno.args[1];
+const download = Deno.args[2];
 if (!core) throw Error("Укажите immutable Core companion");
 const repo = dirname(dirname(new URL(import.meta.url).pathname));
 const files = [];
@@ -20,8 +22,12 @@ const commands = [["run", "--no-config", "-A", "tools/check-contracts.ts"], [
 const temporary = await Deno.makeTempDir({ prefix: "pl-check-imports-" });
 try {
   const map = resolve(temporary, "imports.json");
-  await writeNativeCoreImportMap(core, map);
+  await writeNativeCoreImportMap(core, map, {
+    ...(qrc ? { "reference-catalog": qrc } : {}),
+    ...(download ? { "project-download": download } : {}),
+  });
   for (const [command, ...args] of commands) {
+    if (!command) throw Error("Пустая команда проверки");
     const r = await new Deno.Command(Deno.execPath(), {
       args: [command, "--import-map", map, ...args],
       cwd: repo,

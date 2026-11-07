@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import type * as CorePublic from "course-core/public.ts";
 import { pathToFileURL } from "node:url";
 const Core: typeof CorePublic = await import(
@@ -99,7 +100,7 @@ const input: Parameters<typeof projectNativeChecks>[0] = {
 const before = JSON.stringify(student);
 const positive = await projectNativeChecks(input);
 assert(
-  positive.project.references[0].sources.map((f) => f.name).join(",") ===
+  required(positive.project.references[0]).sources.map((f) => f.name).join(",") ===
     "Helper.java,Replacement.java",
   "Полное решение потеряло helper/replacement",
 );
@@ -111,8 +112,8 @@ assert(
 const rejected: string[] = [];
 for (
   const [name, mutate] of [
-    ["role", (v: typeof input) => v.full!.files[2].reason = "starter"],
-    ["bytes", (v: typeof input) => v.full!.files[2].bytes[0] = 0],
+    ["role", (v: typeof input) => required(required(v.full).files[2]).reason = "starter"],
+    ["bytes", (v: typeof input) => required(required(v.full).files[2]).bytes[0] = 0],
     ["missing-group", (v: typeof input) => v.fullPlan.groups = []],
     [
       "configured-primary",
@@ -142,7 +143,7 @@ for (
 console.log(
   JSON.stringify({
     status: "PASS_PURE_PROJECTION_NOT_OPERATION_AUTHORITY",
-    referenceFiles: positive.project.references[0].sources,
+    referenceFiles: required(positive.project.references[0]).sources,
     studentUnchanged: true,
     rejected,
   }),

@@ -1,16 +1,19 @@
+import type * as CorePublic from "course-core/public.ts";
+import type * as PLPublic from "../_extensions/course-prairielearn/public.ts";
+import { required, setFixture } from "./fixture-values.ts";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 const wrongGrading = Deno.args.includes("--wrong-grading");
 const author = Deno.args.includes("--author"),
   projection = author ? "author" : "student",
   profile = author ? "full" : "student";
-const corePath = resolve(Deno.args[0], "_extensions/course-core"),
+const corePath = resolve(required(Deno.args[0]), "_extensions/course-core"),
   plPath = join(
     dirname(dirname(fileURLToPath(import.meta.url))),
     "_extensions/course-prairielearn",
   );
-const Core = await import(pathToFileURL(join(corePath, "public.ts")).href),
-  PL = await import(pathToFileURL(join(plPath, "public.ts")).href);
+const Core: typeof CorePublic = await import(pathToFileURL(join(corePath, "public.ts")).href),
+  PL: typeof PLPublic = await import(pathToFileURL(join(plPath, "public.ts")).href);
 const root = await Deno.makeTempDir({ prefix: "pl-scope-" }),
   checks: string[] = [];
 async function put(path: string, text: string) {
@@ -81,7 +84,7 @@ if (wrongGrading) {
 await Core.withNativeCaptureScope(
   { root, projection, outputDirectory: root + "/_site" },
   { expectedSources: ["index.qmd", "slides.qmd"] },
-  async (scope: any) => {
+  async (scope) => {
     for (const source of ["index.qmd", "slides.qmd"]) {
       await scope.captureInputs([source], async (token: string) => {
         const r = await new Deno.Command("quarto", {
@@ -111,7 +114,7 @@ await Core.withCurrentNativeOperation({
     source: "slides.qmd",
     format: "revealjs",
   }],
-}, async (op: any) => {
+}, async (op) => {
   const adapter = PL.createNativeAdapter({ root, core: Core });
   if (wrongGrading) {
     let error = "";
@@ -199,7 +202,7 @@ await Core.withCurrentNativeOperation({
     ]
   ) {
     const bad = structuredClone(input);
-    bad.nativeMetadata = nativeMetadata;
+    setFixture(bad, ["nativeMetadata"], nativeMetadata);
     let refused = false;
     try {
       await external.validate(bad);
@@ -210,7 +213,7 @@ await Core.withCurrentNativeOperation({
   }
 
   if (
-    input.declarations.map((d: any) => d.answer?.type).sort().join(",") !==
+    input.declarations.map((d) => d.answer?.type).sort().join(",") !==
       "manual,matching,multipart,numeric,single-choice"
   ) throw Error("canonical answers lost");
   const publicBytes = JSON.stringify({
@@ -230,9 +233,9 @@ await Core.withCurrentNativeOperation({
       {
         root,
         proof,
-        forms: input.declarations.map((d: any) => ({
+        forms: input.declarations.map((d) => ({
           id: d.id,
-          type: d.answer.type,
+          type: required(d.answer).type,
         })),
         metrics: op.metrics,
       },

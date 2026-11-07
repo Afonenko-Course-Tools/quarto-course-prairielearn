@@ -55,7 +55,7 @@ export async function nativeWorkspaceArtifact(options: {
   if (!["workspace", "upload"].includes(settings.mode)) {
     throw Error("PL.WORKSPACE_SEED: upload or Workspace submission required");
   }
-  let materialization: any;
+  let materialization: ReturnType<typeof NativeMaterializationSchema.parse>;
   try {
     materialization = NativeMaterializationSchema.parse(
       options.materialization,
@@ -63,10 +63,8 @@ export async function nativeWorkspaceArtifact(options: {
   } catch (error) {
     throw Error("PL.WORKSPACE_SEED: invalid materialization", { cause: error });
   }
-  if (
-    materialization?.projects?.[options.exerciseId]?.["include-git"] !== true
-  ) throw Error("PL.WORKSPACE_SEED: explicit include-git required");
   const declaration = materialization.projects[options.exerciseId];
+  if (declaration?.["include-git"] !== true) throw Error("PL.WORKSPACE_SEED: explicit include-git required");
   const target = NativeSeedTargetSchema.parse(
     options.seedTarget === undefined ? "work" : options.seedTarget,
   );
@@ -114,7 +112,7 @@ export async function nativeWorkspaceArtifact(options: {
     const selected = options.files.filter((file) => file.name === target);
     if (
       selected.length !== 1 ||
-      !isDeepStrictEqual(source,selected[0].bytes)
+      !isDeepStrictEqual(source,selected[0]?.bytes)
     ) {
       throw Error(
         "PL.WORKSPACE_SEED: common file lacks exact native inventory binding",
@@ -153,7 +151,9 @@ export async function nativeWorkspaceArtifact(options: {
           new TextDecoder().decode(run.stderr),
       );
     }
-    const identity = JSON.parse(new TextDecoder().decode(run.stdout));
+    const raw: unknown = JSON.parse(new TextDecoder().decode(run.stdout));
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw Error("PL.WORKSPACE_SEED: invalid recipe identity");
+    const identity: Record<string, unknown> = Object.fromEntries(Object.entries(raw));
     const sha = (value: unknown): value is string =>
       typeof value === "string" && /^[a-f0-9]{40}$/.test(value);
     const single = sha(identity.A) &&
@@ -165,6 +165,7 @@ export async function nativeWorkspaceArtifact(options: {
       throw Error("PL.WORKSPACE_SEED: exact A or S0/S1 recipe required");
     }
     const initial = single ? identity.A : identity.S1;
+    if (!sha(initial)) throw Error("PL.WORKSPACE_SEED: invalid initial commit");
     // Прежнее исключение GIT_* сохраняется, но только из одного saved map.
     const gitEnvironment = Object.freeze({
       ...Object.fromEntries(
@@ -195,9 +196,9 @@ export async function nativeWorkspaceArtifact(options: {
     const refs = await git(["show-ref"]);
     const status = await git(["status", "--porcelain=v1"]);
     const graph = await git(["rev-list", "--parents", "HEAD"]);
-    const expectedGraph = single
-      ? initial
-      : identity.S1 + " " + identity.S0 + "\n" + identity.S0;
+    const parent = identity.S0;
+    if (!single && !sha(parent)) throw Error("PL.WORKSPACE_SEED: invalid parent commit");
+    const expectedGraph = single ? initial : initial + " " + parent + "\n" + parent;
     if (
       head !== "refs/heads/main" ||
       await git(["rev-parse", "HEAD"]) !== initial ||
