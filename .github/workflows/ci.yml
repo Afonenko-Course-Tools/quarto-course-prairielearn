@@ -20,7 +20,7 @@ jobs:
     name: Проверка (${{ matrix.quarto }})
     runs-on: ubuntu-latest
     env:
-      XDG_CACHE_HOME: ${{ runner.temp }}/course-pl-cache
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/course-pl-cache
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -102,7 +102,7 @@ jobs:
     name: Installed native questions and Java/Gradle
     runs-on: ubuntu-latest
     env:
-      XDG_CACHE_HOME: ${{ runner.temp }}/course-pl-cache
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/course-pl-cache
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -159,10 +159,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      XDG_CACHE_HOME: ${{ runner.temp }}/course-pl-cache
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/course-pl-cache
       PERFORMANCE: ${{ github.workspace }}/.ci-deps/performance
       COURSE_PERFORMANCE_SOURCE: ${{ github.workspace }}/.ci-deps/performance
-      LUA_LANGUAGE_SERVER: ${{ runner.temp }}/luals/bin/lua-language-server
+      LUA_LANGUAGE_SERVER: ${{ github.workspace }}/.ci/luals/bin/lua-language-server
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -234,7 +234,7 @@ jobs:
       - name: Строгая проверка четырёх собственных Python-файлов
         run: npm exec --yes --package=pyright@1.1.414 -- pyright --project pyrightconfig.json --pythonpath "${{ steps.python.outputs.python-path }}" --outputjson
       - name: Единственная установка canonical LuaLS
-        run: bash "$PERFORMANCE/tools/setup-lua-ci.sh" "$RUNNER_TEMP/luals"
+        run: bash "$PERFORMANCE/tools/setup-lua-ci.sh" "$GITHUB_WORKSPACE/.ci/luals"
       - name: Строгая проверка двух собственных Lua-файлов
         run: timeout --kill-after=3s 60s quarto run "$PERFORMANCE/tools/check-lua.ts" --root "$GITHUB_WORKSPACE" --server "$LUA_LANGUAGE_SERVER" --scope _extensions/course-prairielearn/observability/bridge.lua --scope _extensions/course-prairielearn/filter.lua
       - name: Установить закреплённый ShellCheck
