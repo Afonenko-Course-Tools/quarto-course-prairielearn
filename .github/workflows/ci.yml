@@ -78,10 +78,17 @@ jobs:
           ref: 21abbbe40a66cbdc1f0185d09b9f6710e20f140b
           path: .ci-deps/site
           persist-credentials: false
-      - name: Проверить закреплённые QRC и Site
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-project-download
+          ref: a621ec302a701d7409616f47675d2df0afb87aca
+          path: .ci-deps/download
+          persist-credentials: false
+      - name: Проверить закреплённые QRC, Site и Download
         run: |
           test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "0b62c6501d716a634e0d1e3fcc3d21e41142b5a1"
           test "$(git -C .ci-deps/site rev-parse HEAD)" = "21abbbe40a66cbdc1f0185d09b9f6710e20f140b"
+          test "$(git -C .ci-deps/download rev-parse HEAD)" = "a621ec302a701d7409616f47675d2df0afb87aca"
       - name: Настоящие закрытые answers, HTML/Reveal и grading composition
         run: quarto run tests/native-answers-integration.ts .ci-deps/core --author
       - name: Отказ несовместимого cross-document grading
@@ -96,7 +103,7 @@ jobs:
         run: |
           quarto --version
       - name: Проверка правил PrairieLearn и сборка примера student/full
-        run: quarto run tests/check.ts .ci-deps/core
+        run: quarto run tests/check.ts .ci-deps/core .ci-deps/qrc .ci-deps/download
 
   java-delivery:
     name: Installed native questions and Java/Gradle
@@ -129,11 +136,27 @@ jobs:
         run: |
           git -C .ci-deps/core rev-parse HEAD
           test "$(git -C .ci-deps/core rev-parse HEAD)" = "8aba3b47df161c98645f3fc268adefc2e96ef8d3"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-reference-catalog
+          ref: 0b62c6501d716a634e0d1e3fcc3d21e41142b5a1
+          path: .ci-deps/qrc
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Afonenko-Course-Tools/quarto-project-download
+          ref: a621ec302a701d7409616f47675d2df0afb87aca
+          path: .ci-deps/download
+          persist-credentials: false
+      - name: Проверить закреплённые QRC и Download
+        run: |
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "0b62c6501d716a634e0d1e3fcc3d21e41142b5a1"
+          test "$(git -C .ci-deps/download rev-parse HEAD)" = "a621ec302a701d7409616f47675d2df0afb87aca"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5
       - name: Карта типов фактического Core для штатных compiler entries
-        run: quarto run tools/native-core-import-map.ts .ci-deps/core .ci-deps/pl-native-imports.json
+        run: quarto run tools/native-core-import-map.ts .ci-deps/core .ci-deps/pl-native-imports.json .ci-deps/qrc .ci-deps/download
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
         with:
           deno-version: v2.7.14
