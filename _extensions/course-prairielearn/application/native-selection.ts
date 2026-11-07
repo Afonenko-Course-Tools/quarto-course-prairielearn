@@ -28,6 +28,11 @@ const file = async (value: File, name: string) => {
 };
 const under = (target: string, root: string) =>
   target.startsWith(root + "/") ? target.slice(root.length + 1) : undefined;
+function selectedName(target: string, root: string): string {
+  const name = under(target, root);
+  if (name === undefined) throw Error("PL.SELECTION_INVALID: target outside selected root");
+  return name;
+}
 function select(
   files: File[],
   root: string,
@@ -76,7 +81,7 @@ export async function selectNativeStarterSources(
     "source",
   );
   const sources = await Promise.all(
-    sourceRecords.map((f) => file(f, under(f.target, profile.root)!)),
+    sourceRecords.map((f) => file(f, selectedName(f.target, profile.root))),
   );
   validateSources(sources, runtimeProfile);
   return sources;
@@ -220,7 +225,7 @@ export async function selectNativeCompilerInputs(options: {
       "reference:" + ref.name,
     );
     const files = await Promise.all(
-      records.map((f) => file(f, under(f.target, ref.root)!)),
+      records.map((f) => file(f, selectedName(f.target, ref.root))),
     );
     // Вспомогательные классы эталона принадлежат той же проверенной A1 solution group.
     validateSources(files, options.runtimeProfile);

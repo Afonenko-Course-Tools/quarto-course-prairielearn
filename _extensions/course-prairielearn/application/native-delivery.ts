@@ -1,6 +1,7 @@
+import type { AnswerFacts, NativeResponseSlot } from "course-core/public.ts";
 // @deno-types="../vendor/zod/v4/index.d.ts"
 import { z } from "../vendor/zod/v4/index.js";
-const slotSchema = z.strictObject({
+const slotSchema: z.ZodType<NativeResponseSlot> = z.strictObject({
   name: z.string().min(1),
   type: z.enum(["manual", "numeric", "single-choice", "matching"]),
   anchor: z.string().min(1),
@@ -17,36 +18,51 @@ const slotSchema = z.strictObject({
 export function nativeAnswerBinding(
   uuid: string,
   method: string,
-  answer: any,
-  slots: any[],
+  answer: AnswerFacts,
+  inputSlots: unknown,
 ) {
-  slots = z.array(slotSchema).min(1).max(4096).parse(slots);
+  const slots = z.array(slotSchema).min(1).max(4096).parse(inputSlots);
   if (!Array.isArray(slots) || !slots.length) {
     throw Error("PL.NATIVE_SLOTS_REQUIRED");
   }
-  const expected = answer.type === "multipart"
-    ? answer.parts.map((p: any) => [p.name, p.type])
-    : answer.type === "matching"
-    ? answer.prompts.map((_: any, i: number) => ["match-" + i, "matching"])
-    : answer.type === "single-choice"
-    ? Array.from({ length: answer.count }, () => ["answer", "single-choice"])
-    : [["answer", answer.type]];
+  let expected: [string, NativeResponseSlot["type"]][];
+  let metadataMismatch: boolean;
+  switch (answer.type) {
+    case "manual":
+    case "numeric":
+      expected = [["answer", answer.type]];
+      metadataMismatch = slots.some((s) => Object.keys(s).length !== 3);
+      break;
+    case "single-choice":
+      expected = Array.from(
+        { length: answer.count },
+        () => ["answer", "single-choice"],
+      );
+      metadataMismatch = slots.some((s, i) =>
+        s.ordinal !== i || !s.labelAnchor || s.options !== undefined
+      );
+      break;
+    case "matching":
+      expected = answer.prompts.map((_, i) => ["match-" + i, "matching"]);
+      metadataMismatch = slots.some((s, i) =>
+        s.ordinal !== i || !s.labelAnchor || !s.options ||
+        s.options.length !== answer.options.length ||
+        s.options.some((o, j) => o.ordinal !== j)
+      );
+      break;
+    case "multipart":
+      expected = answer.parts.map((p) => [p.name, p.type]);
+      metadataMismatch = slots.some((s) =>
+        !s.labelAnchor || s.ordinal !== undefined || s.options !== undefined
+      );
+      break;
+    default:
+      answer satisfies never;
+      throw Error("PL.ANSWER_UNQUALIFIED: canonical Core answer required");
+  }
   if (
     JSON.stringify(slots.map((s) => [s.name, s.type])) !==
-      JSON.stringify(expected)
-  ) throw Error("PL.NATIVE_SLOT_MISMATCH");
-  if (
-    slots.some((s, i) =>
-      answer.type === "single-choice"
-        ? s.ordinal !== i || !s.labelAnchor || s.options !== undefined
-        : answer.type === "matching"
-        ? s.ordinal !== i || !s.labelAnchor || !s.options ||
-          s.options.length !== answer.options.length ||
-          s.options.some((o: any, j: number) => o.ordinal !== j)
-        : answer.type === "multipart"
-        ? !s.labelAnchor || s.ordinal !== undefined || s.options !== undefined
-        : Object.keys(s).length !== 3
-    )
+      JSON.stringify(expected) || metadataMismatch
   ) throw Error("PL.NATIVE_SLOT_MISMATCH");
   const types = new Set(slots.map((s) => s.type));
   const expectedMethod = types.has("manual")

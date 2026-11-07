@@ -108,7 +108,7 @@ async function saveRequest(root: string, request: NativePreparedRequest) {
   const id = generation.parse(request.identity.operation),
     folder = await directory(root, ownBase + "/" + id);
   try {
-    const previous = JSON.parse(
+    const previous: unknown = JSON.parse(
       await Deno.readTextFile(
         await ownFile(root, ownBase + "/" + id + "/request.json"),
       ),
@@ -182,23 +182,13 @@ export async function prepareNativeAdapter(
 }
 
 async function requestFor(root: string) {
-  const active = JSON.parse(
-    await Deno.readTextFile(await ownFile(root, ownBase + "/active.json")),
-  );
-  const id = generation.parse(active.operation);
-  const request = JSON.parse(
-    await Deno.readTextFile(
-      await ownFile(root, ownBase + "/" + id + "/request.json"),
-    ),
-  );
-  if (
-    request.schema !== "pl-native-business-request-v1" ||
-    request.identity.operation !== id || request.owner !== root ||
-    typeof request.outputDirectory !== "string" ||
-    !request.outputDirectory.startsWith(root + "/") ||
-    request.outputDirectory.split("/").includes("..")
-  ) throw Error("PL.CAPTURE_CHANGED: request");
-  return { id, request };
+  const candidate = await readNativeEntryCandidate(root);
+  const request: NativePreparedRequest = {
+    schema:"pl-native-business-request-v1", owner:candidate.root,
+    identity:candidate.identity, outputDirectory:candidate.outputDirectory,
+    inputs:candidate.inputs,
+  };
+  return {id:candidate.identity.operation, request};
 }
 /** CLI читает лишь correlation candidate; полномочия затем заново проверяет публичная Core operation. */
 export async function readNativeAdapterExpectation(
@@ -258,7 +248,7 @@ export function createNativeAdapter(
         ) {
           throw Error("PL.CAPTURE_CHANGED: generation/profiles/projection");
         }
-        const ref = current.request.inputs.find((item: any) =>
+        const ref = current.request.inputs.find((item) =>
           item.source === input.origin.source
         );
         if (!ref || ref.captureWitness !== input.origin.captureWitness) {
@@ -271,6 +261,7 @@ export function createNativeAdapter(
       const sources: { path: string; kind: "directory" | "file" }[] = [];
       for (const declaration of input.declarations) {
         const settings = business.questions[declaration.id];
+        if (!settings) throw Error("PL.ASSIGNMENT_CHANGED: missing question policy");
         if (declaration.answer) {
           if (
             declaration.attributes["project-check"] ||
@@ -282,10 +273,10 @@ export function createNativeAdapter(
           }
           const hasManual = declaration.answer.type === "manual" ||
             declaration.answer.type === "multipart" &&
-              declaration.answer.parts.some((p: any) => p.type === "manual");
+              declaration.answer.parts.some((p) => p.type === "manual");
           const hasAuto = declaration.answer.type !== "manual" &&
             (declaration.answer.type !== "multipart" ||
-              declaration.answer.parts.some((p: any) => p.type === "numeric"));
+              declaration.answer.parts.some((p) => p.type === "numeric"));
           const expected = hasManual
             ? hasAuto ? "mixed" : "manual"
             : "external";
@@ -308,12 +299,13 @@ export function createNativeAdapter(
           throw Error("PL.PROJECT_CHECK_INVALID: требуется project-check");
         }
         if (settings.grading.method !== "manual") {
+          if (!check) throw Error("PL.PROJECT_CHECK_INVALID: требуется project-check");
           decodeNativeCheck(raw.projectChecks, check);
         }
         sources.push({ path, kind: "directory" });
         for (
           const common
-            of (business.materialization as any)?.projects?.[declaration.id]
+            of business.materialization?.projects?.[declaration.id]
               ?.["common-files"] ?? []
         ) sources.push({ path: common.source, kind: "file" });
       }
@@ -359,7 +351,7 @@ export function createNativeAdapter(
               preparedIdentity,
             ) ||
           !isDeepStrictEqual(
-            validatingRequest.request.inputs.map((i: any) => i.source),
+            validatingRequest.request.inputs.map((i) => i.source),
             request.expectedSources,
           )
         ) {
@@ -435,8 +427,8 @@ export function createNativeAdapter(
         delivery.assessment.source !== request.source ||
         delivery.assessment.id !== request.assessmentId ||
         delivery.publicPackage.works.length !== 1 ||
-        delivery.publicPackage.works[0].id !== request.assessmentId ||
-        delivery.publicPackage.works[0].source !== request.source
+        delivery.publicPackage.works[0]?.id !== request.assessmentId ||
+        delivery.publicPackage.works[0]?.source !== request.source
       ) {
         throw Error("PL.ASSIGNMENT_CHANGED: public delivery binding");
       }
@@ -490,7 +482,7 @@ export function createNativeAdapter(
     },
     async workspaceArtifact(
       request: {
-        operation: any;
+        operation: NativeOperation;
         auxiliary?: NativeAuxiliary;
         checkpoint?: () => Promise<void>;
         expectedSources: string[];
@@ -522,19 +514,19 @@ export function createNativeAdapter(
       ) throw Error("PL.WORKSPACE_SEED: inventory identity");
       return await nativeWorkspaceArtifact({
         root: options.root,
-        project: declaration.attributes.project.replace(/^\//, ""),
-        settings: business.questions[request.exerciseId].submission,
+        project: (() => { const path = declaration.attributes.project; if (!path) throw Error("PL.PROJECT_INVALID: missing project"); return path.replace(/^\//, ""); })(),
+        settings: (() => { const settings = business.questions[request.exerciseId]; if (!settings) throw Error("PL.ASSIGNMENT_CHANGED: missing question policy"); return settings.submission; })(),
         materialization: business.materialization,
         exerciseId: request.exerciseId,
         seedTarget: business.seedTargets[request.exerciseId],
-        files: inventory.files.map((f: any) => ({
+        files: inventory.files.map((f) => ({
           name: f.target,
           bytes: f.bytes,
         })),
         zip: request.zip,
         assertCurrent: request.checkpoint ??
           (() => request.operation.assertCurrent()),
-        auxiliary: request.auxiliary,
+        ...(request.auxiliary ? {auxiliary: request.auxiliary} : {}),
       });
     },
     /** Значения только после настоящего executable callback; publish владеет outer Core fence. */

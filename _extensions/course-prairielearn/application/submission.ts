@@ -47,7 +47,7 @@ export function submission(value: unknown, authored = false): Submission {
     authored && value !== null && typeof value === "object" &&
     !Array.isArray(value)
   ) {
-    const record = value as Record<string, unknown>;
+    const record: Record<string, unknown> = Object.fromEntries(Object.entries(value));
     if (Object.hasOwn(record, "ace-mode")) {
       if (Object.hasOwn(record, "aceMode")) {
         throw Error("PL.SUBMISSION_INVALID: неоднозначный aceMode");

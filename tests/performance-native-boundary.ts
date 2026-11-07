@@ -1,3 +1,4 @@
+import { record, string, array, fixtureAt } from "./fixture-values.ts";
 // Отрицательная fixture публичной границы, не Core implementation/authority/P.
 // Старые export-course Docker/inspect sites заменены accepted nativeEntry.
 import { strict as assert } from "node:assert";
@@ -21,6 +22,7 @@ export async function withNativeCaptureScope(request,options,use){
   await Deno.writeTextFile(
     join(core, "public.ts"),
     `
+export {withNativeCaptureScope} from "./capture.ts";
 export const NativeOperationIdentitySchema={parse:v=>v};
 export async function withNativePublication(expectation,selection,use){
  await Deno.writeTextFile(${
@@ -117,7 +119,7 @@ await nativeEntry({root:Deno.args[0],book:'tasks',instance:'fixture'});}
         stderr,
         /UNEXPECTED_NATIVE_CHILD|Requires env access/,
       );
-      const gate = JSON.parse(await Deno.readTextFile(log));
+      const gate = record(JSON.parse(await Deno.readTextFile(log)));
       if (boundary === "inspect") {
         assert.deepEqual(gate, {
           expectation: {

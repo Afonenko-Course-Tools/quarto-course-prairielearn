@@ -1,13 +1,18 @@
 """Generate the single R1 seed into an EMPTY stage directory, never source .git.
 Caller supplies canonical tools directory via PYTHONPATH. No archive assembly.
 """
-import json
 from pathlib import Path
-from build_git_materials import initialize,commit,normalize
+from build_git_materials import GitState,initialize,commit,normalize
+from system_support import read_json, json_object, json_texts
 
 
-def generate(destination,empty_template):
-    spec=json.loads(Path(__file__).with_name('seed.json').read_text())
+class SeedState(GitState):
+    S0: str
+    S1: str
+
+
+def generate(destination: Path, empty_template: Path) -> SeedState:
+    spec={name: json_texts(files) for name, files in json_object(read_json(Path(__file__).with_name('seed.json'))).items()}
     initialize(destination,empty_template)
     s0=commit(destination,spec['S0'],'Добавлен первый прибор')
     s1=commit(destination,spec['S1'],'Добавлен второй прибор')

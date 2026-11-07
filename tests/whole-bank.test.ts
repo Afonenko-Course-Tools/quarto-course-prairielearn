@@ -1,12 +1,13 @@
+import { required, setFixture, deleteFixture, record, string, array, fixtureAt } from "./fixture-values.ts";
 import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import { exportCourse } from "../_extensions/course-prairielearn/application/export-course.ts";
 import { publicProjectFiles } from "../_extensions/course-prairielearn/application/export.ts";
 import { NativeProjectCheckSchema } from "../_extensions/course-prairielearn/application/native-checks.ts";
 import { runtimeDescriptor } from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
 import { selectedCheckFile } from "../_extensions/course-prairielearn/application/native-check-inventory.ts";
-const assert = (v: unknown, m: string) => {
+function assert(v: unknown, m: string): asserts v {
   if (!v) throw Error(m);
-};
+}
 const para = (s: string) => ({ t: "Para", c: [{ t: "Str", c: s }] });
 const image = (s: string) => ({
   t: "Para",
@@ -20,7 +21,14 @@ const assignment:
     requirement: "required",
     workMode: "individual",
   };
-function work(id: string, exr = "exr-a"): any {
+type CourseInput = Parameters<typeof exportCourse>[0];
+type Work = CourseInput["content"]["assessments"][number];
+type FixtureInput = Omit<CourseInput, "config" | "content" | "deferPublish"> & {
+  config: ReturnType<typeof import("../_extensions/course-prairielearn/application/declarations.ts").declarations>["raw"];
+  content: Required<CourseInput["content"]>;
+  deferPublish?: false;
+};
+function work(id: string, exr = "exr-a"): Work {
   return {
     id,
     source: id + ".qmd",
@@ -45,9 +53,9 @@ function work(id: string, exr = "exr-a"): any {
 }
 async function fixture(
   run: (
-    input: any,
+    input: FixtureInput,
     root: string,
-    body: (w: any) => PublicBodyPackage,
+    body: (w: Work | undefined) => PublicBodyPackage,
   ) => Promise<void>,
 ) {
   const root = await Deno.makeTempDir({ prefix: "whole-bank-" });
@@ -58,12 +66,14 @@ async function fixture(
       "PUBLIC_STARTER",
     );
     const first = work("sec-first"), second = work("sec-unit-a");
-    const body = (w: any): PublicBodyPackage => ({
+    const body = (value: Work | undefined): PublicBodyPackage => {
+      const w = required(value, "assessment body");
+      return ({
       schema: "course-body-package-v2",
       owner: "fixture",
       release: "native",
       apiVersion: [1, 23, 1],
-      questions: w.slots.flatMap((s: any) => s.candidates).map((
+      questions: w.slots.flatMap((s) => s.candidates).map((
         id: string,
       ) => ({
         owner: "fixture",
@@ -85,16 +95,17 @@ async function fixture(
         key: "fixture/" + w.id,
         source: w.source,
         kind: w.kind,
-        title: w.title,
+        title: required(w.title),
         introduction: [para("PUBLIC_UNIT_INTRO")],
-        slots: w.slots.map((s: any) => ({
+        slots: w.slots.map((s) => ({
           ...s,
           id: "fixture/" + w.id + "/" + s.id,
           candidates: s.candidates.map((id: string) => "fixture/" + id),
         })),
       }],
     });
-    const input: any = {
+    };
+    const input: FixtureInput = {
       courseId: "fixture",
       projectRoot: root,
       content: {
@@ -160,14 +171,14 @@ async function fixture(
       output: root + "/out",
       checksOutput: root + "/private.json",
       body: async (id: string) =>
-        body(input.content.assessments.find((w: any) => w.id === id)),
+        body(input.content.assessments.find((w) => w.id === id)),
     };
     await run(input, root, body);
   } finally {
     await Deno.remove(root, { recursive: true });
   }
 }
-async function refuses(input: any) {
+async function refuses(input: FixtureInput) {
   let error: unknown;
   try {
     await exportCourse(input);
@@ -184,15 +195,15 @@ async function refuses(input: any) {
 Deno.test("whole-bank: public menu context uses its original resources and excludes raw private body", async () =>
   fixture(async (input, root, body) => {
     const menu = work("sec-reserve");
-    menu.slots[0].assignment.requirement = "optional";
-    menu.body = { blocks: [para("PRIVATE_RAW_MENU")] };
-    delete menu.extensions.prairielearn;
+    required(menu.slots[0]).assignment.requirement = "optional";
+    setFixture(menu, ["body"], { blocks: [para("PRIVATE_RAW_MENU")] });
+    deleteFixture(menu, ["extensions", "prairielearn"]);
     input.content.assessments.push(menu);
     input.body = async (id: string) => {
-      const w = input.content.assessments.find((x: any) => x.id === id),
+      const w = input.content.assessments.find((x) => x.id === id),
         p = body(w);
       if (id === menu.id) {
-        p.works[0].introduction = [
+        required(p.works[0]).introduction = [
           para("PUBLIC_MENU_CONTEXT"),
           image("menu.svg"),
         ];
@@ -208,19 +219,19 @@ Deno.test("whole-bank: public menu context uses its original resources and exclu
       return p;
     };
     const result = await exportCourse(input),
-      assessment = JSON.parse(
+      assessment = record(JSON.parse(
         await Deno.readTextFile(
           root +
             "/out/courseInstances/pilot/assessments/sec-unit-a/infoAssessment.json",
         ),
-      );
+      ));
     assert(
-      assessment.text.includes("PUBLIC_MENU_CONTEXT") &&
-        assessment.text.includes("{{ client_files_course }}/menu.svg"),
+      string(assessment.text).includes("PUBLIC_MENU_CONTEXT") &&
+        string(assessment.text).includes("{{ client_files_course }}/menu.svg"),
       "Публичный контекст меню или исходная привязка ресурса потеряны",
     );
     assert(
-      !assessment.text.includes("PRIVATE_RAW_MENU"),
+      !string(assessment.text).includes("PRIVATE_RAW_MENU"),
       "Приватное тело меню попало в обзор",
     );
     assert(
@@ -237,23 +248,23 @@ Deno.test("whole-bank: matching shared question is reused with manual100 and ori
   fixture(async (input, root) => {
     const d = await exportCourse(input);
     assert(d.questions.length === 1, "Один exr продублирован");
-    const info = JSON.parse(
+    const info = record(JSON.parse(
       await Deno.readTextFile(root + "/out/questions/fixture/exr-a/info.json"),
-    );
+    ));
     assert(
       info.gradingMethod === "Manual" && info.singleVariant === true &&
         !info.externalGradingOptions,
       "Manual получил grader или потерял singleVariant",
     );
-    const a = JSON.parse(
+    const a = record(JSON.parse(
       await Deno.readTextFile(
         root +
           "/out/courseInstances/pilot/assessments/sec-unit-a/infoAssessment.json",
       ),
-    );
+    ));
     assert(
-      a.zones[0].questions[0].autoPoints === 0 &&
-        a.zones[0].questions[0].manualPoints === 100,
+      fixtureAt(a, ["zones", 0, "questions", 0, "autoPoints"]) === 0 &&
+        fixtureAt(a, ["zones", 0, "questions", 0, "manualPoints"]) === 100,
       "Ручные100 потеряны",
     );
   }));
@@ -261,10 +272,10 @@ for (
   const [name, change] of [
     [
       "condition",
-      (p: any) => p.questions[0].condition = [para("DIFFERENT_CONDITION")],
+      (p: PublicBodyPackage) => required(p.questions[0]).condition = [para("DIFFERENT_CONDITION")],
     ],
-    ["title", (p: any) => p.questions[0].title = "Другое название"],
-    ["canonical source", (p: any) => p.questions[0].source = "foreign/a.qmd"],
+    ["title", (p: PublicBodyPackage) => required(p.questions[0]).title = "Другое название"],
+    ["canonical source", (p: PublicBodyPackage) => required(p.questions[0]).source = "foreign/a.qmd"],
   ] as const
 ) {
   Deno.test(
@@ -273,7 +284,7 @@ for (
       fixture(async (input, root, body) => {
         input.body = async (id: string) => {
           const p = body(
-            input.content.assessments.find((x: any) => x.id === id),
+            input.content.assessments.find((x) => x.id === id),
           );
           if (id === "sec-unit-a") change(p);
           return p;
@@ -286,11 +297,11 @@ Deno.test("whole-bank: duplicate submission semantics refuses rather than preser
   fixture(async (input, root, body) => {
     input.body = async (id: string) => {
       if (id === "sec-unit-a") {
-        input.content.exercises[0].extensions.prairielearn.submission = {
+        required(required(input.content.exercises[0]).extensions?.prairielearn).submission = {
           mode: "editor",
         };
       }
-      return body(input.content.assessments.find((x: any) => x.id === id));
+      return body(input.content.assessments.find((x) => x.id === id));
     };
     await refuses(input);
   }));
@@ -316,11 +327,11 @@ for (const mappingOnly of [false, true]) {
       fixture(async (input, root, body) => {
         input.body = async (id: string) => {
           const p = body(
-              input.content.assessments.find((x: any) => x.id === id),
+              input.content.assessments.find((x) => x.id === id),
             ),
             different = id === "sec-unit-a",
             data = different && !mappingOnly ? "<svg>B</svg>" : "<svg>A</svg>";
-          p.questions[0].condition = [image("q.svg")];
+          required(p.questions[0]).condition = [image("q.svg")];
           p.resources = [{
             owner: "fixture",
             source: different && mappingOnly ? "foreign.qmd" : "bank/a.qmd",
@@ -339,9 +350,9 @@ Deno.test("whole-bank: ambiguous resource target in public projection refuses", 
   fixture(async (input, root, body) => {
     input.body = async (id: string) => {
       const p = body(
-        input.content.assessments.find((x: any) => x.id === id),
+        input.content.assessments.find((x) => x.id === id),
       );
-      p.questions[0].condition = [image("q.svg")];
+      required(p.questions[0]).condition = [image("q.svg")];
       p.resources = await Promise.all(
         ["<svg>A</svg>", "<svg>B</svg>"].map(async (
           data,
@@ -360,21 +371,21 @@ Deno.test("whole-bank: ambiguous resource target in public projection refuses", 
   }));
 Deno.test("whole-bank: foreign sec-unit identity refuses even with valid fixed local slot", async () =>
   fixture(async (input) => {
-    input.content.assessments[1].id = "sec-unit-foreign";
-    input.config.delivery.instances.pilot.works[1] = "sec-unit-foreign";
+    required(input.content.assessments[1]).id = "sec-unit-foreign";
+    required(input.config.delivery.instances.pilot).works[1] = "sec-unit-foreign";
     await refuses(input);
   }));
 Deno.test("whole-bank: missing public menu projection never falls back to raw source body", async () =>
   fixture(async (input, root, body) => {
     const menu = work("sec-reserve");
-    menu.slots[0].assignment.requirement = "optional";
-    menu.body = { blocks: [para("PRIVATE_RAW")] };
+    required(menu.slots[0]).assignment.requirement = "optional";
+    setFixture(menu, ["body"], { blocks: [para("PRIVATE_RAW")] });
     input.content.assessments.push(menu);
     input.body = async (id: string) => {
       const p = body(
-        input.content.assessments.find((x: any) => x.id === id),
+        input.content.assessments.find((x) => x.id === id),
       );
-      if (id === menu.id) delete p.works[0].introduction;
+      if (id === menu.id) delete required(p.works[0]).introduction;
       return p;
     };
     await refuses(input);
@@ -384,9 +395,9 @@ Deno.test("whole-bank: mixed semantic grading cannot drift to external-only on d
     await prepareMixed(input, root);
     input.body = async (id: string) => {
       if (id === "sec-unit-a") {
-        input.content.exercises[0].extensions.prairielearn.grading = "external";
+        required(required(input.content.exercises[0]).extensions?.prairielearn).grading = "external";
       }
-      return body(input.content.assessments.find((x: any) => x.id === id));
+      return body(input.content.assessments.find((x) => x.id === id));
     };
     await refuses(input);
   }));
@@ -398,19 +409,19 @@ for (const conflict of [false, true]) {
       fixture(async (input, root, body) => {
         for (const id of ["sec-menu-one", "sec-menu-two"]) {
           const menu = work(id);
-          menu.slots[0].assignment.requirement = "optional";
-          delete menu.extensions.prairielearn;
+          required(menu.slots[0]).assignment.requirement = "optional";
+          deleteFixture(menu, ["extensions", "prairielearn"]);
           input.content.assessments.push(menu);
         }
         input.body = async (id: string) => {
           const p = body(
-            input.content.assessments.find((x: any) => x.id === id),
+            input.content.assessments.find((x) => x.id === id),
           );
           if (id.startsWith("sec-menu-")) {
             const data = conflict && id === "sec-menu-two"
               ? "<svg>B</svg>"
               : "<svg>A</svg>";
-            p.works[0].introduction = [para(id), image("shared.svg")];
+            required(p.works[0]).introduction = [para(id), image("shared.svg")];
             p.resources = [{
               owner: "fixture",
               source: id + ".qmd",
@@ -427,14 +438,14 @@ for (const conflict of [false, true]) {
           return;
         }
         await exportCourse(input);
-        const a = JSON.parse(
+        const a = record(JSON.parse(
           await Deno.readTextFile(
             root +
               "/out/courseInstances/pilot/assessments/sec-unit-a/infoAssessment.json",
           ),
-        );
+        ));
         assert(
-          a.text.includes("sec-menu-one") && a.text.includes("sec-menu-two"),
+          string(a.text).includes("sec-menu-one") && string(a.text).includes("sec-menu-two"),
           "Один из публичных контекстов потерян",
         );
         assert(
@@ -446,12 +457,12 @@ for (const conflict of [false, true]) {
       }),
   );
 }
-for (const selection of ["random", "choice"]) {
+for (const selection of ["random", "choice"] satisfies Work["slots"][number]["selection"][]) {
   Deno.test(
     "whole-bank: reference-only unit rejects " + selection + " candidate pool",
     async () =>
       fixture(async (input) => {
-        const w = input.content.assessments[1];
+        const w = required(input.content.assessments[1]);
         w.slots[0] = {
           id: "alt-pool",
           selection,
@@ -469,11 +480,11 @@ for (const selection of ["random", "choice"]) {
 Deno.test("whole-bank: foreign public menu owner refuses before using its introduction", async () =>
   fixture(async (input, root, body) => {
     const menu = work("sec-menu");
-    menu.slots[0].assignment.requirement = "optional";
+    required(menu.slots[0]).assignment.requirement = "optional";
     input.content.assessments.push(menu);
     input.body = async (id: string) => {
       const p = body(
-        input.content.assessments.find((x: any) => x.id === id),
+        input.content.assessments.find((x) => x.id === id),
       );
       if (id === menu.id) p.owner = "foreign";
       return p;
@@ -481,7 +492,7 @@ Deno.test("whole-bank: foreign public menu owner refuses before using its introd
     await refuses(input);
   }));
 
-async function prepareMixed(input: any, root: string) {
+async function prepareMixed(input: FixtureInput, root: string) {
   await Deno.mkdir(root + "/project/student/src/main/java", {
     recursive: true,
   });
@@ -571,7 +582,7 @@ async function prepareMixed(input: any, root: string) {
       image: "registry/fixture@sha256:" + "c".repeat(64),
     },
   };
-  input.content.exercises[0].extensions.prairielearn.grading = {
+  required(required(input.content.exercises[0]).extensions?.prairielearn).grading = {
     method: "mixed",
   };
   for (const w of input.content.assessments) {
@@ -591,21 +602,21 @@ Deno.test("whole-bank: matching mixed duplicate retains complete starter and tea
         "class A {}",
       "Закрытый starter snapshot потерян",
     );
-    const info = JSON.parse(await Deno.readTextFile(base + "/info.json"));
+    const info = record(JSON.parse(await Deno.readTextFile(base + "/info.json")));
     assert(
       info.gradingMethod === "External" &&
-        d.gradingPayloads["fixture/exr-a"].grading.method === "mixed",
+        required(d.gradingPayloads["fixture/exr-a"]).grading.method === "mixed",
       "Mixed ошибочно стал external-only",
     );
-    const a = JSON.parse(
+    const a = record(JSON.parse(
       await Deno.readTextFile(
         root +
           "/out/courseInstances/pilot/assessments/sec-unit-a/infoAssessment.json",
       ),
-    );
+    ));
     assert(
-      a.zones[0].questions[0].autoPoints === 70 &&
-        a.zones[0].questions[0].manualPoints === 30,
+      fixtureAt(a, ["zones", 0, "questions", 0, "autoPoints"]) === 70 &&
+        fixtureAt(a, ["zones", 0, "questions", 0, "manualPoints"]) === 30,
       "Повторный mixed потерял teacher30",
     );
   }));
@@ -623,13 +634,13 @@ Deno.test("whole-bank: internally valid public Body cannot substitute another un
     });
     input.body = async (id: string) => {
       const p = body(
-        input.content.assessments.find((w: any) => w.id === id),
+        input.content.assessments.find((w) => w.id === id),
       );
       if (id === "sec-unit-a") {
-        p.questions[0].id = "exr-b";
-        p.questions[0].key = "fixture/exr-b";
-        p.works[0].slots[0].id = "fixture/sec-unit-a/exr-b";
-        p.works[0].slots[0].candidates = ["fixture/exr-b"];
+        required(p.questions[0]).id = "exr-b";
+        required(p.questions[0]).key = "fixture/exr-b";
+        required(required(p.works[0]).slots[0]).id = "fixture/sec-unit-a/exr-b";
+        required(required(p.works[0]).slots[0]).candidates = ["fixture/exr-b"];
       }
       return p;
     };
@@ -653,7 +664,7 @@ for (const test of [
       });
       await exportCourse(input);
       const base = root + "/out/questions/fixture/exr-a";
-      const info = JSON.parse(await Deno.readTextFile(base + "/info.json"));
+      const info = record(JSON.parse(await Deno.readTextFile(base + "/info.json")));
       const html = await Deno.readTextFile(base + "/question.html");
       assert(info.gradingMethod === "Manual" && !info.externalGradingOptions && !html.includes("pl-external-grader-results"), "Manual получил автоматический runtime");
       assert(!html.includes("optional-file-") && !html.includes('allow-blank="true"'), "Manual формы смешаны");

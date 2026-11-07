@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import {
   type NativeProjectCheck,
   NativeProjectCheckSchema,
@@ -35,7 +36,7 @@ function rejected(fn: () => unknown) {
   assert(denied, "invalid native build descriptor accepted");
 }
 Deno.test("native Gradle descriptor carries closed build record and preserves independent Java API/extras", () => {
-  const value: any = runtimeDescriptor(
+  const value = runtimeDescriptor(
     {
       ...check,
       "api-precheck": { files: ["tests/Api.java"], entry: "grade.Api" },
@@ -211,18 +212,18 @@ Deno.test("optional-primary policy preserves absent bytes and validates both typ
     "max-total-bytes": 4194304,
     "max-archive-bytes": 2097152,
   };
-  const plain: any = runtimeDescriptor(
+  const plain = runtimeDescriptor(
     { ...check, "additional-java-sources": extra },
     profile,
     ["Main.java"],
     ["Checks.java"],
   );
   assert(
-    !("primaryRequired" in plain.additionalJavaSources),
+    !("primaryRequired" in required(plain.additionalJavaSources)),
     "legacy descriptor acquired field",
   );
   for (const value of [false, true]) {
-    const descriptor: any = runtimeDescriptor(
+    const descriptor = runtimeDescriptor(
       {
         ...check,
         "additional-java-sources": { ...extra, "primary-required": value },
@@ -232,7 +233,7 @@ Deno.test("optional-primary policy preserves absent bytes and validates both typ
       ["Checks.java"],
     );
     assert(
-      descriptor.additionalJavaSources.primaryRequired === value,
+      required(descriptor.additionalJavaSources).primaryRequired === value,
       "primaryRequired translation lost",
     );
   }
@@ -258,7 +259,7 @@ Deno.test("native library Gradle descriptor omits mainClass and rejects bad pres
     ...check,
     "java-build": { kind: "gradle-jar-v1", artifact: "library.jar" },
   });
-  const result: any = runtimeDescriptor(library, profile, ["Book.java"], [
+  const result = runtimeDescriptor(library, profile, ["Book.java"], [
     "Api.java",
     "Checks.java",
   ]);

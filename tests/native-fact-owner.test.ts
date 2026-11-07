@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 // Чистые data controls; не Core operation/assignment/P authority.
 import { strict as assert } from "node:assert";
 import * as Provenance from "../_extensions/course-prairielearn/application/native-provenance.ts";
@@ -77,11 +78,11 @@ Deno.test("typed project rows сохраняют hidden/non-PL normalization и 
   };
   const rows = Provenance.nativeProjectRows(value);
   assert.deepEqual(
-    rows[0].fact.check,
+    required(rows[0]).fact.check,
     decodeNativeCheck(policy, "native"),
   );
-  assert.equal(rows[0].format, "revealjs");
-  assert.equal(rows[0].fact.bankMember, false);
+  assert.equal(required(rows[0]).format, "revealjs");
+  assert.equal(required(rows[0]).fact.bankMember, false);
   const checked: NativeCheckProject = {
     ...fact,
     qualifiedId: "course/exr-hidden",
@@ -104,7 +105,7 @@ Deno.test("typed project rows сохраняют hidden/non-PL normalization и 
     /PL.NATIVE_CHECKS_SCOPE_INCOMPLETE/,
   );
   const bad = structuredClone(value);
-  bad.documents[0].projects[0].projectRoot = "../private";
+  required(required(bad.documents[0]).projects[0]).projectRoot = "../private";
   assert.throws(() => Provenance.nativeProjectRows(bad), /PL.PROJECT_INVALID/);
   // Synthetic malformed callback data проверяют реальные отказы до acquisition;
   // такой объект не считается genuine operation/A1 положительным случаем.

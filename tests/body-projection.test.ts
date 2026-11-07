@@ -1,6 +1,7 @@
+import { required } from "./fixture-values.ts";
 import { renderPublicBody } from "../_extensions/course-prairielearn/application/export.ts";
 Deno.test("native body omits bibliographic nodes and preserves code brackets and useful author links", async () => {
-  const nodes: any[] = [{
+  const nodes: Parameters<typeof renderPublicBody>[1] = [{
     t: "Para",
     c: [
       { t: "Str", c: "PUBLIC_WORDS" },
@@ -41,7 +42,7 @@ Deno.test("native body omits bibliographic nodes and preserves code brackets and
       { owner: "fixture", apiVersion: [1, 23, 1], resources: [] },
       nodes,
       "fixture/exr-test",
-      { owner: "fixture", id: "exr-test" } as any,
+      { source: "work.qmd", id: "exr-test" },
       "resources",
       "{{options.client_files_question_url}}",
     );
@@ -107,6 +108,6 @@ Deno.test("public body resource rewrites preserve query and fragment on one veri
     !result.html.includes(
       "{{ client_files_course }}/diagram.svg?download=1#source",
     ) || result.files.length !== 1 ||
-    result.files[0].name !== "clientFilesCourse/diagram.svg"
+    required(result.files[0], "resource file").name !== "clientFilesCourse/diagram.svg"
   ) throw Error("resource suffix lost or fake target emitted");
 });

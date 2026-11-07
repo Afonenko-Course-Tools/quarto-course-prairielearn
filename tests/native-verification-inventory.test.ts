@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import {
   nativeChecksManifest,
   selectedCheckFile,
@@ -50,8 +51,8 @@ Deno.test("selected v3 сохраняет содержимое и детерми
   if (
     result.schemaVersion !== 3 || result.projects[0] !== a ||
     result.projects[1] !== b ||
-    result.projects[0].sources[0].name !== "Study.java" ||
-    !result.projects[0].trustedTests[0].data
+    required(result.projects[0].sources[0]).name !== "Study.java" ||
+    !required(result.projects[0].trustedTests[0]).data
   ) throw Error("functional selected data lost");
   if (
     Object.keys(result).sort().join(",") !==

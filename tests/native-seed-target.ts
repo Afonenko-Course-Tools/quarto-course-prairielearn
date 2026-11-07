@@ -1,3 +1,4 @@
+import { required, setFixture } from "./fixture-values.ts";
 import { nativeWorkspaceArtifact } from "../_extensions/course-prairielearn/application/native-workspace.ts";
 
 import { workspaceSeed } from "../_extensions/course-prairielearn/application/workspace-seed.ts";
@@ -7,29 +8,24 @@ const [sp, download, output] = Deno.args;
 if (!sp || !download || !output) {
   throw Error("Требуются exact SP, Download и собственный output");
 }
-const { zip } = await import(
+const { zip }: Pick<typeof import("project-download/public.ts"), "zip"> = await import(
   pathToFileURL(join(download, "_extensions/project-download/public.ts")).href
 );
 await Deno.mkdir(output, { recursive: true });
-const results: any[] = [];
-const originalCommand = Deno.Command, commands: any[] = [];
-(Deno as any).Command = new Proxy(originalCommand, {
-  construct(t, a: any[]) {
-    commands.push({
-      executable: a[0],
-      args: a[1].args,
-      cwd: a[1].cwd,
-      clearEnv: a[1].clearEnv,
-    });
-    return Reflect.construct(t, a);
-  },
-});
+const results: Record<string, unknown>[] = [];
+const originalCommand = Deno.Command, commands: Record<string, unknown>[] = [];
+Deno.Command = class extends originalCommand {
+  constructor(command: string | URL, options?: Deno.CommandOptions) {
+    commands.push({executable: String(command), args: options?.args, cwd: options?.cwd, clearEnv: options?.clearEnv});
+    super(command, options);
+  }
+};
 for (
   const [recipe, mode, target] of [[
     "github-ssh",
     "upload",
     "versioning/project",
-  ], ["restore-selected-state", "workspace", "work"]]
+  ], ["restore-selected-state", "workspace", "work"]] satisfies [string, string, string][]
 ) {
   const root = await Deno.makeTempDir({ prefix: "pl-seed-target-" }),
     project = "projects/seed",
@@ -71,7 +67,7 @@ for (
       bytes: new TextEncoder().encode("KEEP"),
     },
   ];
-  const options: any = {
+  const options: Parameters<typeof nativeWorkspaceArtifact>[0] = {
     root,
     project,
     seedTarget: target,
@@ -95,7 +91,7 @@ for (
       projects: { "exr-seed": { "include-git": true, "common-files": [] } },
     },
     files,
-    zip: (files: any[]) => {
+    zip: (files) => {
       zipCalls++;
       return zip(files);
     },
@@ -110,7 +106,7 @@ for (
   await Deno.writeFile(join(output, recipe + ".zip"), positive.archive);
   if (mode === "workspace") await workspaceSeed(positive);
   let rejects = 0;
-  async function refuse(label: string, change: (o: any) => void) {
+  async function refuse(label: string, change: (o: typeof options) => void) {
     const o = {
       ...options,
       files: files.map((f) => ({ ...f, bytes: new Uint8Array(f.bytes) })),
@@ -132,7 +128,7 @@ for (
   await refuse(
     "ancestor collision",
     (o) =>
-      o.files.push({ name: target.split("/")[0], bytes: new Uint8Array() }),
+      o.files.push({ name: required(required(target).split("/")[0]), bytes: new Uint8Array() }),
   );
   await refuse(
     "file-prefix collision",
@@ -162,7 +158,7 @@ for (
   );
   await refuse(
     "missing include-git",
-    (o) => o.materialization.projects["exr-seed"]["include-git"] = false,
+    (o) => setFixture(o.materialization, ["projects", "exr-seed", "include-git"], false),
   );
   await refuse("currentness", (o) =>
     o.assertCurrent = async () => {
@@ -195,5 +191,5 @@ await Deno.writeTextFile(
   join(output, "commands.json"),
   JSON.stringify(commands, null, 2) + "\n",
 );
-(Deno as any).Command = originalCommand;
+Deno.Command = originalCommand;
 console.log(JSON.stringify(results));

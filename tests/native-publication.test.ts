@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import type { AnswerSpec } from "course-core/public.ts";
 import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 // Ограниченный lifecycle harness; scope callbacks здесь НЕ genuine Core operation/prior P.
@@ -86,7 +87,7 @@ async function fixture(course: boolean) {
       owner: "fixture",
       key: "fixture/sec-work",
       slots: [{
-        ...work.slots[0],
+        ...required(work.slots[0]),
         id: "fixture/sec-work/" + id,
         candidates: [key],
       }],
@@ -191,7 +192,7 @@ async function fixture(course: boolean) {
       },
     };
   };
-  const scope = async (use: (v: any) => Promise<any>) => {
+  const scope = async <T>(use: (v: { harness: string }) => Promise<T>): Promise<T> => {
     const result = await use({ harness: "not-authority" });
     events.push("A1-close");
     events.push("Core-close");
@@ -228,7 +229,7 @@ for (const course of [false, true]) {
     async () => {
       const f = await fixture(course);
       try {
-        let prepared: any;
+        let prepared: Awaited<ReturnType<typeof f.build>> | undefined;
         await publishNativePrepared(f.scope, async () => {
           prepared = await f.build();
           return prepared;
@@ -248,7 +249,7 @@ for (const course of [false, true]) {
         if (course) {
           assert((await Deno.stat(f.privateOut)).isFile, "Нет checks");
         }
-        await reject(() => prepared.publish(), "already consumed");
+        await reject(() => required(prepared).publish(), "already consumed");
       } finally {
         await Deno.remove(f.root, { recursive: true });
       }
@@ -331,7 +332,7 @@ Deno.test("Course rollback после private rename удаляет private outp
   const f = await fixture(true), actual = Deno.rename;
   let privateVisible = false;
   try {
-    (Deno as any).rename = async (from: string, to: string) => {
+    Deno.rename = async (from, to) => {
       if (to === f.out) {
         privateVisible = await Deno.stat(f.privateOut).then(
           (s) => s.isFile,
@@ -348,7 +349,7 @@ Deno.test("Course rollback после private rename удаляет private outp
     assert(privateVisible, "Private-first порядок потерян");
     await f.clean();
   } finally {
-    (Deno as any).rename = actual;
+    Deno.rename = actual;
     await Deno.remove(f.root, { recursive: true });
   }
 });

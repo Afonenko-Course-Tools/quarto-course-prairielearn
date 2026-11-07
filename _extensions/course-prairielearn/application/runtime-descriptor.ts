@@ -6,11 +6,20 @@ import { safePath } from './source-selection.ts';
 import type { RuntimeCheckInput } from './runtime-check.ts';
 export type RuntimeProfile = NonNullable<Parameters<typeof javaBuild>[1]>;
 export interface AdditionalJavaSources {primaryRequired?:boolean;allowAdditional?:boolean;archive:string;maxFiles:number;maxFileBytes:number;maxTotalBytes:number;maxArchiveBytes:number}
-export function validateAdditionalJavaSources(value:any,sources:string[],tests:string[]):AdditionalJavaSources {
-  const caps={maxFiles:128,maxFileBytes:1048576,maxTotalBytes:4194304,maxArchiveBytes:2097152};
-  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['archive','primaryRequired','allowAdditional',...Object.keys(caps)].includes(k))||('primaryRequired' in value&&typeof value.primaryRequired!=='boolean')||('allowAdditional' in value&&typeof value.allowAdditional!=='boolean')||typeof value.archive!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.zip$/.test(value.archive)||Object.entries(caps).some(([key,cap])=>!Number.isInteger(value[key])||value[key]<1||value[key]>cap))throw new Error('PL invalid additional Java sources policy');
-  if([...sources,...tests,'grading-job.json','tests/grading-job.json'].some(name=>name===value.archive||name.startsWith(value.archive+'/')||value.archive.startsWith(name+'/')))throw new Error('PL additional Java archive conflicts with primary/trusted path');
-  return {...value};
+export function validateAdditionalJavaSources(value: unknown, sources: string[], tests: string[]): AdditionalJavaSources {
+  const caps = {maxFiles:128,maxFileBytes:1048576,maxTotalBytes:4194304,maxArchiveBytes:2097152};
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error('PL invalid additional Java sources policy');
+  const cap = (key: keyof typeof caps): number => {
+    const n: unknown = Reflect.get(value, key);
+    if (typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > caps[key]) throw new Error('PL invalid additional Java sources policy');
+    return n;
+  };
+  const archive: unknown = Reflect.get(value, 'archive');
+  const primaryRequired: unknown = Reflect.get(value, 'primaryRequired');
+  const allowAdditional: unknown = Reflect.get(value, 'allowAdditional');
+  if(Object.keys(value).some(k=>!['archive','primaryRequired','allowAdditional',...Object.keys(caps)].includes(k)) || ('primaryRequired' in value && typeof primaryRequired !== 'boolean') || ('allowAdditional' in value && typeof allowAdditional !== 'boolean') || typeof archive !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.zip$/.test(archive)) throw new Error('PL invalid additional Java sources policy');
+  if([...sources,...tests,'grading-job.json','tests/grading-job.json'].some(name=>name===archive||name.startsWith(archive+'/')||archive.startsWith(name+'/')))throw new Error('PL additional Java archive conflicts with primary/trusted path');
+  return {archive, maxFiles:cap('maxFiles'),maxFileBytes:cap('maxFileBytes'),maxTotalBytes:cap('maxTotalBytes'),maxArchiveBytes:cap('maxArchiveBytes'), ...(typeof primaryRequired === 'boolean' ? {primaryRequired} : {}), ...(typeof allowAdditional === 'boolean' ? {allowAdditional} : {})};
 }
 export interface ApiPrecheck {files:string[];entry:string}
 export function runtimeDescriptor<C extends RuntimeCheckInput>(c: C, profile: RuntimeProfile, sources: string[], tests: string[], api?:ApiPrecheck) {
@@ -18,7 +27,7 @@ export function runtimeDescriptor<C extends RuntimeCheckInput>(c: C, profile: Ru
   const javaRuntime = profile.javaRelease !== undefined || !profile.sourceExtensions;
   if (!javaRuntime && c.java !== undefined) throw new Error('PL non-Java runtime cannot declare Java compiler settings');
   if(Boolean(c['api-precheck'])!==Boolean(api))throw new Error('PL API precheck selection missing or undeclared');
-  if(api&&(!['java25-junit-v1','java25-gradle-junit-v1'].includes(c.runtime)||!javaRuntime||c.sourceProfile.mode!=='implementation'||!Array.isArray(api.files)||!api.files.length||new Set(api.files).size!==api.files.length||api.files.length>=tests.length||api.files.some(x=>!safePath(x)||!x.endsWith('.java')||!tests.includes(x))||!/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(api.entry)||api.entry!==c['api-precheck']!.entry))throw new Error('PL API precheck must be a proper trusted Java subset');
+  if(api&&(!['java25-junit-v1','java25-gradle-junit-v1'].includes(c.runtime)||!javaRuntime||c.sourceProfile.mode!=='implementation'||!Array.isArray(api.files)||!api.files.length||new Set(api.files).size!==api.files.length||api.files.length>=tests.length||api.files.some(x=>!safePath(x)||!x.endsWith('.java')||!tests.includes(x))||!/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(api.entry)||api.entry!==c['api-precheck']?.entry))throw new Error('PL API precheck must be a proper trusted Java subset');
   const extra=c['additional-java-sources'];
   let additionalJavaSources:AdditionalJavaSources|undefined;
   if(extra!==undefined){
@@ -26,7 +35,8 @@ export function runtimeDescriptor<C extends RuntimeCheckInput>(c: C, profile: Ru
     additionalJavaSources=validateAdditionalJavaSources({...('primary-required' in extra?{primaryRequired:extra['primary-required']}:{}),...('allow-additional' in extra?{allowAdditional:extra['allow-additional']}:{}),archive:extra.archive,maxFiles:extra['max-files'],maxFileBytes:extra['max-file-bytes'],maxTotalBytes:extra['max-total-bytes'],maxArchiveBytes:extra['max-archive-bytes']},sources,tests);
   }
   const mode: C['sourceProfile']['mode'] = c.sourceProfile.mode;
-  const scoring: C['scoring'] = c.scoring;
+  const field = <K extends keyof C>(key: K): C[K] => c[key];
+  const scoring = field('scoring');
   return {
     schemaVersion:1, sourceFiles:sources, testFiles:tests,
     mode, runtime:c.runtime,

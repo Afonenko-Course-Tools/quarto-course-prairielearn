@@ -1,3 +1,4 @@
+import { array, record, required, string } from "./fixture-values.ts";
 // Usage: deno run -A tests/native-acl.ts NATIVE_ROOT PINNED_UPSTREAM_RESOLVER_BUNDLE
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -5,21 +6,23 @@ const [nativeRoot, bundle] = Deno.args;
 if (!nativeRoot || !bundle) {
   throw new Error("native-acl.ts NATIVE_ROOT PINNED_UPSTREAM_RESOLVER_BUNDLE");
 }
-const { resolveAccessControl } = await import(pathToFileURL(bundle).href);
-const instance = JSON.parse(
+const resolver = record(await import(pathToFileURL(bundle).href)).resolveAccessControl;
+if (typeof resolver !== "function") throw Error("Upstream resolver отсутствует");
+const resolveAccessControl = (input: unknown) => record(resolver(input));
+const instance = record(JSON.parse(
   await Deno.readTextFile(
     join(nativeRoot, "courseInstances/pilot/infoCourseInstance.json"),
   ),
-);
-const delivery = JSON.parse(
+));
+const delivery = record(JSON.parse(
   await Deno.readTextFile(join(nativeRoot, "delivery.json")),
-);
+));
 for await (
   const entry of Deno.readDir(
     join(nativeRoot, "courseInstances/pilot/assessments"),
   )
 ) {
-  const info = JSON.parse(
+  const info = record(JSON.parse(
     await Deno.readTextFile(
       join(
         nativeRoot,
@@ -28,22 +31,24 @@ for await (
         "infoAssessment.json",
       ),
     ),
-  );
-  const rules = info.accessControl.map((r: any, index: number) => {
-    const body: any = {
+  ));
+  const rules = array(info.accessControl).map((value, index) => {
+    const r = record(value), dateControl = record(r.dateControl),
+      release = record(dateControl.release), due = record(dateControl.due);
+    const body = {
       ...r,
       dateControl: {
-        ...r.dateControl,
-        release: { date: new Date(r.dateControl.release.date) },
+        ...dateControl,
+        release: { date: new Date(string(release.date)) },
         due: {
-          date: r.dateControl.due.date === null
+          date: due.date === null
             ? null
-            : new Date(r.dateControl.due.date),
+            : new Date(string(due.date)),
         },
       },
     };
-    delete body.uuid;
-    delete body.labels;
+    Reflect.deleteProperty(body, "uuid");
+    Reflect.deleteProperty(body, "labels");
     return index === 0
       ? {
         targetType: "none",
@@ -54,28 +59,27 @@ for await (
         targetType: "student_label",
         number: index,
         rule: body,
-        studentLabelIds: r.labels.map((name: string) => {
-          const label = instance.studentLabels.find((l: any) =>
-            l.name === name
-          );
+        studentLabelIds: array(r.labels).map((value) => {
+          const name = string(value);
+          const label = array(instance.studentLabels).map(record).find(l => l.name === name);
           if (!label) throw new Error("missing declared label");
-          return label.uuid;
+          return string(label.uuid);
         }),
       };
   });
   const base = {
     rules,
     date: new Date("2026-10-10T12:00:00Z"),
-    displayTimezone: instance.timezone,
+    displayTimezone: string(instance.timezone),
     authzMode: "Public",
     courseRole: "None",
     courseInstanceRole: "None",
     prairieTestReservations: [],
   };
-  const work = delivery.works.find((w: any) => w.id === entry.name);
+  const work = array(delivery.works).map(record).find(w => w.id === entry.name);
   if (!work) throw new Error("native work missing from manifest");
   if (!work.relatedExercise) {
-    if (rules.length !== 1 || work.policy.assignment) {
+    if (rules.length !== 1 || record(work.policy).assignment) {
       throw new Error("ordinary lab carries defense ACL");
     }
     for (const labels of [[], ["foreign-label"]]) {
@@ -109,7 +113,7 @@ for await (
     ...base,
     enrollment: {
       enrollmentId: "ordinary-student",
-      studentLabelIds: rules[1].studentLabelIds,
+      studentLabelIds: required(rules[1]).studentLabelIds,
     },
   });
   if (assigned.authorization !== "granted" || !assigned.submittable) {

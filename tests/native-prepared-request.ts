@@ -1,7 +1,9 @@
+import type * as CorePublic from "course-core/public.ts";
+import { required } from "./fixture-values.ts";
 // Чистый DTO-контроль; не lease/operation и не positive producer qualification.
 import { pathToFileURL } from "node:url";
 import * as PL from "../_extensions/course-prairielearn/application/native-adapter.ts";
-const Core = await import(
+const Core: typeof CorePublic = await import(
   pathToFileURL(Deno.args[0] + "/_extensions/course-core/public.ts").href
 );
 const A = "11111111-1111-4111-8111-111111111111",
@@ -22,24 +24,24 @@ const descriptor = {
   }],
   assessments: [{ source: "labs/work.qmd", id: "sec-work" }],
 };
-const request = await (PL as any).nativePreparedRequest(Core, descriptor);
+const request = await PL.nativePreparedRequest(Core, descriptor);
 if (
   request.identity.operation !== B || JSON.stringify(request).includes(A) ||
-  request.inputs[0].captureWitness !== descriptor.inputs[0].captureWitness ||
+  required(request.inputs[0]).captureWitness !== required(descriptor.inputs[0]).captureWitness ||
   request.outputDirectory !== descriptor.outputDirectory
 ) throw Error("new request B not derived from descriptor B");
 for (
   const mutate of [
-    (v: any) => v.extra = true,
-    (v: any) => v.identity.operation = "bad",
-    (v: any) => v.inputs[0].captureWitness = "bad",
+    (v: typeof descriptor) => { Reflect.set(v, "extra", true); },
+    (v: typeof descriptor) => v.identity.operation = "bad",
+    (v: typeof descriptor) => required(v.inputs[0]).captureWitness = "bad",
   ]
 ) {
   const bad = structuredClone(descriptor);
   mutate(bad);
   let refused = false;
   try {
-    await (PL as any).nativePreparedRequest(Core, bad);
+    await PL.nativePreparedRequest(Core, bad);
   } catch {
     refused = true;
   }

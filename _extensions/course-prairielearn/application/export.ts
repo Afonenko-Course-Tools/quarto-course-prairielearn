@@ -1,4 +1,4 @@
-import type { BodyResource, PublicBodyPackage } from "course-core/body-export/model.ts";
+import type { AnswerFacts, BodyResource, MaterializableCondition, PublicBodyPackage } from "course-core/public.ts";
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { renderNativeAnswer } from "./native-answer.ts";
 import { workspaceSeed } from "./workspace-seed.ts";
@@ -22,12 +22,12 @@ const fail = (
 ): never => {
   throw diagnostic("ADAPTER", message, context, cause);
 };
-const record = (v: any) =>
+const record = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
 const safe = (v: unknown): v is string =>
   typeof v === "string" && !!v && !v.includes("\\") && !v.includes("\0") &&
   !isAbsolute(v) && !v.split("/").some((p) => !p || p === "." || p === "..");
-const fields = (v: any, required: string[], optional: string[] = []) =>
+const fields = (v: unknown, required: string[], optional: string[] = []): v is Record<string, unknown> =>
   record(v) && required.every((k) => Object.hasOwn(v, k)) &&
   Object.keys(v).every((k) => [...required, ...optional].includes(k));
 export interface StudentArtifact {
@@ -36,9 +36,9 @@ export interface StudentArtifact {
 }
 export interface ProjectContext {
   deferPublish?: boolean;
-  nativeBody?: boolean;
-  nativeAuxiliary?: NativeAuxiliary;
-  nativeAnswers?: Record<string, any>;
+  nativeBody?: boolean | undefined;
+  nativeAuxiliary?: NativeAuxiliary | undefined;
+  nativeAnswers?: Record<string, AnswerFacts> | undefined;
   projectRoot: string;
   projects: Record<string, string>;
   publicationConditions?: Record<string, PublicationCondition>;
@@ -166,8 +166,10 @@ export async function uuid(key: string): Promise<string> {
     0,
     16,
   );
-  h[6] = (h[6] & 15) | 80;
-  h[8] = (h[8] & 63) | 128;
+  const version = h.at(6), variant = h.at(8);
+  if (version === undefined || variant === undefined) throw Error("PL UUID digest too short");
+  h[6] = (version & 15) | 80;
+  h[8] = (variant & 63) | 128;
   const hex = Array.from(h, (x) => x.toString(16).padStart(2, "0")).join("");
   return [
     hex.slice(0, 8),
@@ -212,12 +214,12 @@ async function files(
 }
 export async function renderPublicBody(
   p: Pick<PublicBodyPackage, "owner" | "apiVersion" | "resources">,
-  nodes: any[],
+  nodes: MaterializableCondition["body"],
   key: string,
   questionContext: DiagnosticContext,
   resourceBase: string,
   clientFilesToken: string,
-  options: { preserveBibliography?: boolean; auxiliary?: NativeAuxiliary } = {},
+  options: { preserveBibliography?: boolean | undefined; auxiliary?: NativeAuxiliary | undefined } = {},
 ): Promise<{ html: string; files: { name: string; data: Uint8Array }[] }> {
   const questionFail = (
     message: string,
@@ -246,69 +248,62 @@ export async function renderPublicBody(
   const anchorPrefix = "pl-" + await uuid(key) + "-";
   const anchors = new Map<string, string>();
   // TableHead/Body/Foot, Row and Cell carry semantic Attr arrays, not t nodes.
-  const nodeAttrs = (node: any): any[] => {
-    if (node.t === "Header") return [node.c[1]];
+  const list = (value: unknown): unknown[] => {
+    if (!Array.isArray(value)) return questionFail("Неверный массив native AST", "condition");
+    return value;
+  };
+  const attr = (value: unknown): unknown[] => {
+    const parts = list(value);
+    if (parts.length !== 3 || typeof parts[0] !== "string" || !list(parts[1]).every(v => typeof v === "string") || !list(parts[2]).every(v => Array.isArray(v) && v.length === 2 && v.every((x: unknown) => typeof x === "string"))) return questionFail("Неверный Attr native AST", "condition");
+    return parts;
+  };
+  const nodeAttrs = (node: unknown): unknown[][] => {
+    if (!record(node) || typeof node.t !== "string") return [];
+    if (node.t === "Header") return [attr(list(node.c)[1])];
     if (node.t === "Table") {
-      const [, , , head, bodies, foot] = node.c;
-      const rows = [
-        ...head[1],
-        ...bodies.flatMap((body: any) => [...body[2], ...body[3]]),
-        ...foot[1],
-      ];
-      return [
-        node.c[0],
-        head[0],
-        ...bodies.map((body: any) => body[0]),
-        foot[0],
-        ...rows.flatMap((
-          row: any,
-        ) => [row[0], ...row[1].map((cell: any) => cell[0])]),
-      ];
+      const c = list(node.c), head = list(c[3]), bodies = list(c[4]).map(list), foot = list(c[5]);
+      const rows = [...list(head[1]), ...bodies.flatMap(body => [...list(body[2]), ...list(body[3])]), ...list(foot[1])].map(list);
+      return [attr(c[0]), attr(head[0]), ...bodies.map(body => attr(body[0])), attr(foot[0]), ...rows.flatMap(row => [attr(row[0]), ...list(row[1]).map(cell => attr(list(cell)[0]))])];
     }
-    return ["Div", "Span", "CodeBlock", "Code", "Link", "Image", "Figure"]
-        .includes(node.t)
-      ? [node.c[0]]
-      : [];
+    return ["Div", "Span", "CodeBlock", "Code", "Link", "Image", "Figure"].includes(node.t) ? [attr(list(node.c)[0])] : [];
   };
   const bibliographyTargets = new Set<string>();
-  const collectBibliographyTargets = (value: any) => {
+  const collectBibliographyTargets = (value: unknown): void => {
     if (Array.isArray(value)) {
       value.forEach(collectBibliographyTargets);
       return;
     }
-    if (!value || typeof value !== "object") return;
+    if (!record(value)) return;
     for (const attr of nodeAttrs(value)) {
-      if (attr?.[0]) bibliographyTargets.add(attr[0]);
+      if (typeof attr[0] === "string" && attr[0]) bibliographyTargets.add(attr[0]);
     }
     Object.values(value).forEach(collectBibliographyTargets);
   };
-  const projectBibliography = (value: any, links = false): any => {
+  const projectBibliography = (value: unknown, links = false): unknown => {
     if (Array.isArray(value)) {
       return value.flatMap((item) => {
         const next = projectBibliography(item, links);
         return next === undefined ? [] : [next];
       });
     }
-    if (!value || typeof value !== "object") return value;
+    if (!record(value)) return value;
     if (
       !links &&
       (value.t === "Cite" ||
         value.t === "Div" &&
-          (value.c?.[0]?.[0] === "refs" ||
-            value.c?.[0]?.[1]?.some((c: string) =>
-              ["references", "csl-bib-body"].includes(c)
-            )))
+          (attr(list(value.c)[0])[0] === "refs" ||
+            list(attr(list(value.c)[0])[1]).some(c => typeof c === "string" && ["references", "csl-bib-body"].includes(c))))
     ) {
       collectBibliographyTargets(value);
       return undefined;
     }
     if (
-      links && value.t === "Link" && typeof value.c?.[2]?.[0] === "string" &&
-      value.c[2][0].startsWith("#")
+      links && value.t === "Link" && typeof list(list(value.c)[2])[0] === "string"
     ) {
-      let target: string;
+      let target = "";
       try {
-        target = decodeURIComponent(value.c[2][0].slice(1));
+        const href = list(list(value.c)[2])[0];
+        target = typeof href === "string" && href.startsWith("#") ? decodeURIComponent(href.slice(1)) : "";
       } catch {
         target = "";
       }
@@ -324,14 +319,14 @@ export async function renderPublicBody(
   const blocks = options.preserveBibliography
     ? structuredClone(nodes)
     : projectBibliography(projectBibliography(nodes), true);
-  const indexAnchors = (value: any) => {
+  const indexAnchors = (value: unknown): void => {
     if (Array.isArray(value)) {
       value.forEach(indexAnchors);
       return;
     }
-    if (!value || typeof value !== "object") return;
+    if (!record(value)) return;
     for (const attr of nodeAttrs(value)) {
-      if (attr?.[0]) {
+      if (typeof attr[0] === "string" && attr[0]) {
         if (anchors.has(attr[0])) {
           questionFail(
             "Повторная цель в публичном вопросе: " + attr[0],
@@ -344,8 +339,10 @@ export async function renderPublicBody(
     Object.values(value).forEach(indexAnchors);
   };
   indexAnchors(blocks);
-  const map = (node: any) => {
-    if (!node || typeof node !== "object") return;
+  const map = (node: unknown): void => {
+    if (Array.isArray(node)) { node.forEach(map); return; }
+    if (!record(node)) return;
+    if (typeof node.t !== "string") { Object.values(node).forEach(map); return; }
     if (
       ["RawBlock", "RawInline", "Note"].includes(node.t) ||
       node.t === "Cite" &&
@@ -356,23 +353,26 @@ export async function renderPublicBody(
       questionFail("Неподдерживаемый узел условия: " + node.t, "condition");
     }
     for (const attr of nodeAttrs(node)) {
-      if (attr?.[0]) attr[0] = anchors.get(attr[0]);
+      if (typeof attr[0] === "string" && attr[0]) { const mapped = anchors.get(attr[0]); if (!mapped) return questionFail("Отсутствует индекс Attr", "condition.reference"); attr[0] = mapped; }
     }
     if (
       ["Div", "Span", "CodeBlock", "Code"].includes(node.t) &&
-      node.c[0][1].some((c: string) =>
+      list(attr(list(node.c)[0])[1]).some((c) =>
+        typeof c === "string" &&
         ["answer", "answer-spec", "correct", "solution", "grading-notes"]
           .includes(c)
       )
     ) questionFail("Закрытая отметка в публичном условии", "condition");
     if (node.t === "Image" || node.t === "Link") {
-      const href = node.c[2][0];
+      const targetPair = list(list(node.c)[2]);
+      const href = targetPair[0];
+      if (typeof href !== "string") return questionFail("Неверная ссылка native AST", "condition.reference");
       const split = href.search(/[?#]/),
         path = split < 0 ? href : href.slice(0, split),
         suffix = split < 0 ? "" : href.slice(split);
       const resource = declaredResources.get(path);
       if (node.t === "Link" && href.startsWith("#")) {
-        let target: string;
+        let target = "";
         try {
           target = decodeURIComponent(href.slice(1));
         } catch (cause) {
@@ -382,14 +382,14 @@ export async function renderPublicBody(
             cause,
           );
         }
-        const actual = anchors.get(target!);
+        const actual = anchors.get(target);
         if (!actual) {
           questionFail(
             "Цель ссылки отсутствует в публичном вопросе: " + href,
             "condition.reference",
           );
         }
-        node.c[2][0] = "#" + actual;
+        targetPair[0] = "#" + actual;
       } else if (resource) {
         if (
           !safe(resource.target) || /[?#]/.test(resource.target) ||
@@ -403,7 +403,7 @@ export async function renderPublicBody(
           );
         }
         resources.set(resource.target, resource);
-        node.c[2][0] = resourceMarker + "/" + resource.target + suffix;
+        targetPair[0] = resourceMarker + "/" + resource.target + suffix;
       } else if (!(node.t === "Link" && /^https?:\/\//.test(href))) {
         questionFail(
           "Ресурс условия отсутствует в публичной поставке: " + href,
@@ -411,33 +411,25 @@ export async function renderPublicBody(
         );
       }
     }
-    if (node.t === "Link" && !node.c[2][0].startsWith("#")) {
-      const attributes = node.c[0][2].filter((pair: string[]) =>
-        !["target", "rel"].includes(pair[0])
-      );
-      const oldRel = node.c[0][2].find((pair: string[]) =>
-        pair[0] === "rel"
-      )?.[1] ?? "";
-      attributes.push(["target", "_blank"], [
-        "rel",
-        [
-          ...new Set([
-            ...oldRel.split(/\s+/).filter(Boolean),
-            "noopener",
-            "noreferrer",
-          ]),
-        ].join(" "),
-      ]);
-      node.c[0][2] = attributes;
+    if (node.t === "Link") {
+      const href = list(list(node.c)[2])[0];
+      if (typeof href !== "string") return questionFail("Неверная ссылка native AST", "condition.reference");
+      if (!href.startsWith("#")) {
+        const attributes = attr(list(node.c)[0]), pairs = list(attributes[2]).map(list);
+        const filtered = pairs.filter(pair => pair[0] !== "target" && pair[0] !== "rel");
+        const oldRel = pairs.find(pair => pair[0] === "rel")?.[1];
+        filtered.push(["target", "_blank"], ["rel", [...new Set([...(typeof oldRel === "string" ? oldRel.split(/\s+/).filter(Boolean) : []), "noopener", "noreferrer"])].join(" ")]);
+        attributes[2] = filtered;
+      }
     }
     Object.values(node).forEach((value) => {
       if (Array.isArray(value)) value.forEach(map);
       else map(value);
     });
   };
-  blocks.forEach(map);
+  list(blocks).forEach(map);
   for (const r of resources.values()) {
-    let bytes: Uint8Array;
+    let bytes = new Uint8Array();
     try {
       bytes = Uint8Array.from(atob(r.data), (c) => c.charCodeAt(0));
     } catch (cause) {
@@ -449,7 +441,7 @@ export async function renderPublicBody(
     }
     files.push({
       name: resourceBase + "/" + r.target,
-      data: bytes!,
+      data: bytes,
     });
   }
   const authoredHtml = await command(
@@ -480,16 +472,19 @@ function metadata(
     ? '<p class="course-question-metadata">' + parts.join(" · ") + "</p>\n"
     : "";
 }
+type PreparedPrairieLearn = {publish(): Promise<void>; discard(): Promise<void>};
+export function exportPrairieLearn(p: PublicBodyPackage, context: ProjectContext & {deferPublish:true}, binding: unknown, output: string): Promise<PreparedPrairieLearn>;
+export function exportPrairieLearn(p: PublicBodyPackage, context: ProjectContext & {deferPublish?:false | undefined}, binding: unknown, output: string): Promise<void>;
+export function exportPrairieLearn(p: PublicBodyPackage, context: ProjectContext, binding: unknown, output: string): Promise<void | PreparedPrairieLearn>;
 export async function exportPrairieLearn(
   p: PublicBodyPackage,
   context: ProjectContext,
-  binding: any,
+  binding: unknown,
   output: string,
 ): Promise<void | { publish(): Promise<void>; discard(): Promise<void> }> {
   const work = Array.isArray(p?.works) ? p.works[0] : undefined;
   const workContext: DiagnosticContext = {
-    source: work?.source,
-    id: work?.id,
+    ...(work ? {source:work.source, id:work.id} : {}),
     field: "works",
     hint: "Экспортируйте одну выбранную работу через установленный Core",
   };
@@ -518,7 +513,7 @@ export async function exportPrairieLearn(
     !fields(binding, ["questions"]) || !record(binding.questions) ||
     Object.keys(binding.questions).length !== p.questions.length
   ) {
-    refuse(
+    return refuse(
       "Требуется явная привязка PrairieLearn для каждого выбранного вопроса",
       "binding.questions",
     );
@@ -633,7 +628,7 @@ export async function exportPrairieLearn(
       );
     }
     if (
-      assignments[q.key].stage === "demonstration" &&
+      assignments[q.key]?.stage === "demonstration" &&
       (q.statementVisibility !== "open" || q.purpose !== "demonstration" ||
         !q.hasPublicSolution)
     ) {
@@ -644,6 +639,7 @@ export async function exportPrairieLearn(
     }
     keys.add(q.key);
     const b = binding.questions[q.id];
+    if (!record(b)) return questionFail("Нет привязки вопроса", "binding.questions." + q.id);
     const answer = context.nativeAnswers?.[q.id];
     if (answer) {
       if (
@@ -728,17 +724,17 @@ export async function exportPrairieLearn(
       ]) ||
       b.singleVariant !== undefined && typeof b.singleVariant !== "boolean" ||
       typeof b.topic !== "string" || !b.topic.trim() ||
-      !Array.isArray(b.files) || !manual && !b.files.length ||
+      !Array.isArray(b.files) || !b.files.every((name: unknown) => typeof name === "string") || !manual && !b.files.length ||
       new Set(b.files).size !== b.files.length || b.files.some((f: unknown) =>
         !safe(f) || /[",<>]/.test(String(f))
       )
     ) {
-      questionFail(
+      return questionFail(
         "Требуются topic, принимаемые файлы и внешний проверяющий инструмент",
         "binding.questions." + q.id,
       );
     }
-    let submission!: ReturnType<typeof parseSubmission>;
+    let submission: ReturnType<typeof parseSubmission> = {mode:"upload"};
     try {
       submission = parseSubmission(b.submission ?? { mode: "upload" });
     } catch (cause) {
@@ -773,7 +769,7 @@ export async function exportPrairieLearn(
           "environment",
         ]) || typeof grading.image !== "string" || !grading.image.trim() ||
         grading.timeout !== undefined &&
-          (!Number.isInteger(grading.timeout) || grading.timeout < 1 ||
+          (typeof grading.timeout !== "number" || !Number.isInteger(grading.timeout) || grading.timeout < 1 ||
             grading.timeout > 600) ||
         grading.enableNetworking !== undefined &&
           typeof grading.enableNetworking !== "boolean" ||
@@ -800,7 +796,7 @@ export async function exportPrairieLearn(
       typeof project !== "string" || !project.startsWith("/") ||
       !safe(project.slice(1))
     ) {
-      questionFail(
+      return questionFail(
         "Требуется путь проекта от корня выбранного проекта",
         "project",
       );
@@ -877,17 +873,17 @@ export async function exportPrairieLearn(
       });
     }
     if (submission.mode === "workspace") {
-      let seed;
+      let seed: Awaited<ReturnType<typeof workspaceSeed>>;
       try {
         seed = await workspaceSeed(artifact);
       } catch (cause) {
-        questionFail(
+        return questionFail(
           "Неполный seed либо договор возврата Workspace",
           "studentArtifact",
           cause,
         );
       }
-      for (const file of seed!) {
+      for (const file of seed) {
         prepared.push({
           name: base + "/workspace/" + file.name,
           data: file.data,
@@ -938,8 +934,8 @@ export async function exportPrairieLearn(
     if (manual && b.files.length && b.files.every((name: string) => name.endsWith(".java"))) {
       for (const name of b.files) {
         const starter = student.find(file => file.name === name);
-        if (!starter) questionFail("Нет настоящего starter для Manual Java", "project.student." + name);
-        prepared.push({ name: base + "/serverFilesQuestion/starter/" + name, data: starter!.data });
+        if (!starter) return questionFail("Нет настоящего starter для Manual Java", "project.student." + name);
+        prepared.push({ name: base + "/serverFilesQuestion/starter/" + name, data: starter.data });
       }
     }
     let controls: string;
@@ -947,18 +943,19 @@ export async function exportPrairieLearn(
       controls =
         '<pl-workspace></pl-workspace>\n<p>При работе в собственной ОС загрузите архив решения.</p>\n<pl-file-upload optional-file-patterns="*.zip,*.tar.gz"></pl-file-upload>';
     } else if (submission.mode === "editor") {
+      const aceMode = submission.aceMode;
       controls = b.files.map((name: string) => {
         const starter = student.find((file) => file.name === name);
         if (!starter || starter.data.length > 1024 * 1024) {
-          questionFail(
+          return questionFail(
             "Требуется UTF-8 starter для каждого editor файла",
             "project.student." + name,
           );
         }
-        let source: string;
+        let source = "";
         try {
           source = new TextDecoder("utf-8", { fatal: true }).decode(
-            starter!.data,
+            starter.data,
           );
           if (source.includes("\0")) throw new Error("NUL in source");
         } catch (cause) {
@@ -968,11 +965,11 @@ export async function exportPrairieLearn(
             cause,
           );
         }
-        const code = escape(source!).replaceAll("{{", "&#123;&#123;")
+        const code = escape(source).replaceAll("{{", "&#123;&#123;")
           .replaceAll("}}", "&#125;&#125;");
         return '<pl-file-editor file-name="' + escape(name) + '"' +
-          (submission.aceMode
-            ? ' ace-mode="' + escape(submission.aceMode) + '"'
+          (aceMode
+            ? ' ace-mode="' + escape(aceMode) + '"'
             : "") +
           ' normalize-to-ascii="false">' + code + "</pl-file-editor>";
       }).join("\n");
@@ -1101,7 +1098,7 @@ export async function exportPrairieLearn(
       }
     };
     if (context.deferPublish) return { publish, discard };
-    await publish();
+    return await publish();
   } catch (e) {
     try {
       await Deno.remove(stage, { recursive: true });

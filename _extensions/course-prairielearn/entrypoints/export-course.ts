@@ -3,16 +3,17 @@ const args = Deno.args[0] === "--" ? Deno.args.slice(1) : Deno.args;
 const [rootArg, output, ...options] = args;
 const flags: Record<string, string> = {};
 for (let i = 0; i < options.length; i += 2) {
+  const option = options[i], value = options[i + 1];
   if (
-    ![
+    option === undefined || ![
       "--instance",
       "--checks-output",
       "--runtime-registry",
       "--book",
       "--candidate-image",
-    ].includes(options[i]) || !options[i + 1] || flags[options[i]]
+    ].includes(option) || !value || flags[option]
   ) throw new Error("PL unknown or duplicate CLI option");
-  flags[options[i]] = options[i + 1];
+  flags[option] = value;
 }
 if (!rootArg || !output || !flags["--instance"] || !flags["--checks-output"]) {
   throw new Error(
@@ -25,6 +26,6 @@ await nativeEntry({
   instance: flags["--instance"],
   output,
   checksOutput: flags["--checks-output"],
-  runtimeRegistry: flags["--runtime-registry"],
-  candidateImage: flags["--candidate-image"],
+  ...(flags["--runtime-registry"] === undefined ? {} : { runtimeRegistry: flags["--runtime-registry"] }),
+  ...(flags["--candidate-image"] === undefined ? {} : { candidateImage: flags["--candidate-image"] }),
 });

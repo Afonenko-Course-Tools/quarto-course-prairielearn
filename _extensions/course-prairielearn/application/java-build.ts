@@ -47,11 +47,10 @@ export function javaBuild(
       "PL java-build requires a closed native Gradle implementation record/profile",
     );
   }
+  const mainClass = Object.hasOwn(value, "main-class") ? value["main-class"] : undefined;
   return {
     kind: value.kind,
-    ...(Object.hasOwn(value, "main-class")
-      ? { mainClass: value["main-class"] }
-      : {}),
+    ...(typeof mainClass === "string" ? { mainClass } : {}),
     artifact: value.artifact,
   };
 }

@@ -1,3 +1,4 @@
+import { record, string, array, fixtureAt } from "./fixture-values.ts";
 import type { PublicBodyPackage } from "course-core/body-export/model.ts";
 import { question } from "../_extensions/course-prairielearn/application/declarations.ts";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
@@ -150,9 +151,9 @@ Deno.test("реальный exporter создаёт native Manual Workspace и �
         copied.length === artifact.archive.length,
       "Workspace seed ZIP bytes изменены",
     );
-    const manifest = JSON.parse(
+    const manifest = record(JSON.parse(
       await Deno.readTextFile(join(base, "workspace/.pl-seed/manifest.json")),
-    );
+    ));
     assert(
       manifest.schema === "pl-git-workspace-seed-v1" &&
         Array.isArray(manifest.files) &&
@@ -160,7 +161,7 @@ Deno.test("реальный exporter создаёт native Manual Workspace и �
         Object.keys(manifest).sort().join(",") === "files,schema",
       "Seed manifest потерял действительные имена файлов либо вернул собственное доказательство",
     );
-    const info = JSON.parse(await Deno.readTextFile(join(base, "info.json")));
+    const info = record(JSON.parse(await Deno.readTextFile(join(base, "info.json"))));
     const html = await Deno.readTextFile(join(base, "question.html"));
     assert(infoQuestion(info), "Pinned native schema отвергает info.json");
     assert(
@@ -169,7 +170,7 @@ Deno.test("реальный exporter создаёт native Manual Workspace и �
       "Workspace получил automatic runtime или смену variant",
     );
     assert(
-      info.workspaceOptions.gradedFiles.includes("work/.git/**"),
+      array(record(info.workspaceOptions).gradedFiles).includes("work/.git/**"),
       "Возврат Git-состояния не объявлен",
     );
     assert(

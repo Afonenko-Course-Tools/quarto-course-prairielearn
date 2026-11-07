@@ -1,7 +1,8 @@
+import { required } from "./fixture-values.ts";
 import { decodeNativeBusiness } from "../_extensions/course-prairielearn/public.ts";
-const root = Deno.args[0];
+const root = required(Deno.args[0]);
 if (!root) throw Error("Требуется exact SP source checkout");
-const ref = "8c8622d7be5043f32a611717064bc642a346f1e0";
+const ref = "6b4ffbe35a018678a0bf6bb3e7f99bcf794bf204";
 async function git(args: string[]) {
   const p = await new Deno.Command("git", {
     args: ["-C", root, ...args],
@@ -11,8 +12,8 @@ async function git(args: string[]) {
   if (!p.success) throw Error(new TextDecoder().decode(p.stderr));
   return new TextDecoder().decode(p.stdout);
 }
-if ((await git(["rev-parse", "HEAD"])).trim() !== ref) {
-  throw Error("Exact SP input changed");
+if ((await git(["rev-parse", ref + "^{commit}"])).trim() !== ref) {
+  throw Error("Точный SP commit недоступен");
 }
 const paths = (await git([
   "grep",
@@ -79,7 +80,7 @@ const result = decodeNativeBusiness({ config, declarations }, {
 });
 for (const d of declarations) {
   if (
-    result.questions[d.id].submission.mode !==
+    required(result.questions[d.id]).submission.mode !==
       d.attributes["prairielearn-submission"]
   ) throw Error("Inherited carrier changed authored mode");
 }
@@ -89,7 +90,7 @@ console.log(
       ref,
       actualModes: declarations.map((d) => ({
         id: d.id,
-        mode: result.questions[d.id].submission.mode,
+        mode: required(result.questions[d.id]).submission.mode,
       })),
       fixtureOnlyImage: true,
     },

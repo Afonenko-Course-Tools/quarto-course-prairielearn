@@ -1,8 +1,10 @@
+import type * as CorePublic from "course-core/public.ts";
+import { required, record, array, setFixture, deleteFixture } from "./fixture-values.ts";
 // Genuine ordinary Core producer → C consumer; не assignment/P/actual C CLI.
 import { strict as assert } from "node:assert";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-const coreSource = resolve(Deno.args[0]),
+const coreSource = resolve(required(Deno.args[0])),
   repo = resolve(new URL("../", import.meta.url).pathname);
 const root = await Deno.makeTempDir({ prefix: "pl-c9-native-" }),
   checks: string[] = [];
@@ -80,8 +82,8 @@ prairielearn:
   );
   await command(["add", coreSource, "--no-prompt"]);
   await command(["add", repo, "--no-prompt"]);
-  const Core = await import(pathToFileURL(join(core, "public.ts")).href),
-    PL = await import(pathToFileURL(join(pl, "public.ts")).href);
+  const Core: typeof CorePublic = await import(pathToFileURL(join(core, "public.ts")).href),
+    PL: typeof import("../_extensions/course-prairielearn/public.ts") = await import(pathToFileURL(join(pl, "public.ts")).href);
   const { readNativeAdapterExpectation } = await import(
     pathToFileURL(join(pl, "application/native-adapter.ts")).href
   );
@@ -89,7 +91,7 @@ prairielearn:
     await Core.withNativeCaptureScope(
       { root, projection: "student", outputDirectory: root + "/_site" },
       { expectedSources: ["index.qmd", "slides.qmd"] },
-      async (scope: any) => {
+      async (scope) => {
         for (const source of ["index.qmd", "slides.qmd"]) {
           await scope.captureInputs(
             [source],
@@ -118,11 +120,11 @@ prairielearn:
     (publication: import("course-core/public.ts").NativePublication) => PL.inspectPublication(publication)), /RELEASE.COVERAGE/);
   await Core.withCurrentNativeOperation(
     candidate.expectation,
-    async (op: any) => {
+    async (op) => {
       let validates = 0, currents = 0;
       const observed = {
         ...op,
-        validateRelease: (...args: any[]) => {
+        validateRelease: (...args: Parameters<typeof op.validateRelease>) => {
           validates++;
           return op.validateRelease(...args);
         },
@@ -138,7 +140,7 @@ prairielearn:
       });
       const request = { expectedSources: ["index.qmd", "slides.qmd"] };
       const proof = await adapter.validateCourse(observed, request);
-      assert.deepEqual(proof.documents.map((d: any) => d.format).sort(), [
+      assert.deepEqual(proof.documents.map((d) => d.format).sort(), [
         "html",
         "revealjs",
       ]);
@@ -163,9 +165,9 @@ prairielearn:
         Deno.readTextFile = (() => {
           io++;
           throw Error("unexpected read");
-        }) as any;
-        Deno.readFile = Deno.readTextFile as any;
-        Deno.realPath = Deno.readTextFile as any;
+        });
+        Deno.readFile = () => { io++; throw Error("unexpected read"); };
+        Deno.realPath = () => { io++; throw Error("unexpected read"); };
         await plain.validate(structuredClone(input));
       } finally {
         Deno.readTextFile = read;
@@ -186,31 +188,31 @@ prairielearn:
         ]
       ) {
         const bad = structuredClone(input);
-        bad.nativeMetadata = nativeMetadata;
+        setFixture(bad, ["nativeMetadata"], nativeMetadata);
         await assert.rejects(() => plain.validate(bad));
       }
       const missing = structuredClone(input);
-      delete missing.nativeMetadata;
+      deleteFixture(missing, ["nativeMetadata"]);
       await assert.rejects(() => plain.validate(missing));
       for (
         const [label, change] of [
-          ["source", (v: any) => v.origin.source = "foreign.qmd"],
+          ["source", (v: CorePublic.NativeAdapterValidationInput) => setFixture(v, ["origin", "source"], "foreign.qmd")],
           [
             "witness",
-            (v: any) => v.origin.captureWitness = crypto.randomUUID(),
+            (v: CorePublic.NativeAdapterValidationInput) => setFixture(v, ["origin", "captureWitness"], crypto.randomUUID()),
           ],
-          ["profiles", (v: any) => v.origin.profiles = ["foreign"]],
-          ["generation", (v: any) => v.origin.operation = crypto.randomUUID()],
+          ["profiles", (v: CorePublic.NativeAdapterValidationInput) => setFixture(v, ["origin", "profiles"], ["foreign"])],
+          ["generation", (v: CorePublic.NativeAdapterValidationInput) => setFixture(v, ["origin", "operation"], crypto.randomUUID())],
         ] as const
       ) {
         const mutant = {
           ...op,
-          validateRelease: (r: any, validators: any[]) =>
+          validateRelease: (r: Parameters<typeof op.validateRelease>[0], validators: Parameters<typeof op.validateRelease>[1]) =>
             op.validateRelease(
               r,
-              validators.map((v) => ({
+              (validators ?? []).map((v) => ({
                 ...v,
-                validate: (input: any) => {
+                validate: (input: Parameters<typeof v.validate>[0]) => {
                   const copy = structuredClone(input);
                   change(copy);
                   return v.validate(copy);
@@ -242,9 +244,9 @@ prairielearn:
       // Private proof не меняется от изменения неиспользуемого candidate, новые
       // operation/request обязаны заново приобрести и проверить transport.
       const businessCopy = adapter.business("index.qmd");
-      businessCopy.questions["exr-example"].topic = "MUTATED_LOCAL_COPY";
+      required(businessCopy.questions["exr-example"]).topic = "MUTATED_LOCAL_COPY";
       assert.equal(
-        adapter.business("index.qmd").questions["exr-example"].topic,
+        required(adapter.business("index.qmd").questions["exr-example"]).topic,
         "Git",
       );
       const inputCopy = adapter.validatedInput("index.qmd");
@@ -258,19 +260,19 @@ prairielearn:
       );
       const requestPath = join(folder, "request.json"),
         originalCandidate = await Deno.readTextFile(requestPath);
-      const changedCandidate = JSON.parse(originalCandidate);
-      changedCandidate.inputs[0].captureWitness = crypto.randomUUID();
+      const changedCandidate = record(JSON.parse(originalCandidate));
+      record(required(array(changedCandidate.inputs)[0])).captureWitness = crypto.randomUUID();
       await Deno.writeTextFile(requestPath, JSON.stringify(changedCandidate));
       const readCandidate = Deno.readTextFile;
       let candidateReads = 0;
       try {
-        Deno.readTextFile = ((path: any, ...rest: any[]) => {
+        Deno.readTextFile = ((path, ...rest) => {
           if (String(path) === requestPath) {
             candidateReads++;
             throw Error("UNUSED_CANDIDATE_READ");
           }
-          return (readCandidate as any)(path, ...rest);
-        }) as any;
+          return readCandidate(path, ...rest);
+        });
         assert.equal(await adapter.validateCourse(observed, request), proof);
         assert.equal(candidateReads, 0);
       } finally {

@@ -31,7 +31,7 @@ for (
   }
 }
 const adapter = await extension("course-prairielearn");
-const { nativeEntry } = await import(
+const { nativeEntry }: Pick<typeof import("../../_extensions/course-prairielearn/application/native-entry.ts"), "nativeEntry"> = await import(
   pathToFileURL(join(adapter, "application/native-entry.ts")).href
 );
 for (const variant of ["a", "b"]) {

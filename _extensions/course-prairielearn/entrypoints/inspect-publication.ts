@@ -4,9 +4,10 @@ import { inspectPublication } from "../application/native-publication.ts";
 const args = Deno.args[0] === "--" ? Deno.args.slice(1) : Deno.args;
 const [ownerArg, ...options] = args, flags: Record<string, string> = {};
 for (let i = 0; i < options.length; i += 2) {
-  if (!["--projection", "--profiles", "--output-directory", "--output"].includes(options[i]) ||
-      !options[i + 1] || flags[options[i]]) throw Error("PL unknown/duplicate publication option");
-  flags[options[i]] = options[i + 1];
+  const option = options[i], value = options[i + 1];
+  if (option === undefined || !["--projection", "--profiles", "--output-directory", "--output"].includes(option) ||
+      !value || flags[option]) throw Error("PL unknown/duplicate publication option");
+  flags[option] = value;
 }
 const projection = flags["--projection"];
 if (!ownerArg || !flags["--output-directory"] || (projection !== "student" && projection !== "author")) {

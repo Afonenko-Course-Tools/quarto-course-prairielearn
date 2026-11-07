@@ -1,14 +1,15 @@
+import { required } from "./fixture-values.ts";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { nativeWorkspaceArtifact } from "../_extensions/course-prairielearn/application/native-workspace.ts";
-const sp = Deno.args[0],
-  download = Deno.args[1],
+const sp = required(Deno.args[0]),
+  download = required(Deno.args[1]),
   root = await Deno.makeTempDir({ prefix: "pl-common-seed-" }),
   project = "projects/restore";
-const { zip } = await import(
+const { zip }: Pick<typeof import("project-download/public.ts"), "zip"> = await import(
   pathToFileURL(join(download, "_extensions/project-download/public.ts")).href
 );
-const ref = "8c8622d7be5043f32a611717064bc642a346f1e0",
+const ref = "6b4ffbe35a018678a0bf6bb3e7f99bcf794bf204",
   prefix = "tasks/projects/version-control/restore-selected-state/";
 async function original(path: string) {
   const r = await new Deno.Command("git", {
@@ -80,18 +81,18 @@ const options = {
 };
 const result = await nativeWorkspaceArtifact(options);
 if (
-  !result.files.some((f: any) =>
+  !result.files.some((f) =>
     f.name === "explanation.md" &&
     new TextDecoder().decode(f.bytes).includes("Объясните")
   )
 ) throw Error("common file lost");
 for (
-  const [label, mutation] of [["changed-source", async (o: any) => {
+  const [label, mutation] of [["changed-source", async (o: typeof options) => {
     await put("shared/explanation.md", new TextEncoder().encode("tampered"));
-  }], ["missing-inventory-target", async (o: any) => {
-    o.files = o.files.filter((f: any) => f.name !== "explanation.md");
-  }], ["foreign-common-target", async (o: any) => {
-    o.materialization.projects["exr-restore"]["common-files"][0].target =
+  }], ["missing-inventory-target", async (o: typeof options) => {
+    o.files = o.files.filter((f) => f.name !== "explanation.md");
+  }], ["foreign-common-target", async (o: typeof options) => {
+    required(o.materialization.projects["exr-restore"]["common-files"][0]).target =
       "student/.git/config";
   }]] as const
 ) {
@@ -119,7 +120,7 @@ console.log(JSON.stringify(
     initial: result.initial,
     commonFiles: 1,
     controls: 3,
-    files: result.files.map(({ bytes, ...f }: any) => f),
+    files: result.files.map(({ bytes, ...f }) => f),
     limits:
       "Real immutable SP seed recipe with explicit common-file binding; lower-level host fixture only, no OCI/image/portal claim",
   },

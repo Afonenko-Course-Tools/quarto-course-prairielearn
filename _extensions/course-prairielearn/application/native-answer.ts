@@ -1,5 +1,7 @@
+import type { AnswerFacts } from "course-core/public.ts";
+
 /** Только lowering уже проверенного private Core declaration.answer. YAML/AST здесь не разбираются. */
-export function renderNativeAnswer(answer: any) {
+export function renderNativeAnswer(answer: AnswerFacts) {
   const escape = (s: string) =>
     s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;").replaceAll("{{", "&#123;&#123;").replaceAll(
@@ -26,11 +28,17 @@ export function renderNativeAnswer(answer: any) {
       controls = text("answer", `Номер варианта от 1 до ${answer.count}`);
       break;
     case "multipart":
-      controls = answer.parts.map((part: any) =>
-        part.type === "manual"
-          ? manual(part.name, part.label)
-          : text(part.name, part.label)
-      ).join("\n");
+      controls = answer.parts.map((part) => {
+        switch (part.type) {
+          case "manual":
+            return manual(part.name, part.label);
+          case "numeric":
+            return text(part.name, part.label);
+          default:
+            part satisfies never;
+            throw Error("PL.ANSWER_UNQUALIFIED: canonical Core answer required");
+        }
+      }).join("\n");
       break;
     case "matching":
       controls = "<p>Для каждого условия введите соответствующий вариант: " +
@@ -40,6 +48,7 @@ export function renderNativeAnswer(answer: any) {
         ).join("\n");
       break;
     default:
+      answer satisfies never;
       throw Error("PL.ANSWER_UNQUALIFIED: canonical Core answer required");
   }
   const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(answer))));

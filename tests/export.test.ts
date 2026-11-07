@@ -1,4 +1,5 @@
-import type { PublicBodyPackage } from "course-core/body-export/model.ts";
+import { required, property, record, setFixture, deleteFixture, array, fixtureAt, pandoc as decodePandoc, string } from "./fixture-values.ts";
+import type { PublicBodyPackage } from "course-core/public.ts";
 import { stripVTControlCharacters } from "node:util";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 const assert = (v: unknown, m: string) => {
@@ -40,7 +41,7 @@ const p = (): PublicBodyPackage => ({
   }],
   resources: [],
 });
-const binding = {
+const binding: { questions: { "exr-clamp": Record<string, unknown> } } = {
   questions: {
     "exr-clamp": {
       topic: "Java",
@@ -101,7 +102,7 @@ Deno.test("native PL delivery separates public starter and private tests and kee
       absent = e instanceof Deno.errors.NotFound;
     }
     assert(absent, "reference became public");
-    const info = JSON.parse(await Deno.readTextFile(q + "/info.json"));
+    const info = record(JSON.parse(await Deno.readTextFile(q + "/info.json")));
     assert(
       info.title === "Ограничение диапазона",
       "Native title должен сохранять авторское название",
@@ -116,14 +117,14 @@ Deno.test("native PL delivery separates public starter and private tests and kee
       "native info missing",
     );
     const moved = p();
-    moved.questions[0].source = "moved.qmd";
+    required(moved.questions[0]).source = "moved.qmd";
     await exportPrairieLearn(moved, context, binding, root + "/second");
     assert(
-      JSON.parse(
+      record(JSON.parse(
         await Deno.readTextFile(
           root + "/second/questions/demo/exr-clamp/info.json",
         ),
-      ).uuid === info.uuid,
+      )).uuid === info.uuid,
       "UUID depends on physical path",
     );
   } finally {
@@ -178,7 +179,7 @@ Deno.test("PL refuses questions outside selected work and protects literal templ
       projects: { "exr-clamp": "/projects/clamp" },
     };
     const foreign = p();
-    foreign.works[0].slots = [];
+    required(foreign.works[0]).slots = [];
     let rejected = false;
     try {
       await exportPrairieLearn(foreign, context, binding, root + "/invalid");
@@ -187,7 +188,7 @@ Deno.test("PL refuses questions outside selected work and protects literal templ
     }
     assert(rejected, "unassigned question exported");
     const literal = p();
-    literal.questions[0].condition[0] = {
+    required(literal.questions[0]).condition[0] = {
       t: "Para",
       c: [{ t: "Str", c: "Literal {{closed_answer}}" }],
     };
@@ -280,8 +281,8 @@ Deno.test("ADAPTER binding refusal identifies component, authored question and r
   const root = await Deno.makeTempDir();
   try {
     const bad = structuredClone(binding);
-    bad.questions["exr-clamp"].externalGradingOptions.image = "";
-    let error: any;
+    record(bad.questions["exr-clamp"].externalGradingOptions).image = "";
+    let error: unknown;
     try {
       await exportPrairieLearn(
         p(),
@@ -293,7 +294,7 @@ Deno.test("ADAPTER binding refusal identifies component, authored question and r
       error = e;
     }
     assert(
-      error?.name === "ExtensionDiagnostic" && error.code === "ADAPTER",
+      property(error, "name") === "ExtensionDiagnostic" && property(error, "code") === "ADAPTER",
       "binding refusal is not a known own diagnostic",
     );
     for (
@@ -307,7 +308,7 @@ Deno.test("ADAPTER binding refusal identifies component, authored question and r
         "подсказка",
       ]
     ) {
-      assert(error.message.includes(term), "missing author context: " + term);
+      assert(String(property(error, "message")).includes(term), "missing author context: " + term);
     }
     await noDelivery(root);
   } finally {
@@ -327,17 +328,17 @@ Deno.test("ADAPTER unsupported body and resource retain question field before ou
         ],
       ] as const
     ) {
-      const candidate: any = p();
-      candidate.questions[0].condition = [node];
-      let error: any;
+      const candidate = p();
+      required(candidate.questions[0]).condition = [node];
+      let error: unknown;
       try {
         await exportPrairieLearn(candidate, context, binding, root + "/out");
       } catch (e) {
         error = e;
       }
       assert(
-        error?.code === "ADAPTER" && error.message.includes("tasks.qmd") &&
-          error.message.includes("exr-clamp") && error.message.includes(field),
+        property(error, "code") === "ADAPTER" && String(property(error, "message")).includes("tasks.qmd") &&
+          String(property(error, "message")).includes("exr-clamp") && String(property(error, "message")).includes(field),
         "unsupported body lost author context",
       );
       await noDelivery(root);
@@ -356,7 +357,7 @@ Deno.test("Pandoc command failure preserves tool exit stdout stderr and cause wi
     );
     await Deno.chmod(tool, 0o755);
     Deno.env.set("QUARTO", tool);
-    let error: any;
+    let error: unknown;
     try {
       await exportPrairieLearn(
         p(),
@@ -368,20 +369,20 @@ Deno.test("Pandoc command failure preserves tool exit stdout stderr and cause wi
       error = e;
     }
     assert(
-      error?.name === "ExternalToolFailure" && error.tool === tool &&
-        error.exitCode === 17,
+      property(error, "name") === "ExternalToolFailure" && property(error, "tool") === tool &&
+        property(error, "exitCode") === 17,
       "external command reclassified or exit lost",
     );
     assert(
-      error.stdout === "foreign stdout" &&
-        error.stderr === "PANDOC_FOREIGN: original details" &&
-        error.cause?.code === 17,
+      property(error, "stdout") === "foreign stdout" &&
+        property(error, "stderr") === "PANDOC_FOREIGN: original details" &&
+        property(property(error, "cause"), "code") === 17,
       "external streams or cause lost",
     );
     assert(
-      !error.message.includes("ADAPTER") &&
-        error.message.includes("tasks.qmd") &&
-        error.message.includes("exr-clamp"),
+      !String(property(error, "message")).includes("ADAPTER") &&
+        String(property(error, "message")).includes("tasks.qmd") &&
+        String(property(error, "message")).includes("exr-clamp"),
       "external failure lacks execution context",
     );
     await noDelivery(root);
@@ -403,11 +404,11 @@ Deno.test("staged filesystem failure removes partial delivery and retains unknow
       visibility: "public",
       data: btoa("resource"),
     });
-    candidate.questions[0].condition = [{
+    required(candidate.questions[0]).condition = [{
       t: "Para",
       c: [{ t: "Image", c: [["", [], []], [], ["Clamp.java/image.png", ""]] }],
     }];
-    let error: any;
+    let error: unknown;
     try {
       await exportPrairieLearn(
         candidate,
@@ -419,7 +420,7 @@ Deno.test("staged filesystem failure removes partial delivery and retains unknow
       error = e;
     }
     assert(
-      error instanceof Error && error.name !== "ExtensionDiagnostic" &&
+      error instanceof Error && property(error, "name") !== "ExtensionDiagnostic" &&
         !!error.stack,
       "unexpected filesystem error was suppressed",
     );
@@ -513,6 +514,7 @@ Deno.test("CLI preserves foreign Core diagnostic and unknown stack", async () =>
         ['throw new Error("unexpected internal export fault");', false],
       ] as const
     ) {
+      await Deno.writeTextFile(core + "/public.ts", 'export {withNativeCaptureScope} from "./capture.ts";\n');
       await Deno.writeTextFile(
         core + "/capture.ts",
         "export async function withNativeCaptureScope() {" + source + "}\n",
@@ -548,19 +550,19 @@ Deno.test("ADAPTER invalid resource encoding keeps original cause and resource f
   const root = await Deno.makeTempDir();
   try {
     const candidate = p();
-    candidate.resources = [{
+    setFixture(candidate, ["resources"], [{
       owner: "demo",
       source: "tasks.qmd",
       effectiveBase: ".",
       target: "image.png",
       visibility: "public",
       data: "!",
-    }];
-    candidate.questions[0].condition = [{
+    }]);
+    required(candidate.questions[0]).condition = [{
       t: "Para",
       c: [{ t: "Image", c: [["", [], []], [], ["image.png", ""]] }],
     }];
-    let error: any;
+    let error: unknown;
     try {
       await exportPrairieLearn(
         candidate,
@@ -572,9 +574,9 @@ Deno.test("ADAPTER invalid resource encoding keeps original cause and resource f
       error = e;
     }
     assert(
-      error?.code === "ADAPTER" && error.message.includes("exr-clamp") &&
-        error.message.includes("resources.data") &&
-        error.cause instanceof Error,
+      property(error, "code") === "ADAPTER" && String(property(error, "message")).includes("exr-clamp") &&
+        String(property(error, "message")).includes("resources.data") &&
+        property(error, "cause") instanceof Error,
       "resource diagnostic suppressed encoding cause or author context",
     );
     await noDelivery(root);
@@ -588,6 +590,7 @@ Deno.test("CLI retains unknown cause stack when known wrapper quotes its message
     const core = root + "/bank/_extensions/course-core";
     await Deno.mkdir(core, { recursive: true });
     await writeCliCorrelationCandidate(root);
+    await Deno.writeTextFile(core + "/public.ts", 'export {withNativeCaptureScope} from "./capture.ts";\n');
     await Deno.writeTextFile(
       core + "/capture.ts",
       `export async function withNativeCaptureScope() {
@@ -624,30 +627,30 @@ Deno.test("PL accepts restricted participant-safe statements and new assignment 
   const root = await Deno.makeTempDir();
   try {
     const context = await projectFixture(root);
-    for (const kind of ["lab", "seminar", "practical", "test"]) {
-      const candidate: any = p();
-      candidate.works[0].kind = kind;
-      candidate.works[0].theoryTime = 2.5;
-      candidate.works[0].slots[0].assignment = {
+    for (const kind of ["lab", "seminar", "practical", "test"] satisfies PublicBodyPackage["works"][number]["kind"][]) {
+      const candidate = p();
+      required(candidate.works[0]).kind = kind;
+      required(candidate.works[0]).theoryTime = 2.5;
+      required(required(candidate.works[0]).slots[0]).assignment = {
         stage: "homework",
         requirement: "optional",
         workMode: "pair",
       };
       await exportPrairieLearn(candidate, context, binding, root + "/" + kind);
-      const delivery = JSON.parse(
+      const delivery = record(JSON.parse(
         await Deno.readTextFile(root + "/" + kind + "/delivery.json"),
-      );
+      ));
       assert(
-        delivery.works[0].theoryTime === 2.5 &&
-          delivery.works[0].slots[0].assignment.workMode === "pair",
+        fixtureAt(delivery, ["works", 0, "theoryTime"]) === 2.5 &&
+          fixtureAt(delivery, ["works", 0, "slots", 0, "assignment", "workMode"]) === "pair",
         "assignment metadata lost",
       );
     }
-    const demonstration: any = p();
-    demonstration.questions[0].statementVisibility = "open";
-    demonstration.questions[0].purpose = "demonstration";
-    demonstration.questions[0].hasPublicSolution = true;
-    demonstration.works[0].slots[0].assignment.stage = "demonstration";
+    const demonstration = p();
+    required(demonstration.questions[0]).statementVisibility = "open";
+    required(demonstration.questions[0]).purpose = "demonstration";
+    required(demonstration.questions[0]).hasPublicSolution = true;
+    required(required(demonstration.works[0]).slots[0]).assignment.stage = "demonstration";
     await exportPrairieLearn(
       demonstration,
       context,
@@ -662,108 +665,105 @@ Deno.test("PL standalone guards reject invalid work, assignment and statement po
   const root = await Deno.makeTempDir();
   try {
     const context = await projectFixture(root);
-    const cases: [string, (p: any) => void][] = [
-      ["null work", (p) => p.works[0] = null],
-      ["null question", (p) => p.questions[0] = null],
-      ["missing slots", (p) => delete p.works[0].slots],
-      ["old assignments", (p) => p.works[0].assignments = {}],
-      ["old items", (p) => p.works[0].items = []],
-      ["unqualified slot", (p) => p.works[0].slots[0].id = "exr-clamp"],
+    const cases: [string, (p: PublicBodyPackage) => void][] = [
+      ["null work", (p) => setFixture(p, ["works", 0], null)],
+      ["null question", (p) => setFixture(p, ["questions", 0], null)],
+      ["missing slots", (p) => deleteFixture(p, ["works", 0, "slots"])],
+      ["old assignments", (p) => setFixture(p, ["works", 0, "assignments"], {})],
+      ["old items", (p) => setFixture(p, ["works", 0, "items"], [])],
+      ["unqualified slot", (p) => setFixture(p, ["works", 0, "slots", 0, "id"], "exr-clamp")],
       [
         "foreign candidate",
-        (p) => p.works[0].slots[0].candidates = ["other/exr-clamp"],
+        (p) => setFixture(p, ["works", 0, "slots", 0, "candidates"], ["other/exr-clamp"]),
       ],
-      ["missing assignment", (p) => delete p.works[0].slots[0].assignment],
+      ["missing assignment", (p) => deleteFixture(p, ["works", 0, "slots", 0, "assignment"])],
       [
         "missing requirement",
-        (p) => delete p.works[0].slots[0].assignment.requirement,
+        (p) => deleteFixture(p, ["works", 0, "slots", 0, "assignment", "requirement"]),
       ],
       [
         "missing workMode",
-        (p) => delete p.works[0].slots[0].assignment.workMode,
+        (p) => deleteFixture(p, ["works", 0, "slots", 0, "assignment", "workMode"]),
       ],
       [
         "unknown assignment field",
-        (p) => p.works[0].slots[0].assignment.extra = true,
+        (p) => setFixture(p, ["works", 0, "slots", 0, "assignment", "extra"], true),
       ],
       [
         "invalid stage",
-        (p) => p.works[0].slots[0].assignment.stage = "lecture",
+        (p) => setFixture(p, ["works", 0, "slots", 0, "assignment", "stage"], "lecture"),
       ],
       [
         "invalid requirement",
-        (p) => p.works[0].slots[0].assignment.requirement = "mandatory",
+        (p) => setFixture(p, ["works", 0, "slots", 0, "assignment", "requirement"], "mandatory"),
       ],
       [
         "invalid work mode",
-        (p) => p.works[0].slots[0].assignment.workMode = "team",
+        (p) => setFixture(p, ["works", 0, "slots", 0, "assignment", "workMode"], "team"),
       ],
-      ["legacy kind", (p) => p.works[0].kind = "handout"],
-      ["foreign owner", (p) => p.works[0].owner = "other"],
-      ["invalid work key", (p) => p.works[0].key = "demo/other"],
-      ["missing title", (p) => delete p.works[0].title],
-      ["empty source", (p) => p.works[0].source = ""],
-      ["unknown work field", (p) => p.works[0].preview = "hidden"],
-      ["zero theory time", (p) => p.works[0].theoryTime = 0],
-      ["infinite theory time", (p) => p.works[0].theoryTime = Infinity],
+      ["legacy kind", (p) => setFixture(p, ["works", 0, "kind"], "handout")],
+      ["foreign owner", (p) => setFixture(p, ["works", 0, "owner"], "other")],
+      ["invalid work key", (p) => setFixture(p, ["works", 0, "key"], "demo/other")],
+      ["missing title", (p) => deleteFixture(p, ["works", 0, "title"])],
+      ["empty source", (p) => setFixture(p, ["works", 0, "source"], "")],
+      ["unknown work field", (p) => setFixture(p, ["works", 0, "preview"], "hidden")],
+      ["zero theory time", (p) => setFixture(p, ["works", 0, "theoryTime"], 0)],
+      ["infinite theory time", (p) => setFixture(p, ["works", 0, "theoryTime"], Infinity)],
       [
         "missing statement policy",
-        (p) => delete p.questions[0].statementVisibility,
+        (p) => deleteFixture(p, ["questions", 0, "statementVisibility"]),
       ],
       [
         "invalid statement policy",
-        (p) => p.questions[0].statementVisibility = "public",
+        (p) => setFixture(p, ["questions", 0, "statementVisibility"], "public"),
       ],
       [
         "missing solution witness",
-        (p) => delete p.questions[0].hasPublicSolution,
+        (p) => deleteFixture(p, ["questions", 0, "hasPublicSolution"]),
       ],
-      ["invalid witness", (p) => p.questions[0].hasPublicSolution = 1],
-      ["invalid purpose", (p) => p.questions[0].purpose = "reading"],
+      ["invalid witness", (p) => setFixture(p, ["questions", 0, "hasPublicSolution"], 1)],
+      ["invalid purpose", (p) => setFixture(p, ["questions", 0, "purpose"], "reading")],
       ["test open condition", (p) => {
-        p.works[0].kind = "test";
-        p.questions[0].statementVisibility = "open";
+        setFixture(p, ["works", 0, "kind"], "test");
+        setFixture(p, ["questions", 0, "statementVisibility"], "open");
       }],
       ["practical open condition", (p) => {
-        p.works[0].kind = "practical";
-        p.questions[0].statementVisibility = "open";
+        setFixture(p, ["works", 0, "kind"], "practical");
+        setFixture(p, ["questions", 0, "statementVisibility"], "open");
       }],
       ["restricted demonstration", (p) => {
-        p.works[0].slots[0].assignment.stage = "demonstration";
-        p.questions[0].purpose = "demonstration";
-        p.questions[0].hasPublicSolution = true;
+        setFixture(p, ["works", 0, "slots", 0, "assignment", "stage"], "demonstration");
+        setFixture(p, ["questions", 0, "purpose"], "demonstration");
+        setFixture(p, ["questions", 0, "hasPublicSolution"], true);
       }],
       ["demonstration without purpose", (p) => {
-        p.works[0].slots[0].assignment.stage = "demonstration";
-        p.questions[0].statementVisibility = "open";
-        p.questions[0].hasPublicSolution = true;
+        setFixture(p, ["works", 0, "slots", 0, "assignment", "stage"], "demonstration");
+        setFixture(p, ["questions", 0, "statementVisibility"], "open");
+        setFixture(p, ["questions", 0, "hasPublicSolution"], true);
       }],
       ["demonstration without public solution", (p) => {
-        p.works[0].slots[0].assignment.stage = "demonstration";
-        p.questions[0].statementVisibility = "open";
-        p.questions[0].purpose = "demonstration";
+        setFixture(p, ["works", 0, "slots", 0, "assignment", "stage"], "demonstration");
+        setFixture(p, ["questions", 0, "statementVisibility"], "open");
+        setFixture(p, ["questions", 0, "purpose"], "demonstration");
       }],
       [
         "private participant payload",
-        (p) => p.questions[0].visibility = "private",
+        (p) => setFixture(p, ["questions", 0, "visibility"], "private"),
       ],
-      ...["solution", "closedKey", "gradingNotes"].map((field) =>
-        [field, (p: any) => p.questions[0][field] = []] as [
-          string,
-          (p: any) => void,
-        ]
+      ...["solution", "closedKey", "gradingNotes"].map((field): [string, (p: PublicBodyPackage) => void] =>
+        [field, (p: PublicBodyPackage) => setFixture(p, ["questions", 0, field], [])]
       ),
     ];
     for (const [name, mutate] of cases) {
-      const candidate: any = p();
+      const candidate = p();
       mutate(candidate);
-      let error: any;
+      let error: unknown;
       try {
         await exportPrairieLearn(candidate, context, binding, root + "/out");
       } catch (e) {
         error = e;
       }
-      assert(error?.code === "ADAPTER", "accepted invalid " + name);
+      assert(property(error, "code") === "ADAPTER", "accepted invalid " + name);
       await noDelivery(root);
     }
   } finally {
@@ -784,19 +784,19 @@ Deno.test("PL restricted conditions retain closed-marker and resource safety gua
         "grading-notes",
       ]
     ) {
-      const candidate: any = p();
-      candidate.questions[0].condition = [{
+      const candidate = p();
+      required(candidate.questions[0]).condition = [{
         t: "Div",
         c: [["", [marker], []], []],
       }];
-      let error: any;
+      let error: unknown;
       try {
         await exportPrairieLearn(candidate, context, binding, root + "/out");
       } catch (e) {
         error = e;
       }
       assert(
-        error?.code === "ADAPTER" && error.message.includes("condition"),
+        property(error, "code") === "ADAPTER" && String(property(error, "message")).includes("condition"),
         "restricted closed marker escaped: " + marker,
       );
       await noDelivery(root);
@@ -808,25 +808,25 @@ Deno.test("PL restricted conditions retain closed-marker and resource safety gua
         ["invalid resource encoding", "image.png", "public", "incorrect"],
       ]
     ) {
-      const candidate: any = p();
-      candidate.questions[0].condition = [{
+      const candidate = p();
+      required(candidate.questions[0]).condition = [{
         t: "Para",
         c: [{ t: "Image", c: [["", [], []], [], [target, ""]] }],
       }];
-      candidate.resources = [{
+      setFixture(candidate, ["resources"], [{
         owner: "demo",
         target,
         visibility,
         data: hash === "incorrect" ? "!!!!" : btoa("image"),
-      }];
-      let error: any;
+      }]);
+      let error: unknown;
       try {
         await exportPrairieLearn(candidate, context, binding, root + "/out");
       } catch (e) {
         error = e;
       }
       assert(
-        error?.code === "ADAPTER" && error.message.includes("resource"),
+        property(error, "code") === "ADAPTER" && String(property(error, "message")).includes("resource"),
         "restricted unsafe resource escaped: " + name,
       );
       await noDelivery(root);
@@ -862,7 +862,7 @@ Deno.test("editor delivery exposes only inline accepted starter code and keeps t
       root + "/project/reference/Clamp.java",
       "PRIVATE_REFERENCE",
     );
-    const b = structuredClone(binding) as any;
+    const b = structuredClone(binding);
     b.questions["exr-clamp"].submission = {
       mode: "editor",
       aceMode: "ace/mode/java",
@@ -907,7 +907,7 @@ Deno.test("editor delivery exposes only inline accepted starter code and keeps t
       await Deno.readTextFile(q + "/tests/grade.sh") === "PRIVATE_CHECKS",
       "checks missing",
     );
-    const uploadInfo = JSON.parse(await Deno.readTextFile(q + "/info.json"));
+    const uploadInfo = record(JSON.parse(await Deno.readTextFile(q + "/info.json")));
     assert(uploadInfo.gradingMethod === "External", "grader contract changed");
   } finally {
     await Deno.remove(root, { recursive: true });
@@ -935,7 +935,7 @@ Deno.test("editor refuses unknown mode, unsafe mode, missing or non-text starter
         aceMode: 'ace/mode/java" onclick="bad',
       }, { mode: "editor", unexpected: true }]
     ) {
-      const b = structuredClone(binding) as any;
+      const b = structuredClone(binding);
       b.questions["exr-clamp"].submission = submission;
       let refused = false;
       try {
@@ -945,7 +945,7 @@ Deno.test("editor refuses unknown mode, unsafe mode, missing or non-text starter
       }
       assert(refused, "bad submission contract accepted");
     }
-    const b = structuredClone(binding) as any;
+    const b = structuredClone(binding);
     b.questions["exr-clamp"].submission = { mode: "editor" };
     await Deno.remove(root + "/project/student/Clamp.java");
     await Deno.writeTextFile(
@@ -988,7 +988,7 @@ Deno.test("literal Mustache in editor filenames is escaped in native attributes"
     await Deno.mkdir(root + "/project/tests");
     await Deno.writeTextFile(root + "/project/student/{{literal}}.txt", "text");
     await Deno.writeTextFile(root + "/project/tests/grade.sh", "checks");
-    const b = structuredClone(binding) as any;
+    const b = structuredClone(binding);
     b.questions["exr-clamp"].files = ["{{literal}}.txt"];
     b.questions["exr-clamp"].submission = { mode: "editor" };
     await exportPrairieLearn(
@@ -1021,7 +1021,7 @@ Deno.test("question repeat policy preserves authored true/false and omits absent
     await Deno.writeTextFile(root + "/project/student/Clamp.java", "starter");
     await Deno.writeTextFile(root + "/project/tests/grade.sh", "test");
     for (const value of [undefined, true, false]) {
-      const b: any = structuredClone(binding);
+      const b = structuredClone(binding);
       if (value !== undefined) b.questions["exr-clamp"].singleVariant = value;
       const out = root + "/out-" + String(value);
       await exportPrairieLearn(
@@ -1030,9 +1030,9 @@ Deno.test("question repeat policy preserves authored true/false and omits absent
         b,
         out,
       );
-      const info = JSON.parse(
+      const info = record(JSON.parse(
         await Deno.readTextFile(out + "/questions/demo/exr-clamp/info.json"),
-      );
+      ));
       assert(
         value === undefined
           ? !Object.hasOwn(info, "singleVariant")
@@ -1056,8 +1056,8 @@ Deno.test("Body v2 rejects non-string relatedExercise without publishing output"
     );
     await Deno.writeTextFile(root + "/projects/clamp/tests/grade.sh", "tests");
     for (const value of [["exr-clamp"], null, 42, { id: "exr-clamp" }]) {
-      const body: any = p();
-      body.works[0].relatedExercise = value;
+      const body = p();
+      setFixture(body, ["works", 0, "relatedExercise"], value);
       const out = root + "/out";
       let refused = false;
       try {
@@ -1097,7 +1097,7 @@ Deno.test("PL native projection omits bibliography and preserves namespaced sema
       "STARTER",
     );
     await Deno.writeTextFile(root + "/projects/clamp/tests/grade.sh", "TESTS");
-    const candidate: any = p();
+    const candidate = p();
     const condition = [{
       t: "Para",
       c: [
@@ -1127,13 +1127,13 @@ Deno.test("PL native projection omits bibliography and preserves namespaced sema
         }]],
       }]],
     }];
-    candidate.questions[0].condition = condition;
+    required(candidate.questions[0]).condition = condition;
     candidate.questions.push({
-      ...structuredClone(candidate.questions[0]),
+      ...structuredClone(required(candidate.questions[0])),
       id: "exr-other",
       key: "demo/exr-other",
     });
-    candidate.works[0].slots.push({
+    required(candidate.works[0]).slots.push({
       id: "demo/sec-lab/exr-other",
       selection: "fixed",
       candidates: ["demo/exr-other"],
@@ -1219,8 +1219,8 @@ Deno.test("PL local anchor boundary rejects missing or duplicate targets and kee
       }],
     ];
     for (let i = 0; i < cases.length; i++) {
-      const candidate: any = p();
-      candidate.questions[0].condition = cases[i];
+      const candidate = p();
+      required(candidate.questions[0]).condition = required(cases[i]);
       let rejected = false;
       try {
         await exportPrairieLearn(
@@ -1230,7 +1230,7 @@ Deno.test("PL local anchor boundary rejects missing or duplicate targets and kee
           root + "/out-" + i,
         );
       } catch (e) {
-        rejected = (e as any)?.code === "ADAPTER" &&
+        rejected = property(e, "code") === "ADAPTER" &&
           String(e).includes("condition");
       }
       assert(
@@ -1260,29 +1260,29 @@ Deno.test("PL real Pandoc Table semantic attrs namespace all targets across ques
       stderr: "piped",
     }).output();
     assert(result.success, "native Pandoc Table failed");
-    const ast = JSON.parse(new TextDecoder().decode(result.stdout)),
-      table = ast.blocks[0];
+    const ast = decodePandoc(JSON.parse(new TextDecoder().decode(result.stdout))),
+      table = required(ast.blocks[0]);
     assert(table.t === "Table", "real Pandoc Table required");
     const c = table.c,
-      headRow = c[3][1][0],
-      bodyRow = c[4][0][3][0],
+      headRow = fixtureAt(c, [3, 1, 0]),
+      bodyRow = fixtureAt(c, [4, 0, 3, 0]),
       footRow = structuredClone(bodyRow);
-    c[5][1] = [footRow];
+    setFixture(c, [5, 1], [footRow]);
     const intermediateRow = structuredClone(headRow);
-    c[4][0][2] = [intermediateRow];
+    setFixture(c, [4, 0, 2], [intermediateRow]);
     const attrs = [
-      c[0],
-      c[3][0],
-      c[4][0][0],
-      c[5][0],
-      headRow[0],
-      headRow[1][0][0],
-      bodyRow[0],
-      bodyRow[1][0][0],
-      footRow[0],
-      footRow[1][0][0],
-      intermediateRow[0],
-      intermediateRow[1][0][0],
+      fixtureAt(c, [0]),
+      fixtureAt(c, [3, 0]),
+      fixtureAt(c, [4, 0, 0]),
+      fixtureAt(c, [5, 0]),
+      fixtureAt(headRow, [0]),
+      fixtureAt(headRow, [1, 0, 0]),
+      fixtureAt(bodyRow, [0]),
+      fixtureAt(bodyRow, [1, 0, 0]),
+      fixtureAt(footRow, [0]),
+      fixtureAt(footRow, [1, 0, 0]),
+      fixtureAt(intermediateRow, [0]),
+      fixtureAt(intermediateRow, [1, 0, 0]),
     ];
     const targets = [
       "table-root",
@@ -1298,7 +1298,7 @@ Deno.test("PL real Pandoc Table semantic attrs namespace all targets across ques
       "intermediate-row",
       "intermediate-cell",
     ];
-    attrs.forEach((a: any, i: number) => a[0] = targets[i]);
+    attrs.forEach((a: unknown, i: number) => setFixture(a, [0], required(targets[i])));
     ast.blocks.push({
       t: "Para",
       c: targets.flatMap(
@@ -1308,15 +1308,15 @@ Deno.test("PL real Pandoc Table semantic attrs namespace all targets across ques
         }, { t: "Space" }],
       ),
     });
-    const candidate: any = p();
+    const candidate = p();
     candidate.apiVersion = ast["pandoc-api-version"];
-    candidate.questions[0].condition = ast.blocks;
+    required(candidate.questions[0]).condition = ast.blocks;
     candidate.questions.push({
-      ...structuredClone(candidate.questions[0]),
+      ...structuredClone(required(candidate.questions[0])),
       id: "exr-other",
       key: "demo/exr-other",
     });
-    candidate.works[0].slots.push({
+    required(candidate.works[0]).slots.push({
       id: "demo/sec-lab/exr-other",
       selection: "fixed",
       candidates: ["demo/exr-other"],
@@ -1348,18 +1348,17 @@ Deno.test("PL real Pandoc Table semantic attrs namespace all targets across ques
     for (const html of htmls) {
       assert(
         ids(html).length === targets.length && ids(html).every((id) =>
-          id.startsWith("pl-")
+          required(id).startsWith("pl-")
         ) && links(html).every((id) => ids(html).includes(id)),
         "semantic Table IDs or links not namespaced/preserved",
       );
     }
     assert(
-      ids(htmls[0]).every((id) => !ids(htmls[1]).includes(id)),
+      ids(required(htmls[0])).every((id) => !ids(required(htmls[1])).includes(id)),
       "semantic Table targets collide across questions",
     );
     const duplicate = structuredClone(candidate);
-    duplicate.questions[0].condition[0].c[4][0][3][0][1][0][0][0] =
-      "table-root";
+    setFixture(duplicate, ["questions", 0, "condition", 0, "c", 4, 0, 3, 0, 1, 0, 0, 0], "table-root");
     let rejected = false;
     try {
       await exportPrairieLearn(
@@ -1369,7 +1368,7 @@ Deno.test("PL real Pandoc Table semantic attrs namespace all targets across ques
         root + "/duplicate",
       );
     } catch (e) {
-      rejected = (e as any)?.code === "ADAPTER" &&
+      rejected = property(e, "code") === "ADAPTER" &&
         String(e).includes("Повторная цель");
     }
     assert(rejected, "duplicate semantic Table/Cell target accepted");
@@ -1488,7 +1487,7 @@ Deno.test("Java формы взаимоисключающие по точным 
       await Deno.mkdir(root + project + "/tests", { recursive: true });
       await Deno.writeTextFile(root + project + "/tests/grade.sh", "PRIVATE_TEST");
       for (const primaryRequired of [false, true]) {
-        const b = structuredClone(binding) as any;
+        const b = structuredClone(binding);
         Object.assign(b.questions["exr-clamp"], { files: test.names,
           submission: { mode: "upload", layout: "files-or-zip" },
           additionalJavaSources: { ...policy, primaryRequired, allowAdditional: true } });
@@ -1540,8 +1539,8 @@ assertEquals(42, Clamp.value());
       assert(result.success, "ordinary Pandoc conversion failed");
       return new TextDecoder().decode(result.stdout);
     };
-    const ast = JSON.parse(await pandoc("json"));
-    assert(ast.blocks[0].t === "Div" && ast.blocks[0].c[0][1].includes("public-tests"),
+    const ast = decodePandoc(JSON.parse(await pandoc("json")));
+    assert(required(ast.blocks[0]).t === "Div" && array(fixtureAt(required(ast.blocks[0]).c, [0, 1])).includes("public-tests"),
       "fixture must use a real ordinary Pandoc Div");
     const readme = await pandoc("gfm");
     const publicJUnit = "import org.junit.jupiter.api.Test;\nimport static org.junit.jupiter.api.Assertions.assertEquals;\nclass PublicChecks { @Test void result() { assertEquals(42, Clamp.value()); } }\n";
@@ -1555,9 +1554,9 @@ assertEquals(42, Clamp.value());
     await Deno.writeTextFile(root + "/project/tests/grade.sh", "PRIVATE_CHECKS");
     const body = p();
     body.apiVersion = ast["pandoc-api-version"];
-    body.questions[0].condition = ast.blocks;
-    const original = JSON.stringify(body.questions[0].condition);
-    const b = structuredClone(binding) as any;
+    required(body.questions[0]).condition = ast.blocks;
+    const original = JSON.stringify(required(body.questions[0]).condition);
+    const b = structuredClone(binding);
     b.questions["exr-clamp"].submission = {mode: "editor", aceMode: "ace/mode/java"};
     await exportPrairieLearn(body, {
       nativeBody: true, projectRoot: root, projects: {"exr-clamp": "/project"},
@@ -1571,7 +1570,7 @@ assertEquals(42, Clamp.value());
     }
     assert(!html.includes("PRIVATE_CHECKS") && !html.includes("pl-file-upload"),
       "private files or mixed submission controls leaked");
-    assert(JSON.stringify(body.questions[0].condition) === original, "Body was mutated");
+    assert(JSON.stringify(required(body.questions[0]).condition) === original, "Body was mutated");
     assert(await Deno.readTextFile(base + "/clientFilesQuestion/starter/README.md") === readme,
       "supplied ordinary README changed");
     assert(await Deno.readTextFile(base + "/clientFilesQuestion/starter/src/test/java/PublicChecks.java") === publicJUnit,

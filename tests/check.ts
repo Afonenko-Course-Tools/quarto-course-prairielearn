@@ -22,6 +22,7 @@ try {
   const map = resolve(temporary, "imports.json");
   await writeNativeCoreImportMap(core, map);
   for (const [command, ...args] of commands) {
+    if (!command) throw Error("Пустая команда проверки");
     const r = await new Deno.Command(Deno.execPath(), {
       args: [command, "--import-map", map, ...args],
       cwd: repo,

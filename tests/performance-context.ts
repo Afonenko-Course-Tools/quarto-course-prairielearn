@@ -1,3 +1,4 @@
+import { required, record } from "./fixture-values.ts";
 import { strict as assert } from "node:assert";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -5,7 +6,7 @@ import { createMetrics } from "../_extensions/course-prairielearn/observability/
 
 import { installTsAgent } from "./fixtures/performance-agent.ts";
 const root = await Deno.makeTempDir();
-const registry = globalThis as unknown as Record<symbol, unknown>;
+const registry = globalThis;
 const key = Symbol.for("course.performance.agent.v1");
 const prior = Deno.env.get("COURSE_PERF_MODE");
 try {
@@ -44,13 +45,13 @@ try {
   };
   metrics.wrapSync(spec, fn)();
   metrics.wrapSync({ id: "batch", kind: "function" }, fn)();
-  const begins = agent.events.filter((event: any) => event.event === "begin");
-  assert.equal(begins[0].document_id, "source.qmd");
-  assert.deepEqual(begins[0].attributes, {
+  const begins = agent.events.filter(event => event.event === "begin");
+  assert.equal(required(begins[0], "first begin event").document_id, "source.qmd");
+  assert.deepEqual(required(begins[0], "first begin event").attributes, {
     extension_id: "course-prairielearn",
     functional: 7,
   });
-  assert.equal(begins[1].document_id, undefined);
+  assert.equal(required(begins[1], "second begin event").document_id, undefined);
   assert.equal(spec.attributes.extension_id, "wrong");
   console.log(
     "PASS фасад: extension/document, batch без document, off identity",
@@ -126,12 +127,12 @@ finally{agent.flush()}
         /native inspect probe failure/,
       );
       const rows = (await Deno.readTextFile(log)).trim().split("\n").map(
-        (line) => JSON.parse(line),
+        (line) => record(JSON.parse(line)),
       );
       assert.equal(rows.length, 1);
       const events = (await Deno.readTextFile(
         join(root, "events/actual-entrypoint/ts.jsonl"),
-      )).trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+      )).trim().split("\n").filter(Boolean).map((line) => record(JSON.parse(line)));
       const command = events.find((event) =>
         event.event === "begin" &&
         event.operation_id === "course-prairielearn.application.export.command"
@@ -143,10 +144,10 @@ finally{agent.flush()}
       if (entrypoint === "render-public-body") {
         assert(command, "существующая command boundary записана");
         assert.equal(command.document_id, undefined);
-        assert.equal(command.attributes.extension_id, "course-prairielearn");
+        assert.equal(record(command.attributes).extension_id, "course-prairielearn");
         assert.equal(
           command.parent_span_id,
-          linked ? caller.span_id : undefined,
+          linked ? required(caller, "caller span").span_id : undefined,
         );
       }
       for (const row of rows) {
@@ -155,7 +156,7 @@ finally{agent.flush()}
           entrypoint === "render-public-body"
             ? command?.span_id
             : linked
-            ? caller.span_id
+            ? required(caller, "caller span").span_id
             : null,
           `${entrypoint}: stale/incorrect parent`,
         );
@@ -173,16 +174,16 @@ finally{agent.flush()}
         );
         assert.equal(row.profile, "student");
         assert.equal(row.cwd, Deno.cwd());
-        const summary = JSON.parse(
+        const summary = record(JSON.parse(
           await Deno.readTextFile(
             join(root, "events/actual-entrypoint/ts.summary.json"),
           ),
-        );
+        ));
         assert.equal(row.ppid, summary.os_pid);
         assert(row.pid !== row.ppid);
       }
       assert.deepEqual(
-        rows.at(-1).args,
+        required(rows.at(-1), "last child row").args,
         entrypoint === "render-public-body"
           ? ["pandoc", "--from=json", "--to=html5", "--mathml"]
           : ["inspect", join(root, "tasks")],

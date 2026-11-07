@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import type * as CorePublic from "course-core/public.ts";
 import { pathToFileURL } from "node:url";
 const Core: typeof CorePublic = await import(
@@ -90,7 +91,7 @@ const options = {
 };
 const selected = await selectNativeCompilerInputs(options);
 if (
-  selected.references[0].files.map((x) => x.name).join(",") !==
+  required(selected.references[0]).files.map((x) => x.name).join(",") !==
     "Example.java,Study.java"
 ) throw Error("reference helper not preserved");
 if (
@@ -110,17 +111,17 @@ for (
     ],
     [
       "trusted-starter",
-      (o: typeof options) => o.full.files[2].reason = "starter",
+      (o: typeof options) => required(o.full.files[2]).reason = "starter",
     ],
-    ["foreign-role", (o: typeof options) => o.full.files[4].reason = "starter"],
-    ["changed-bytes", (o: typeof options) => o.full.files[4].bytes[0] = 0],
+    ["foreign-role", (o: typeof options) => required(o.full.files[4]).reason = "starter"],
+    ["changed-bytes", (o: typeof options) => required(o.full.files[4]).bytes[0] = 0],
     ["non-source-helper", (o: typeof options) => {
-      o.full.files[4].target = "author/alternate/src/main/java/evil.txt";
+      required(o.full.files[4]).target = "author/alternate/src/main/java/evil.txt";
       o.check.sourceProfile.include = ["**/*"];
     }],
     ["oversized-helper", async (o: typeof options) => {
       const f = o.full.files[4];
-      f.bytes = new Uint8Array(1048577);
+      required(f).bytes = new Uint8Array(1048577);
     }],
   ] as const
 ) {
@@ -138,7 +139,7 @@ for (
 console.log(
   JSON.stringify(
     {
-      referenceHelpers: selected.references[0].files.map((x) => x.name),
+      referenceHelpers: required(selected.references[0]).files.map((x) => x.name),
       controls: 7,
       descriptor: selected.descriptor,
     },

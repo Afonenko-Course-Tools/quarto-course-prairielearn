@@ -12,7 +12,18 @@ const legacyBoundary = Deno.args.includes("--legacy-boundary");
 const temporary = await Deno.makeTempDir({ prefix: "pl-core-typecheck-" });
 try {
   const map = resolve(temporary, "imports.json");
-  await writeNativeCoreImportMap(Deno.args[0], map);
+  const dependency = (flag: string): string | undefined => {
+    const index = Deno.args.indexOf(flag);
+    if (index < 0) return undefined;
+    const value = Deno.args[index + 1];
+    if (!value || value.startsWith("--")) throw Error("Укажите путь после " + flag);
+    return value;
+  };
+  const qrc = dependency("--qrc-root"), download = dependency("--download-root");
+  await writeNativeCoreImportMap(Deno.args[0], map, {
+    ...(qrc ? {"reference-catalog":qrc} : {}),
+    ...(download ? {"project-download":download} : {}),
+  });
   const args = ["check", "--no-config", "--no-lock", "--import-map", map];
   const positive = await new Deno.Command(Deno.execPath(), {
     args: [
@@ -150,7 +161,7 @@ try {
         [
           "preparation",
           `
-      import {withNativeCaptureScope} from "course-core/capture.ts";
+      import {withNativeCaptureScope} from "course-core/public.ts";
       withNativeCaptureScope({root:"/owner",projection:"author",outputDirectory:"/owner/out"},
         {assignment:{mode:"new",prepare:async () => ({expectedSources:["work.qmd"],
           assessments:[{source:"work.qmd",assessmentId:"work"}]})}}, async () => {});
@@ -168,6 +179,7 @@ try {
         ],
       ]
   ) {
+    if (!name || !code || !diagnostic) throw Error("Неполный отрицательный TS fixture");
     const source = resolve(temporary, name + ".ts");
     await Deno.writeTextFile(source, code);
     const result = await new Deno.Command(Deno.execPath(), {

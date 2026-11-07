@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import * as Entry from "../_extensions/course-prairielearn/application/native-entry.ts";
 const owner = () => ({
   dir: "/owner",
@@ -10,7 +11,7 @@ const owner = () => ({
   },
 });
 Deno.test("C использует observed frontmatter ID, а не basename или inherited metadata", async () => {
-  const selected = await (Entry as any).selectNativeOwnerAssignments(owner(), {
+  const selected = await Entry.selectNativeOwnerAssignments(owner(), {
     root: "/owner",
     book: "tasks",
     work: "sec-lab",
@@ -22,19 +23,19 @@ Deno.test("C использует observed frontmatter ID, а не basename ил
   ) throw Error("source binding/owner coverage lost");
   for (
     const mutate of [
-      (v: any) =>
-        delete v.fileInformation["labs/other-name.qmd"].metadata.assessment,
-      (v: any) =>
+      (v: ReturnType<typeof owner>) =>
+        Reflect.deleteProperty(v.fileInformation["labs/other-name.qmd"].metadata, "assessment"),
+      (v: ReturnType<typeof owner>) =>
         v.fileInformation["slides.qmd"].metadata.assessment.id = "sec-lab",
-      (v: any) => v.files.input.push("/foreign/escape.qmd"),
-      (v: any) => v.files.input.push(v.files.input[0]),
+      (v: ReturnType<typeof owner>) => v.files.input.push("/foreign/escape.qmd"),
+      (v: ReturnType<typeof owner>) => v.files.input.push(required(v.files.input[0])),
     ]
   ) {
     const bad = owner();
     mutate(bad);
     let refused = false;
     try {
-      await (Entry as any).selectNativeOwnerAssignments(bad, {
+      await Entry.selectNativeOwnerAssignments(bad, {
         root: "/owner",
         book: "tasks",
         work: "sec-lab",
@@ -49,7 +50,7 @@ Deno.test("consume existing отказывает до новой scope или ч
   let error = "";
   try {
     await Entry.nativeEntry(
-      { root: "/nonexistent-owner", book: "tasks", mode: "existing" } as any,
+      { root: "/nonexistent-owner", book: "tasks", mode: "existing" },
     );
   } catch (e) {
     error = String(e);
@@ -60,8 +61,8 @@ Deno.test("consume existing отказывает до новой scope или ч
 });
 
 Deno.test("course intent включает observed context меню, standalone остаётся exact work", async () => {
-  const observed: any = owner();
-  observed.config.prairielearn = {
+  const observed = owner();
+  Reflect.set(observed.config, "prairielearn", {
     "question-defaults": {
       topic: "Fixture",
       grading: { method: "manual" },
@@ -88,8 +89,8 @@ Deno.test("course intent включает observed context меню, standalone 
         },
       },
     },
-  };
-  const selected: any = await Entry.selectNativeOwnerAssignments(observed, {
+  });
+  const selected = await Entry.selectNativeOwnerAssignments(observed, {
     root: "/owner",
     book: "tasks",
     instance: "pilot",

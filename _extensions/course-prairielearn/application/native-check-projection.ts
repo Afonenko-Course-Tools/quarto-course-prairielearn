@@ -13,6 +13,7 @@ import type {
 } from "course-core/public.ts";
 import type { NativeProjectCheck } from "./native-checks.ts";
 import type { RuntimeProfile } from "./runtime-descriptor.ts";
+const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
 export type CheckedNativeProjectFact = Omit<NativeProjectFact, "check"> & {
   check?: NativeProjectCheck;
 };
@@ -130,13 +131,14 @@ export async function projectNativeChecks(
       throw Error("PL.SELECTION_INVALID: unsafe contract logical target");
     }
     const files = full.files.filter((f) => f.target === name);
-    if (files.length !== 1 || !trustedRole(files[0])) {
+    const file = files[0];
+    if (files.length !== 1 || !file || !trustedRole(file)) {
       throw Error(
         "PL.SELECTION_MIGRATION_REQUIRED: contract target must be selected trusted A1 raw file: " +
           name,
       );
     }
-    return files[0];
+    return file;
   };
   let contractCaseFile: SelectedCheckFile | undefined;
   let contractCases: (ArtifactFile & { name: string }) | undefined;
@@ -148,22 +150,23 @@ export async function projectNativeChecks(
     const raw: unknown = JSON.parse(
       new TextDecoder("utf-8", { fatal: true }).decode(file.bytes),
     );
-    const doc = raw as Record<string, unknown>;
-    if (doc.schemaVersion !== 1 || !Array.isArray(doc.cases)) {
+    if (!record(raw) || raw.schemaVersion !== 1 || !Array.isArray(raw.cases)) {
       throw Error("PL.VERIFICATION_INVALID: contract cases");
     }
     const ids = new Set<string>();
-    const cases: unknown[] = doc.cases;
+    const cases: unknown[] = raw.cases;
     for (const value of cases) {
-      const row = value as Record<string, unknown>;
+      if (!record(value)) throw Error("PL.VERIFICATION_INVALID: contract case");
+      const row = value;
       if (typeof row.id !== "string" || !row.id || ids.has(row.id)) {
         throw Error("PL.VERIFICATION_INVALID: case id");
       }
       ids.add(row.id);
-      for (const value of (row.sources ?? []) as Iterable<unknown>) {
-        const item = value as Record<string, unknown>;
+      const mappings: unknown = row.sources ?? [];
+      if (!Array.isArray(mappings)) throw Error("PL.VERIFICATION_INVALID: fixture sources");
+      for (const item of mappings) {
         if (
-          !safePath(item.fixture) ||
+          !record(item) || !safePath(item.fixture) ||
           !item.fixture.startsWith("tests/fixtures/") ||
           !safePath(item.submission)
         ) throw Error("PL.VERIFICATION_INVALID: fixture mapping");

@@ -23,7 +23,14 @@ import type {
 import type { createNativeAdapter } from "./native-adapter.ts";
 import type { question } from "./declarations.ts";
 import type { RuntimeProfile } from "./runtime-descriptor.ts";
-export async function publicExtension(owner: string, name: string) {
+import type * as ReferencePublic from "reference-catalog/public.ts";
+import type * as DownloadPublic from "project-download/public.ts";
+type ReferenceAPI = Pick<typeof ReferencePublic, "loadBodyLinks" | "createBodyLinks" | "bindConditionLinks">;
+type DownloadAPI = Pick<typeof DownloadPublic, "zip" | "packageArtifact">;
+const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+export function publicExtension(owner: string, name: "reference-catalog"): Promise<ReferenceAPI>;
+export function publicExtension(owner: string, name: "project-download"): Promise<DownloadAPI>;
+export async function publicExtension(owner: string, name: "reference-catalog" | "project-download"): Promise<ReferenceAPI | DownloadAPI> {
   for (
     const root of [
       join(owner, "_extensions", name),
@@ -33,7 +40,14 @@ export async function publicExtension(owner: string, name: string) {
     try {
       const p = join(root, "public.ts");
       if (await Deno.realPath(p) === p && (await Deno.lstat(p)).isFile) {
-        return await import(pathToFileURL(p).href);
+        if (name === "reference-catalog") {
+          const api: ReferenceAPI = await import(pathToFileURL(p).href);
+          if (typeof api.loadBodyLinks !== "function" || typeof api.createBodyLinks !== "function" || typeof api.bindConditionLinks !== "function") throw Error("PL.PUBLIC_API_REQUIRED: reference-catalog functions");
+          return api;
+        }
+        const api: DownloadAPI = await import(pathToFileURL(p).href);
+        if (typeof api.zip !== "function" || typeof api.packageArtifact !== "function") throw Error("PL.PUBLIC_API_REQUIRED: project-download functions");
+        return api;
       }
     } catch (e) {
       if (!(e instanceof Deno.errors.NotFound)) throw e;
@@ -48,16 +62,15 @@ export async function checkedJSON(path: string) {
     throw Error("PL.INPUT_INVALID: aliased JSON input");
   }
   const bytes = await Deno.readFile(canonical);
-  return {
-    value: JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)),
-  };
+  const value: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  return {value};
 }
 export async function nativeReferenceBindings(
   input: {
     owner: string;
     outputDirectory: string;
     book: string;
-    config: any;
+    config: unknown;
     operation: Pick<NativeOperation, "catalog">;
   },
 ) {
@@ -65,9 +78,13 @@ export async function nativeReferenceBindings(
     file = await checkedJSON(
       join(input.outputDirectory, "reference-catalog-local.json"),
     );
-  const namespace = input.config["reference-catalog"]?.namespace;
-  const site = input.config.website?.["site-url"],
-    course = input.config["course-navigation"]?.["course-url"];
+  const config = record(input.config) ? input.config : {};
+  const referenceConfig = record(config["reference-catalog"]) ? config["reference-catalog"] : {};
+  const website = record(config.website) ? config.website : {};
+  const navigation = record(config["course-navigation"]) ? config["course-navigation"] : {};
+  const namespace = referenceConfig.namespace;
+  const site = website["site-url"], course = navigation["course-url"];
+  if (site !== undefined && typeof site !== "string" || course !== undefined && typeof course !== "string") throw Error("PL.REFERENCE_BINDING_REQUIRED: publication URL");
   const baseUrl = site ??
     (course
       ? new URL(input.book + "/", course.endsWith("/") ? course : course + "/")
@@ -78,13 +95,13 @@ export async function nativeReferenceBindings(
       "PL.REFERENCE_BINDING_REQUIRED: actual namespace/publication base-url",
     );
   }
-  const links = input.config["reference-catalog"]?.imports
+  const links = referenceConfig.imports
     ? await QRC.loadBodyLinks({
       catalogFile: join(input.outputDirectory, "reference-catalog-local.json"),
       baseUrl,
       root: input.owner,
       namespace,
-      imports: input.config["reference-catalog"].imports,
+      imports: referenceConfig.imports,
     })
     : QRC.createBodyLinks({ catalog: file.value, baseUrl });
   const sources = Object.fromEntries(
@@ -127,9 +144,10 @@ export async function nativeReferenceBindings(
           sources,
           resourceLinks: fragment.resources,
         });
-        referencesBySource[fragment.source] = {};
+        const fragmentReferences: NonNullable<MaterializationBindings["referencesBySource"]>[string] = {};
+        referencesBySource[fragment.source] = fragmentReferences;
         for (const ref of fragment.references) {
-          referencesBySource[fragment.source][ref.token] = await links.resolve(
+          fragmentReferences[ref.token] = await links.resolve(
             ref.key,
             ref.style,
             fragment.source,
@@ -219,18 +237,14 @@ export async function materializeNativeQuestion(
         )
         : input.settings.submission;
     return describeSubmission(selectedSubmission, sourceMappings, {
-      archive: archive ??
-        (javaFiles && selectedSubmission.mode === "upload" &&
-            selectedSubmission.layout === "zip"
-          ? "solution.zip"
-          : undefined),
+      ...((archive ?? (javaFiles && selectedSubmission.mode === "upload" && selectedSubmission.layout === "zip" ? "solution.zip" : undefined)) !== undefined ? {archive: archive ?? "solution.zip"} : {}),
     });
   };
   const sourceMappings = preliminary?.map((file) => ({
     name: file.name,
     starterPath: file.target,
   })) ??
-    student!.files.filter((file) =>
+    (student?.files ?? []).filter((file) =>
       input.settings.submission.mode !== "workspace" &&
       file.reason === "starter" && applicationJavaTarget(file.target)
     ).map((file) => ({ name: file.target, starterPath: file.target }));
@@ -275,8 +289,8 @@ export async function materializeNativeQuestion(
   ) {
     const workspace = await input.adapter.workspaceArtifact({
       operation: input.operation,
-      checkpoint: input.checkpoint,
-      auxiliary: input.auxiliary,
+      ...(input.checkpoint ? {checkpoint: input.checkpoint} : {}),
+      ...(input.auxiliary ? {auxiliary: input.auxiliary} : {}),
       expectedSources: input.expectedSources,
       source: input.fact.source,
       exerciseId: input.fact.exerciseId,

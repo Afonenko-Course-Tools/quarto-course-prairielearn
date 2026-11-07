@@ -7,10 +7,15 @@ import sys
 import tarfile
 
 root = Path(__file__).resolve().parents[1] / '_extensions/course-prairielearn'
-lock = json.loads((root / 'package-lock.json').read_text())
+lock: object = json.loads((root / 'package-lock.json').read_text())
+match lock:
+    case {'packages': {'node_modules/zod': {'integrity': str(expected)}}}:
+        pass
+    case _:
+        raise SystemExit('Exact lock не содержит integrity Zod')
 tarball = Path(sys.argv[1])
 actual = 'sha512-' + base64.b64encode(hashlib.sha512(tarball.read_bytes()).digest()).decode()
-if actual != lock['packages']['node_modules/zod']['integrity']:
+if actual != expected:
     raise SystemExit('Tarball не соответствует exact lock')
 with tarfile.open(tarball) as archive:
     for member in archive.getmembers():
@@ -20,7 +25,11 @@ with tarfile.open(tarball) as archive:
                 raise SystemExit('Недопустимый tarball entry')
             target = root / 'vendor/zod' / name
             target.parent.mkdir(parents=True,exist_ok=True)
-            data = archive.extractfile(member).read()
+            stream = archive.extractfile(member)
+            if stream is None:
+                raise SystemExit('Tarball entry не содержит обычного файла')
+            with stream:
+                data = stream.read()
             if name.endswith('.d.ts'):
                 data = data.replace(b'.js"',b'.d.ts"')
             target.write_bytes(data)

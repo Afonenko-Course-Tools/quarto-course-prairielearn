@@ -2,7 +2,7 @@ import { applicationJavaTarget, fileSubmission } from "./submission.ts";
 import type {
   BodyResource,
   PublicBodyPackage,
-} from "course-core/body-export/model.ts";
+} from "course-core/public.ts";
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import { nativeAnswerBinding } from "./native-delivery.ts";
 import { createMetrics as __createMetrics } from "../observability/bridge.ts";
@@ -11,6 +11,7 @@ import { nativeSlotZones, qualifiedSlots } from "./slots.ts";
 import { dirname, join, relative, resolve } from "node:path";
 import { gradingPolicy, validateGradingComponents } from "./grading-policy.ts";
 import { completionPolicy } from "./completion.ts";
+// @deno-types="./native-validators.d.ts"
 import * as validators from "./native-validators.js";
 import { validateAssessmentSemantics } from "./native-semantics.ts";
 import {
@@ -78,7 +79,7 @@ export async function identity(
   namespace = "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
 ) {
   const ns = Uint8Array.from(
-    namespace.replaceAll("-", "").match(/../g)!,
+    namespace.replaceAll("-", "").match(/../g) ?? [],
     (x) => parseInt(x, 16),
   );
   const bytes = new Uint8Array([...ns, ...new TextEncoder().encode(name)]);
@@ -86,8 +87,10 @@ export async function identity(
     0,
     16,
   );
-  h[6] = (h[6] & 15) | 80;
-  h[8] = (h[8] & 63) | 128;
+  const version = h.at(6), variant = h.at(8);
+  if (version === undefined || variant === undefined) throw Error("PL UUID digest too short");
+  h[6] = (version & 15) | 80;
+  h[8] = (variant & 63) | 128;
   const hex = [...h].map((x) => x.toString(16).padStart(2, "0")).join("");
   return [
     hex.slice(0, 8),
@@ -182,7 +185,7 @@ export type NativeCompilerInput = Pick<NativeSelection, "descriptor"> & {
   tests: readonly Pick<NativeSelection["tests"][number], "name" | "bytes">[];
 };
 
-export async function exportCourse(
+async function buildCourse(
   input: {
     courseId: string;
     projectRoot: string;
@@ -279,12 +282,15 @@ export async function exportCourse(
       dir: dirname(out),
       prefix: ".pl-selected-",
     });
-  const write = async (path: string, v: any) => {
+  const write = async (path: string, v: unknown) => {
     await Deno.mkdir(dirname(join(stage, path)), { recursive: true });
     const schema = path.endsWith("/info.json")
       ? "infoQuestion"
       : path.split("/").at(-1)?.replace(".json", "");
-    const validate = (validators as any)[schema!];
+    const validate = schema === "infoQuestion" ? validators.infoQuestion
+      : schema === "infoCourse" ? validators.infoCourse
+      : schema === "infoCourseInstance" ? validators.infoCourseInstance
+      : schema === "infoAssessment" ? validators.infoAssessment : undefined;
     if (validate && !validate(v)) {
       throw new Error(
         "PL upstream schema " + path + ": " + JSON.stringify(validate.errors),
@@ -341,12 +347,26 @@ export async function exportCourse(
         },
       },
     );
-    const questions: Record<string, any> = {};
+    type ProjectDelivery = {
+      kind: "project" | "workspace";
+      uuid: string;
+      grading: {method: string};
+      submission: ReturnType<typeof question>["submission"];
+      sourceRoot: string;
+      projectCheck?: string;
+      runtime?: string;
+      sources?: {projectRelativePath:string; submissionRelativePath:string}[];
+      upstreamGradingMethod?: string;
+      singleVariant?: boolean;
+      seed?: {schema:string; archive:string; manifest:string};
+    };
+    type AnswerDelivery = ReturnType<typeof nativeAnswerBinding> & {kind:"native-answer"};
+    const questions: Record<string, ProjectDelivery | AnswerDelivery> = {};
     const questionSnapshots = new Map<string, string>();
-    for (let index = 0; index < works.length; index++) {
-      const work = works[index],
+    for (const [index, work] of works.entries()) {
+      const
         p = await input.body(work.id),
-        binding: any = { questions: {} },
+        binding: {questions:Record<string, ReturnType<typeof question> & {files:string[]; additionalJavaSources?: NativeCompilerInput["descriptor"]["additionalJavaSources"]; externalGradingOptions?:{image:string;timeout:number;enableNetworking:boolean}}> } = { questions: {} },
         projects: Record<string, string> = {},
         studentArtifacts: Record<string, StudentArtifact> = {};
       const contexts = [{ work, body: p, menu: false }];
@@ -451,14 +471,15 @@ export async function exportCourse(
             : {}),
         });
         const method = gradingMethod(settings.grading).method;
-        if (input.nativeAnswers?.[q.id]) {
+        const nativeAnswer = input.nativeAnswers?.[q.id];
+        if (nativeAnswer) {
           binding.questions[q.id] = { ...settings, files: [] };
-          questions[input.courseId + "/" + q.id] = nativeAnswerBinding(
+          questions[input.courseId + "/" + q.id] = {...nativeAnswerBinding(
             await uuid(input.courseId + "/" + q.id),
             method,
-            input.nativeAnswers[q.id],
+            nativeAnswer,
             input.nativeResponseSlots?.[q.id] ?? [],
-          );
+          ), kind:"native-answer"};
           continue;
         }
         const artifactFact = content.projects?.find((f) =>
@@ -467,7 +488,8 @@ export async function exportCourse(
         if (!artifactFact) {
           throw Error("PL student artifact project fact missing");
         }
-        studentArtifacts[q.id] = await input.studentArtifact(artifactFact);
+        const studentArtifact = await input.studentArtifact(artifactFact);
+        studentArtifacts[q.id] = studentArtifact;
         if (method === "manual") {
           const fact = content.projects?.find((f) =>
             f.exerciseId === q.id && f.bankMember
@@ -484,7 +506,7 @@ export async function exportCourse(
               throw Error("PL manual project symlink forbidden");
             }
           }
-          const files = studentArtifacts[q.id].files.map((f) => ({
+          const files = studentArtifact.files.map((f) => ({
             name: f.name,
             data: f.bytes,
           }));
@@ -496,12 +518,13 @@ export async function exportCourse(
             await Deno.mkdir(dirname(path), { recursive: true });
             await Deno.writeFile(path, file.data);
           }
-          const javaSources = studentArtifacts[q.id].files.filter(file => file.reason === "starter" && applicationJavaTarget(file.name));
+          const javaSources = studentArtifact.files.filter(file => file.reason === "starter" && applicationJavaTarget(file.name));
           const selectedSubmission = settings.submission.mode !== "workspace" && javaSources.length
             ? fileSubmission(javaSources.map(file => file.name), settings.submission.mode === "editor" ? settings.submission.aceMode : undefined)
             : settings.submission;
           binding.questions[q.id] = { ...settings, submission: selectedSubmission, files: javaSources.map(file => file.name) };
           questions[input.courseId + "/" + q.id] = {
+            kind: "project",
             uuid: await uuid(input.courseId + "/" + q.id),
             grading: { method: "manual" },
             submission: { ...selectedSubmission },
@@ -595,6 +618,7 @@ export async function exportCourse(
         };
         const key = input.courseId + "/" + q.id;
         questions[key] = {
+          kind:"project",
           uuid: await uuid(key),
           grading: { method },
           submission: { ...selectedSubmission },
@@ -625,9 +649,11 @@ export async function exportCourse(
         const base = "questions/" + q.key;
         const c = input.checks.projects.find((f) => f.exerciseId === q.id)
           ?.check;
-        const info = JSON.parse(
+        const rawInfo: unknown = JSON.parse(
           await Deno.readTextFile(join(partial, base, "info.json")),
         );
+        if (!rawInfo || typeof rawInfo !== "object" || Array.isArray(rawInfo)) throw Error("PL invalid question info");
+        const info: Record<string, unknown> = Object.fromEntries(Object.entries(rawInfo));
         info.partialCredit = input.nativeAnswers?.[q.id]
           ? info.gradingMethod !== "Manual"
           : c
@@ -648,8 +674,10 @@ export async function exportCourse(
         );
         const f = input.checks.projects.find((f) => f.exerciseId === q.id);
         if (f?.check) {
+          const nativeInput = input.nativeInputs[q.id];
+          if (!nativeInput) throw Error("PL.SELECTION_INVALID: native input missing");
           for (
-            const s of input.nativeInputs[q.id].sources.map((file) => ({
+            const s of nativeInput.sources.map((file) => ({
               name: file.name,
               data: file.bytes,
             }))
@@ -762,7 +790,7 @@ export async function exportCourse(
     const files = await inventoryNames(stage);
     const version = 5;
     {
-      for (const [key, value] of Object.entries(questions) as [string, any][]) {
+      for (const [key, value] of Object.entries(questions)) {
         if (value.kind === "native-answer") continue;
         if (value.submission.mode === "workspace") {
           const prefix = "questions/" + key + "/workspace/.pl-seed/";
@@ -781,10 +809,10 @@ export async function exportCourse(
               manifest: "workspace/.pl-seed/manifest.json",
             },
           };
-        } else questions[key] = { kind: "project", ...value };
+        } else questions[key] = { ...value, kind: "project" };
       }
     }
-    const delivery: any = {
+    const delivery = {
       schemaVersion: version,
       courseId: input.courseId,
       bookRoot: input.checks.bookRoot,
@@ -878,6 +906,18 @@ async function exists(path: string) {
 async function parent(path: string) {
   await Deno.mkdir(dirname(path), { recursive: true });
   return path;
+}
+
+type CourseExportInput = Parameters<typeof buildCourse>[0];
+type CourseExportResult = Awaited<ReturnType<typeof buildCourse>>;
+type PreparedCourseExport = Extract<CourseExportResult, {publish: unknown}>;
+type PublishedCourseExport = Exclude<CourseExportResult, {publish: unknown}>;
+/** Режим публикации определяет настоящий результат того же writer. */
+export function exportCourse(input: CourseExportInput & {deferPublish: true}): Promise<PreparedCourseExport>;
+export function exportCourse(input: CourseExportInput & {deferPublish?: false | undefined}): Promise<PublishedCourseExport>;
+export function exportCourse(input: CourseExportInput): Promise<CourseExportResult>;
+export async function exportCourse(input: CourseExportInput): Promise<CourseExportResult> {
+  return await buildCourse(input);
 }
 
 // @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.

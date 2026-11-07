@@ -1,3 +1,4 @@
+import { required } from "./fixture-values.ts";
 import type { NativeBusinessInput } from "../_extensions/course-prairielearn/application/native-business.ts";
 import { gradingPolicy } from "../_extensions/course-prairielearn/application/grading-policy.ts";
 function assert(v: unknown, m: string): asserts v {
@@ -5,7 +6,7 @@ function assert(v: unknown, m: string): asserts v {
 }
 Deno.test("required zero-ceiling Homework fails actionable; optional zero-point zero-ceiling remains supported", () => {
   const w = work();
-  w.slots[0].assignment.requirement = "required";
+  required(w.slots[0]).assignment.requirement = "required";
   w.extensions.prairielearn["question-points"] = 1;
   w.extensions.prairielearn["question-max-points"] = 0;
   let message = "";
@@ -19,11 +20,11 @@ Deno.test("required zero-ceiling Homework fails actionable; optional zero-point 
       message.includes("required question ceiling must be positive"),
     "impossible required zero-ceiling completion accepted",
   );
-  w.slots[0].assignment.requirement = "optional";
+  required(w.slots[0]).assignment.requirement = "optional";
   w.extensions.prairielearn["question-points"] = 0;
-  const native = gradingPolicy(w).slots["exr-a"];
+  const native = required(gradingPolicy(w).slots["exr-a"]);
   assert(
-    native.points === 0 && native.maxPoints === 0,
+    required(native).points === 0 && native.maxPoints === 0,
     "optional zero-ceiling policy changed",
   );
 });
@@ -59,15 +60,15 @@ const work = (): FixtureWork => ({
 Deno.test("authored scores and retry controls preserve scalar values and per-question null/overrides", () => {
   const p = gradingPolicy(work());
   assert(
-    p.slots["exr-a"].points === 2.5 &&
-      p.slots["exr-a"].maxPoints === 6 &&
-      p.slots["exr-a"].triesPerVariant === 3,
+    required(p.slots["exr-a"]).points === 2.5 &&
+      required(p.slots["exr-a"]).maxPoints === 6 &&
+      required(p.slots["exr-a"]).triesPerVariant === 3,
     "default changed",
   );
   assert(
-    p.slots["exr-b"].points === 4 &&
-      p.slots["exr-b"].triesPerVariant === 5 &&
-      !Object.hasOwn(p.slots["exr-b"], "maxPoints"),
+    required(p.slots["exr-b"]).points === 4 &&
+      required(p.slots["exr-b"]).triesPerVariant === 5 &&
+      !Object.hasOwn(required(p.slots["exr-b"]), "maxPoints"),
     "override/clear lost",
   );
   assert(
@@ -93,15 +94,15 @@ Deno.test("missing explicit points fails actionable; no internal score/count cei
     "missing score diagnostic not actionable",
   );
   w.extensions.prairielearn["question-points"] = 0;
-  w.slots[1].assignment.requirement = "optional";
+  required(w.slots[1]).assignment.requirement = "optional";
   delete w.extensions.prairielearn["max-points"];
   delete w.extensions.prairielearn["question-max-points"];
   delete w.extensions.prairielearn["grade-rate-minutes"];
   delete w.extensions.prairielearn["allow-multiple-instances"];
   const p = gradingPolicy(w);
   assert(
-    p.slots["exr-a"].points === 0 &&
-      !Object.hasOwn(p.slots["exr-a"], "maxPoints") &&
+    required(p.slots["exr-a"]).points === 0 &&
+      !Object.hasOwn(required(p.slots["exr-a"]), "maxPoints") &&
       Object.keys(p.assessment).length === 0,
     "optional native defaults replaced silently",
   );
@@ -148,7 +149,7 @@ Deno.test("Exam accepts nonincreasing arrays, clears max; Homework rejects array
   assert(bad, "Exam silently drops authored Homework max");
   w.extensions.prairielearn["question-max-points"] = null;
   assert(
-    JSON.stringify(gradingPolicy(w).slots["exr-a"].points) === "[5,3,1]",
+    JSON.stringify(required(gradingPolicy(w).slots["exr-a"]).points) === "[5,3,1]",
     "Exam list changed",
   );
   w.extensions.prairielearn["question-points"] = [1, 3];
@@ -172,7 +173,7 @@ Deno.test("Exam accepts nonincreasing arrays, clears max; Homework rejects array
 
 Deno.test("required zero-point questions fail closed; optional zero never supplies completion", () => {
   const w = work();
-  w.slots[0].assignment.requirement = "required";
+  required(w.slots[0]).assignment.requirement = "required";
   w.extensions.prairielearn["question-points"] = 0;
   w.extensions.prairielearn["question-max-points"] = null;
   let message = "";
@@ -185,9 +186,9 @@ Deno.test("required zero-point questions fail closed; optional zero never suppli
     message.includes("required questions must have positive points"),
     "required zero silently accepted",
   );
-  w.slots[0].assignment.requirement = "optional";
+  required(w.slots[0]).assignment.requirement = "optional";
   assert(
-    gradingPolicy(w).slots["exr-a"].points === 0,
+    required(gradingPolicy(w).slots["exr-a"]).points === 0,
     "optional zero with no ceiling rejected",
   );
 });
@@ -251,12 +252,12 @@ Deno.test("добровольные mixed и manual сохраняют пров�
   };
   for (const method of ["mixed", "manual", "external"] as const) {
     const policy = validateGradingComponents(w, { "exr-a": method, "exr-b": "mixed" });
-    assert(policy.slots["exr-a"].autoPoints === 0 && policy.slots["exr-a"].manualPoints === 0,
+    assert(required(policy.slots["exr-a"]).autoPoints === 0 && required(policy.slots["exr-a"]).manualPoints === 0,
       "Добровольная задача изменила обязательный вес");
-    assert(policy.slots["exr-b"].autoPoints === 80 && policy.slots["exr-b"].manualPoints === 20,
+    assert(required(policy.slots["exr-b"]).autoPoints === 80 && required(policy.slots["exr-b"]).manualPoints === 20,
       "Обязательные 80/20 изменены");
   }
-  w.slots[0].assignment.requirement = "required";
+  required(w.slots[0]).assignment.requirement = "required";
   let rejected = false;
   try { gradingPolicy(w); } catch { rejected = true; }
   assert(rejected, "Обязательная позиция потеряла положительный вес");
@@ -269,6 +270,6 @@ Deno.test("настоящая native business граница принимает 
   const decoded=decodeNativeBusiness({assessment:policy,declarations:[]},
     {course:{id:"demo"},assessment,declarations:[]},{deferComposition:true});
   const native=gradingPolicy({...assessment,extensions:{prairielearn:decoded.assessment}});
-  assert(native.slots['exr-a'].autoPoints===0&&native.slots['exr-b'].manualPoints===20,
+  assert(required(native.slots['exr-a']).autoPoints===0&&required(native.slots['exr-b']).manualPoints===20,
     "Native decoder изменил обязательные или добровольные компоненты");
 });
