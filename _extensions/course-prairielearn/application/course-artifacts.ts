@@ -1,3 +1,4 @@
+import { upstreamCourseValidationInput } from "./native-course-options.ts";
 import type { BodyResource, PublicBodyPackage } from "course-core/public.ts";
 import type { CourseExportPlan } from "./course-export-plan.ts";
 import type { OwnedExportOutput } from "./export-output.ts";
@@ -64,7 +65,8 @@ export class CourseArtifacts {
       : schema === "infoAssessment"
       ? validators.infoAssessment
       : undefined;
-    if (validate && !validate(v)) {
+    const validationInput = schema === "infoCourse" ? upstreamCourseValidationInput(v) : v;
+    if (validate && !validate(validationInput)) {
       throw new Error(
         "PL upstream schema " + path + ": " + JSON.stringify(validate.errors),
       );

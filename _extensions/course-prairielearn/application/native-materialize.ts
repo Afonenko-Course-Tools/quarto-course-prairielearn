@@ -28,6 +28,12 @@ import type * as DownloadPublic from "project-download/public.ts";
 type ReferenceAPI = Pick<typeof ReferencePublic, "loadBodyLinks" | "createBodyLinks" | "bindConditionLinks">;
 type DownloadAPI = Pick<typeof DownloadPublic, "zip" | "packageArtifact">;
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+function referenceProvider(value: unknown): value is ReferenceAPI {
+  return record(value) && typeof value.loadBodyLinks === "function" && typeof value.createBodyLinks === "function" && typeof value.bindConditionLinks === "function";
+}
+function downloadProvider(value: unknown): value is DownloadAPI {
+  return record(value) && typeof value.zip === "function" && typeof value.packageArtifact === "function";
+}
 export function publicExtension(owner: string, name: "reference-catalog"): Promise<ReferenceAPI>;
 export function publicExtension(owner: string, name: "project-download"): Promise<DownloadAPI>;
 export async function publicExtension(owner: string, name: "reference-catalog" | "project-download"): Promise<ReferenceAPI | DownloadAPI> {
@@ -41,12 +47,12 @@ export async function publicExtension(owner: string, name: "reference-catalog" |
       const p = join(root, "public.ts");
       if (await Deno.realPath(p) === p && (await Deno.lstat(p)).isFile) {
         if (name === "reference-catalog") {
-          const api: ReferenceAPI = await import(pathToFileURL(p).href);
-          if (typeof api.loadBodyLinks !== "function" || typeof api.createBodyLinks !== "function" || typeof api.bindConditionLinks !== "function") throw Error("PL.PUBLIC_API_REQUIRED: reference-catalog functions");
+          const api: unknown = await import(pathToFileURL(p).href);
+          if (!referenceProvider(api)) throw Error("PL.PUBLIC_API_REQUIRED: reference-catalog functions");
           return api;
         }
-        const api: DownloadAPI = await import(pathToFileURL(p).href);
-        if (typeof api.zip !== "function" || typeof api.packageArtifact !== "function") throw Error("PL.PUBLIC_API_REQUIRED: project-download functions");
+        const api: unknown = await import(pathToFileURL(p).href);
+        if (!downloadProvider(api)) throw Error("PL.PUBLIC_API_REQUIRED: project-download functions");
         return api;
       }
     } catch (e) {

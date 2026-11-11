@@ -32,6 +32,95 @@ async function ownerFile(root: string, path: string) {
   }
   return current;
 }
+async function verifySeedHistory(
+  stdout: Uint8Array,
+  auxiliary: NativeAuxiliary,
+  work: string,
+): Promise<string> {
+  const raw: unknown = JSON.parse(new TextDecoder().decode(stdout));
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw Error("PL.WORKSPACE_SEED: invalid recipe identity");
+  }
+  const identity: Record<string, unknown> = Object.fromEntries(
+    Object.entries(raw),
+  );
+  const sha = (value: unknown): value is string =>
+    typeof value === "string" && /^[a-f0-9]{40}$/.test(value);
+  const single = sha(identity.A) &&
+    Object.keys(identity).sort().join() === "A,head,refs,status";
+  const pair = sha(identity.S0) && sha(identity.S1) &&
+    identity.S0 !== identity.S1 &&
+    Object.keys(identity).sort().join() === "S0,S1,head,refs,status";
+  if (!single && !pair) {
+    throw Error("PL.WORKSPACE_SEED: exact A or S0/S1 recipe required");
+  }
+  const initial = single ? identity.A : identity.S1;
+  if (!sha(initial)) throw Error("PL.WORKSPACE_SEED: invalid initial commit");
+  // Прежнее исключение GIT_* сохраняется, но только из одного saved map.
+  const gitEnvironment = Object.freeze({
+    ...Object.fromEntries(
+      Object.entries(auxiliary.environment).filter(([key]) =>
+        !key.startsWith("GIT_")
+      ),
+    ),
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_CONFIG_COUNT: "0",
+    GIT_OPTIONAL_LOCKS: "0",
+  });
+  const git = async (args: string[]) => {
+    await auxiliary.before();
+    const run = await new Deno.Command("git", {
+      args: ["--no-optional-locks", ...args],
+      cwd: work,
+      clearEnv: true,
+      env: { ...gitEnvironment },
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    await auxiliary.after();
+    if (!run.success) throw Error("PL.WORKSPACE_SEED: invalid Git seed");
+    return new TextDecoder().decode(run.stdout).trim();
+  };
+  const head = await git(["symbolic-ref", "HEAD"]);
+  const refs = await git(["show-ref"]);
+  const status = await git(["status", "--porcelain=v1"]);
+  const graph = await git(["rev-list", "--parents", "HEAD"]);
+  const parent = identity.S0;
+  if (!single && !sha(parent)) {
+    throw Error("PL.WORKSPACE_SEED: invalid parent commit");
+  }
+  const expectedGraph = single
+    ? initial
+    : initial + " " + parent + "\n" + parent;
+  if (
+    head !== "refs/heads/main" ||
+    await git(["rev-parse", "HEAD"]) !== initial ||
+    refs !== initial + " refs/heads/main" ||
+    JSON.stringify(identity.refs) !== JSON.stringify([refs]) ||
+    identity.head !== head ||
+    identity.status !== status || status !== "" || graph !== expectedGraph ||
+    await git(["rev-list", "--all", "--count"]) !== (single ? "1" : "2")
+  ) {
+    throw Error(
+      "PL.WORKSPACE_SEED: exact initial clean history/main required",
+    );
+  }
+  await git(["fsck", "--strict", "--full", "--no-reflogs"]);
+  const all = (await git([
+    "cat-file",
+    "--batch-all-objects",
+    "--batch-check=%(objectname)",
+  ])).split("\n").sort();
+  const closure =
+    (await git(["rev-list", "--objects", "--no-object-names", "HEAD"])).split(
+      "\n",
+    ).sort();
+  if (JSON.stringify(all) !== JSON.stringify(closure)) {
+    throw Error("PL.WORKSPACE_SEED: unreachable objects in initial seed");
+  }
+  return initial;
+}
 /** Узкая production-операция для уже принятого include-git seed_recipe.py.
  * Native operation и его executable PL validator обязан вызвать composition.
  * .git не проходит через общий Core ArtifactFiles.
@@ -151,80 +240,7 @@ export async function nativeWorkspaceArtifact(options: {
           new TextDecoder().decode(run.stderr),
       );
     }
-    const raw: unknown = JSON.parse(new TextDecoder().decode(run.stdout));
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw Error("PL.WORKSPACE_SEED: invalid recipe identity");
-    const identity: Record<string, unknown> = Object.fromEntries(Object.entries(raw));
-    const sha = (value: unknown): value is string =>
-      typeof value === "string" && /^[a-f0-9]{40}$/.test(value);
-    const single = sha(identity.A) &&
-      Object.keys(identity).sort().join() === "A,head,refs,status";
-    const pair = sha(identity.S0) && sha(identity.S1) &&
-      identity.S0 !== identity.S1 &&
-      Object.keys(identity).sort().join() === "S0,S1,head,refs,status";
-    if (!single && !pair) {
-      throw Error("PL.WORKSPACE_SEED: exact A or S0/S1 recipe required");
-    }
-    const initial = single ? identity.A : identity.S1;
-    if (!sha(initial)) throw Error("PL.WORKSPACE_SEED: invalid initial commit");
-    // Прежнее исключение GIT_* сохраняется, но только из одного saved map.
-    const gitEnvironment = Object.freeze({
-      ...Object.fromEntries(
-        Object.entries(auxiliary.environment).filter(([key]) =>
-          !key.startsWith("GIT_")
-        ),
-      ),
-      GIT_CONFIG_GLOBAL: "/dev/null",
-      GIT_CONFIG_NOSYSTEM: "1",
-      GIT_CONFIG_COUNT: "0",
-      GIT_OPTIONAL_LOCKS: "0",
-    });
-    const git = async (args: string[]) => {
-      await auxiliary.before();
-      const run = await new Deno.Command("git", {
-        args: ["--no-optional-locks", ...args],
-        cwd: work,
-        clearEnv: true,
-        env: { ...gitEnvironment },
-        stdout: "piped",
-        stderr: "piped",
-      }).output();
-      await auxiliary.after();
-      if (!run.success) throw Error("PL.WORKSPACE_SEED: invalid Git seed");
-      return new TextDecoder().decode(run.stdout).trim();
-    };
-    const head = await git(["symbolic-ref", "HEAD"]);
-    const refs = await git(["show-ref"]);
-    const status = await git(["status", "--porcelain=v1"]);
-    const graph = await git(["rev-list", "--parents", "HEAD"]);
-    const parent = identity.S0;
-    if (!single && !sha(parent)) throw Error("PL.WORKSPACE_SEED: invalid parent commit");
-    const expectedGraph = single ? initial : initial + " " + parent + "\n" + parent;
-    if (
-      head !== "refs/heads/main" ||
-      await git(["rev-parse", "HEAD"]) !== initial ||
-      refs !== initial + " refs/heads/main" ||
-      JSON.stringify(identity.refs) !== JSON.stringify([refs]) ||
-      identity.head !== head ||
-      identity.status !== status || status !== "" || graph !== expectedGraph ||
-      await git(["rev-list", "--all", "--count"]) !== (single ? "1" : "2")
-    ) {
-      throw Error(
-        "PL.WORKSPACE_SEED: exact initial clean history/main required",
-      );
-    }
-    await git(["fsck", "--strict", "--full", "--no-reflogs"]);
-    const all = (await git([
-      "cat-file",
-      "--batch-all-objects",
-      "--batch-check=%(objectname)",
-    ])).split("\n").sort();
-    const closure =
-      (await git(["rev-list", "--objects", "--no-object-names", "HEAD"])).split(
-        "\n",
-      ).sort();
-    if (JSON.stringify(all) !== JSON.stringify(closure)) {
-      throw Error("PL.WORKSPACE_SEED: unreachable objects in initial seed");
-    }
+    const initial = await verifySeedHistory(run.stdout, auxiliary, work);
     const files = options.files.map((f) => ({
       name: f.name,
       bytes: new Uint8Array(f.bytes),

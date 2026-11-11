@@ -31,6 +31,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Подготовить фактическую GNU mv no-replace capability
+        run: bash tools/setup-mv-ci.sh "$RUNNER_TEMP/course-gnu-mv" >> "$GITHUB_PATH"
       - name: Подготовить доступный кеш Quarto
         run: |
           mkdir -p -- "$XDG_CACHE_HOME"
@@ -46,13 +48,13 @@ jobs:
         with:
           repository: Afonenko-Course-Tools/quarto-course
           # Core 9: независимо проверенный исходный код; полный hosted CI и выпуск отдельно.
-          ref: 8aba3b47df161c98645f3fc268adefc2e96ef8d3
+          ref: codex/technical-closure-20261111
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "8aba3b47df161c98645f3fc268adefc2e96ef8d3"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "$(git -C .ci-deps/core rev-parse refs/remotes/origin/codex/technical-closure-20261111)"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -69,26 +71,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: 0b62c6501d716a634e0d1e3fcc3d21e41142b5a1
+          ref: codex/technical-closure-20261111
           path: .ci-deps/qrc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-publish
-          ref: 21abbbe40a66cbdc1f0185d09b9f6710e20f140b
+          ref: codex/technical-closure-20261111
           path: .ci-deps/site
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-download
-          ref: a621ec302a701d7409616f47675d2df0afb87aca
+          ref: codex/technical-closure-20261111
           path: .ci-deps/download
           persist-credentials: false
       - name: Проверить закреплённые QRC, Site и Download
         run: |
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "0b62c6501d716a634e0d1e3fcc3d21e41142b5a1"
-          test "$(git -C .ci-deps/site rev-parse HEAD)" = "21abbbe40a66cbdc1f0185d09b9f6710e20f140b"
-          test "$(git -C .ci-deps/download rev-parse HEAD)" = "a621ec302a701d7409616f47675d2df0afb87aca"
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "$(git -C .ci-deps/qrc rev-parse refs/remotes/origin/codex/technical-closure-20261111)"
+          test "$(git -C .ci-deps/site rev-parse HEAD)" = "$(git -C .ci-deps/site rev-parse refs/remotes/origin/codex/technical-closure-20261111)"
+          test "$(git -C .ci-deps/download rev-parse HEAD)" = "$(git -C .ci-deps/download rev-parse refs/remotes/origin/codex/technical-closure-20261111)"
       - name: Настоящие закрытые answers, HTML/Reveal и grading composition
         run: quarto run tests/native-answers-integration.ts .ci-deps/core --author
       - name: Отказ несовместимого cross-document grading
@@ -116,6 +118,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Подготовить фактическую GNU mv no-replace capability
+        run: bash tools/setup-mv-ci.sh "$RUNNER_TEMP/course-gnu-mv" >> "$GITHUB_PATH"
       - name: Подготовить доступный кеш Quarto
         run: |
           mkdir -p -- "$XDG_CACHE_HOME"
@@ -129,29 +133,29 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: 8aba3b47df161c98645f3fc268adefc2e96ef8d3
+          ref: codex/technical-closure-20261111
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "8aba3b47df161c98645f3fc268adefc2e96ef8d3"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "$(git -C .ci-deps/core rev-parse refs/remotes/origin/codex/technical-closure-20261111)"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: 0b62c6501d716a634e0d1e3fcc3d21e41142b5a1
+          ref: codex/technical-closure-20261111
           path: .ci-deps/qrc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-download
-          ref: a621ec302a701d7409616f47675d2df0afb87aca
+          ref: codex/technical-closure-20261111
           path: .ci-deps/download
           persist-credentials: false
       - name: Проверить закреплённые QRC и Download
         run: |
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "0b62c6501d716a634e0d1e3fcc3d21e41142b5a1"
-          test "$(git -C .ci-deps/download rev-parse HEAD)" = "a621ec302a701d7409616f47675d2df0afb87aca"
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "$(git -C .ci-deps/qrc rev-parse refs/remotes/origin/codex/technical-closure-20261111)"
+          test "$(git -C .ci-deps/download rev-parse HEAD)" = "$(git -C .ci-deps/download rev-parse refs/remotes/origin/codex/technical-closure-20261111)"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5
@@ -192,6 +196,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Подготовить фактическую GNU mv no-replace capability
+        run: bash tools/setup-mv-ci.sh "$RUNNER_TEMP/course-gnu-mv" >> "$GITHUB_PATH"
       - name: Подготовить доступный кеш Quarto
         run: |
           mkdir -p -- "$XDG_CACHE_HOME"
@@ -203,33 +209,33 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: 8aba3b47df161c98645f3fc268adefc2e96ef8d3
+          ref: codex/technical-closure-20261111
           path: .ci-deps/core
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: 0b62c6501d716a634e0d1e3fcc3d21e41142b5a1
+          ref: codex/technical-closure-20261111
           path: .ci-deps/qrc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-download
-          ref: a621ec302a701d7409616f47675d2df0afb87aca
+          ref: codex/technical-closure-20261111
           path: .ci-deps/download
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course-performance
-          ref: 0781f03a11f461691d7ce116f2c53bb5d8af68d7
+          ref: codex/technical-closure-20261111
           path: .ci-deps/performance
           persist-credentials: false
       - name: Проверить закреплённые исходники статических проверок
         run: |
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "8aba3b47df161c98645f3fc268adefc2e96ef8d3"
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "0b62c6501d716a634e0d1e3fcc3d21e41142b5a1"
-          test "$(git -C .ci-deps/download rev-parse HEAD)" = "a621ec302a701d7409616f47675d2df0afb87aca"
-          test "$(git -C "$PERFORMANCE" rev-parse HEAD)" = "0781f03a11f461691d7ce116f2c53bb5d8af68d7"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "$(git -C .ci-deps/core rev-parse refs/remotes/origin/codex/technical-closure-20261111)"
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "$(git -C .ci-deps/qrc rev-parse refs/remotes/origin/codex/technical-closure-20261111)"
+          test "$(git -C .ci-deps/download rev-parse HEAD)" = "$(git -C .ci-deps/download rev-parse refs/remotes/origin/codex/technical-closure-20261111)"
+          test "$(git -C "$PERFORMANCE" rev-parse HEAD)" = "$(git -C "$PERFORMANCE" rev-parse refs/remotes/origin/codex/technical-closure-20261111)"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: 1.11.5
@@ -253,7 +259,9 @@ jobs:
       - name: Установить закреплённые зависимости CJS-проверки
         run: npm ci --ignore-scripts
       - name: Блокирующий typed ESLint и границы модулей
-        run: npm run check-quality -- .ci-deps/pl-native-imports.json
+        run: |
+          npm run check-quality -- .ci-deps/pl-native-imports.json
+          npm run check-quality:controls -- .ci-deps/pl-native-imports.json
       - name: Строгая проверка собственного CJS
         run: npm run typecheck:tools -- --pretty false
       - name: Строгая проверка четырёх собственных Python-файлов
@@ -275,6 +283,9 @@ jobs:
           printf '%s\n' "$tool_dir" >> "$GITHUB_PATH"
       - name: Синтаксис и строгая проверка shell по каждому диалекту
         run: |
+          bash -n tools/check-mv-capability.sh
+          bash -n tools/setup-mv-ci.sh
+          shellcheck tools/check-mv-capability.sh tools/setup-mv-ci.sh
           bash -n tools/check-java.sh
           sh -n examples/java-gradle/bank/projects/clamp/tests/grade.sh
           shellcheck --norc --enable=all --severity=style --shell=bash tools/check-java.sh

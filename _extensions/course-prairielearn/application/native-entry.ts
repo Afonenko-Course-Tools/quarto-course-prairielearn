@@ -1,12 +1,10 @@
-import type * as CorePublic from "course-core/public.ts";
+import { installedCapture, installedCore } from "./public-provider.ts";
 import type {
   NativeOperation,
   NativeAssignmentPreparation,
   NativePreparedOperation,
 } from "course-core/public.ts";
-import type { withNativeCaptureScope as CoreCaptureScope } from "course-core/public.ts";
 import { join, relative, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { readNativeEntryCandidate } from "./native-request-candidate.ts";
 export { readNativeEntryCandidate } from "./native-request-candidate.ts";
@@ -147,11 +145,7 @@ export async function nativeEntry(options: NativeEntryOptions) {
   }
   if (!core) throw Error("PL.INPUT_INVALID: installed public Core required");
   const coreDirectory = core;
-  const { withNativeCaptureScope }: {
-    withNativeCaptureScope: typeof CoreCaptureScope;
-  } = await import(
-    pathToFileURL(join(coreDirectory, "public.ts")).href
-  );
+  const { withNativeCaptureScope } = await installedCapture(join(coreDirectory, "public.ts"));
   let selected:
     | Awaited<ReturnType<typeof selectNativeOwnerAssignments>>
     | undefined;
@@ -188,9 +182,7 @@ export async function nativeEntry(options: NativeEntryOptions) {
     },
   }, async (scope) => {
     await scope.withPreparedOperation(async (lease) => {
-      const Core: typeof CorePublic = await import(
-        pathToFileURL(join(coreDirectory, "public.ts")).href
-      );
+      const Core = await installedCore(join(coreDirectory, "public.ts"));
       const prepared = Core.NativePreparedOperationSchema.parse(
         lease.descriptor,
       );
@@ -240,9 +232,7 @@ export async function nativeEntry(options: NativeEntryOptions) {
     throw Error("PL.CAPTURE_MISSING: prepared operation");
   }
   const prepared = descriptor, selection = selected;
-  const Core: typeof CorePublic = await import(
-    pathToFileURL(join(coreDirectory, "public.ts")).href
-  );
+  const Core = await installedCore(join(coreDirectory, "public.ts"));
   const { prepareNativeCourse } = await import("./native-course.ts");
   return await publishNativePrepared(
     (

@@ -371,7 +371,7 @@ async function starterArtifacts(
       });
     }
   }
-  for (const f of submission.mode === "editor" ? [] : student) {
+  for (const f of submission.mode === "editor" || artifact ? [] : student) {
     prepared.push({
       name: base + "/clientFilesQuestion/" + f.name,
       data: f.data,
@@ -484,7 +484,7 @@ function uploadControls(
   const { b, submission, manual } = policy,
     questionFail = questionFailure(task);
 
-  const downloads = student.map((f) =>
+  const downloads = task.context.studentArtifacts?.[task.question.id] ? "" : student.map((f) =>
     '<pl-file-download file-name="' + escape(f.name) +
     '"></pl-file-download>'
   ).join("\n");

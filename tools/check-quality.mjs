@@ -14,9 +14,13 @@ const run = (bin, args) => execFileSync(bin, args, { encoding: 'utf8', maxBuffer
 const temporary = mkdtempSync(join(tmpdir(), 'course-quality-'));
 try {
   const tracked = run('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z']).split('\0');
-  const files = [...new Set(tracked)].filter(file => scope.some(prefix => file.startsWith(prefix)) &&
-    file.endsWith('.ts') && !/(^|\/)(vendor|node_modules|generated|_generated)(\/|$)/.test(file) && existsSync(file))
+  const sourceFiles = [...new Set(tracked)].filter(file => scope.some(prefix => file.startsWith(prefix)) &&
+    /\.(?:ts|js|cjs)$/.test(file) && !/(^|\/)(vendor|node_modules|generated|_generated)(\/|$)/.test(file) && existsSync(file))
     .sort().map(file => resolve(file));
+  // native-validators.js — генерируемый standalone AJV artifact; проверяется воспроизводимостью и потребляющим .d.ts.
+  const generated = new Set(['_extensions/course-prairielearn/application/native-validators.js'].map(file => resolve(file)));
+  const files = sourceFiles.filter(file => file.endsWith('.ts') && !file.endsWith('.d.ts'));
+  const javascriptFiles = sourceFiles.filter(file => !file.endsWith('.ts') && !generated.has(file));
   if (!files.length) throw Error('Quality scope пуст: проверка без собственного production-кода запрещена');
   const denoConfig = JSON.parse(readFileSync(scope[0].startsWith('src/') ? 'deno.json' : 'typecheck/deno.json', 'utf8'));
   if (denoConfig.compilerOptions?.strict !== true) throw Error('Quality gate требует strict: true');
@@ -26,21 +30,32 @@ try {
     const quarto = JSON.parse(readFileSync(join(share, 'deno_std/run_import_map.json'), 'utf8'));
     for (const name of ['stdlib/path', 'stdlib/fs']) imports[name] = quarto.imports[name].replace('jsr:/', 'jsr:');
     const siblings = dirname(root);
-    imports['course-performance/'] = pathToFileURL(resolve(process.env.COURSE_PERFORMANCE_SOURCE ?? join(siblings, 'quarto-course-performance')) + '/').href;
-    for (const [name, repo, extension] of [
-      ['course-core', 'quarto-course', 'course-core'],
-      ['reference-catalog', 'quarto-reference-catalog', 'reference-catalog'],
-      ['project-download', 'quarto-project-download', 'project-download'],
-    ]) imports[name + '/'] = pathToFileURL(join(siblings, repo, '_extensions', extension) + '/').href;
-    imports['pl-native/'] = pathToFileURL(join(root, '_extensions/course-prairielearn/application') + '/').href;
+    imports['course-performance/'] = pathToFileURL(resolve(process.env.COURSE_PERFORMANCE_SOURCE ?? process.env.PERFORMANCE ?? join(siblings, 'quarto-course-performance')) + '/').href;
+    const providers = new Map();
+    const namespaces = new Set();
+    for (const [name, variable, repo] of [
+      ['course-core', 'CORE', 'quarto-course'],
+      ['course-navigation', 'CORE', 'quarto-course'],
+      ['course-prairielearn', 'PL', 'quarto-course-prairielearn'],
+      ['reference-catalog', 'QRC', 'quarto-reference-catalog'],
+      ['project-download', 'DOWNLOAD', 'quarto-project-download'],
+      ['course-site', 'SITE', 'quarto-project-publish'],
+    ]) {
+      const source = process.env[variable] ?? join(siblings, repo);
+      const extension = [join(source, '_extensions', name), join(source, '_extensions/Afonenko-Course-Tools', name), source]
+        .find(path => existsSync(join(path, 'public.ts')));
+      if (!extension) continue;
+      const target = pathToFileURL(resolve(extension) + '/').href;
+      imports[name + '/'] = target;
+      providers.set(name, target);
+      namespaces.add(dirname(resolve(extension)));
+      if (name === 'course-prairielearn') imports['pl-native/'] = new URL('application/', target).href;
+    }
+    for (const namespace of namespaces) for (const [name, target] of providers) {
+      imports[pathToFileURL(join(namespace, name) + '/').href] = target;
+    }
   }
   let importMap = process.argv[2];
-  if (!importMap && scope[0].startsWith('_extensions/course-prairielearn/')) {
-    importMap = join(temporary, 'providers.json');
-    run(process.env.QUARTO ?? 'quarto', ['run', 'tools/native-core-import-map.ts',
-      join(dirname(root), 'quarto-course'), importMap,
-      join(dirname(root), 'quarto-reference-catalog'), join(dirname(root), 'quarto-project-download')]);
-  }
   if (importMap) Object.assign(imports, JSON.parse(readFileSync(resolve(importMap), 'utf8')).imports);
   const configPath = join(temporary, 'deno.json');
   writeFileSync(configPath, JSON.stringify({ ...denoConfig, imports }));
@@ -70,19 +85,31 @@ try {
       ts.resolveModuleName(name, containing, options, host).resolvedModule;
   });
   const program = ts.createProgram([...files, globals], options, host);
-  const diagnostics = ts.getPreEmitDiagnostics(program).filter(item => !item.file || files.includes(item.file.fileName));
+  const programs = [program];
+  if (javascriptFiles.length) {
+    const browserConfig = join(root, 'typecheck', existsSync(join(root, 'typecheck/javascript.json')) ? 'javascript.json' : 'browser.json');
+    const settings = JSON.parse(readFileSync(browserConfig, 'utf8'));
+    const jsOptions = { ...ts.convertCompilerOptionsFromJson(settings.compilerOptions, dirname(browserConfig)).options,
+      strict: true, allowJs: true, checkJs: true, noEmit: true, skipLibCheck: true,
+      typeRoots: [join(root, 'node_modules/@types')] };
+    const declarations = join(root, 'typecheck/browser.d.ts');
+    programs.push(ts.createProgram([...javascriptFiles, ...(existsSync(declarations) ? [declarations] : [])], jsOptions));
+  }
+  const checkedFiles = [...files, ...javascriptFiles];
+  const diagnostics = programs.flatMap(program => ts.getPreEmitDiagnostics(program))
+    .filter(item => !item.file || checkedFiles.includes(item.file.fileName));
   if (diagnostics.length) throw Error(ts.formatDiagnosticsWithColorAndContext(diagnostics, {
     getCurrentDirectory: () => root, getCanonicalFileName: file => file, getNewLine: () => '\n',
   }));
-  const eslint = new ESLint({ overrideConfig: [{ languageOptions: { parserOptions: { programs: [program] } } }] });
-  const results = await eslint.lintFiles(files);
-  if (results.length !== files.length || results.some(result => result.warningCount)) throw Error('Неполный quality scope либо предупреждения линтера');
+  const eslint = new ESLint({ overrideConfig: [{ languageOptions: { parserOptions: { programs } } }] });
+  const results = await eslint.lintFiles(checkedFiles);
   console.log(await (await eslint.loadFormatter('stylish')).format(results));
+  if (results.length !== checkedFiles.length || results.some(result => result.warningCount)) throw Error('Неполный quality scope либо предупреждения линтера');
   let receipt;
   if (results.some(result => result.errorCount)) process.exitCode = 1;
   else {
-    const configured = await Promise.all(files.map(file => eslint.calculateConfigForFile(file)));
-    receipt = { checked: files.length, structuralChecked: configured.filter(config => config.rules.complexity?.[0] === 2).length, strict: true, typescript: ts.version, eslint: ESLint.version, typescriptESLint: tseslint.parser.meta.version, graphModules: graph.modules.length };
+    const configured = await Promise.all(checkedFiles.map(file => eslint.calculateConfigForFile(file)));
+    receipt = { checked: files.length, javascriptChecked: javascriptFiles.length, structuralChecked: configured.filter(config => config.rules.complexity?.[0] === 2).length, strict: true, typescript: ts.version, eslint: ESLint.version, typescriptESLint: tseslint.parser.meta.version, graphModules: graph.modules.length };
   }
   console.log(run(join(root, 'node_modules/.bin/depcruise'), ['--config', '.dependency-cruiser.json', '--output-type', 'err-long', ...scope.map(prefix => prefix.replace(/\/$/, ''))]));
   if (!process.exitCode) console.log(JSON.stringify(receipt));

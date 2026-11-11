@@ -1,3 +1,4 @@
+import { assertIntegerCourseMaxima } from "./native-course-options.ts";
 import { dirname, join } from "node:path";
 import { CourseArtifacts, inventoryNames } from "./course-artifacts.ts";
 import { CourseOverviews } from "./course-overview.ts";
@@ -47,12 +48,16 @@ async function buildCourse(input: CourseExportInput) {
     overviews = new CourseOverviews(plan, owned);
   try {
     const scratch = await owned.scratchDirectory();
+    if (d.course.options?.integerManualPoints === true) {
+      for (const work of works) assertIntegerCourseMaxima(gradingPolicy(work), `${work.source ?? "course"}#${work.id}`);
+    }
     await writer.write("infoCourse.json", {
       uuid: courseUuid,
       name: d.course.name,
       title: d.course.title,
       timezone: d.course.timezone,
       topics: d.course.topics,
+      ...(d.course.options === undefined ? {} : {options: d.course.options}),
     });
     await writer.write(
       "courseInstances/" + input.instance + "/infoCourseInstance.json",

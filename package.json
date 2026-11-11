@@ -5,7 +5,8 @@
   "scripts": {
     "typecheck:tools": "tsc --project tsconfig.tools.json",
     "check-quality": "node tools/check-quality.mjs",
-    "check:dependencies": "depcruise --config .dependency-cruiser.json --output-type err-long _extensions/course-prairielearn"
+    "check:dependencies": "depcruise --config .dependency-cruiser.json --output-type err-long _extensions/course-prairielearn",
+    "check-quality:controls": "node tools/check-quality-controls.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.0",

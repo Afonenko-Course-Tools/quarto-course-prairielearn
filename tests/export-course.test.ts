@@ -1256,3 +1256,28 @@ Deno.test("inventory: одинаковые Unicode имена не завися�
     }
   });
 });
+
+Deno.test("integer manual course option is opt-in, survives native output, and rejects fractional maxima before publication", async () => {
+  for (const enabled of [undefined, false, true]) {
+    await inventoryCourseFixture(async (input) => {
+      if (enabled !== undefined) input.config.delivery.course.options = {integerManualPoints: enabled};
+      if (enabled === false) for (const work of input.content.assessments) {
+        work.extensions.prairielearn = {...work.extensions.prairielearn, "question-points": 2.5};
+      }
+      await exportCourse(input);
+      const course = record(JSON.parse(await Deno.readTextFile(input.output + "/infoCourse.json")));
+      if (enabled === undefined) assert(!Object.hasOwn(course, "options"), "default changed");
+      else assert(record(course.options).integerManualPoints === enabled, "explicit opt-in lost");
+    });
+  }
+  await inventoryCourseFixture(async (input) => {
+    input.config.delivery.course.options = {integerManualPoints: true};
+    for (const work of input.content.assessments) work.extensions.prairielearn = {...work.extensions.prairielearn, "question-points": 2.5};
+    let failure = "";
+    try { await exportCourse(input); } catch (error) { failure = String(error); }
+    assert(failure.includes("PL.GRADING_INVALID:") && failure.includes("integerManualPoints"), "fractional maximum accepted");
+    let absent = false;
+    try { await Deno.stat(input.output); } catch (error) { absent = error instanceof Deno.errors.NotFound; }
+    assert(absent, "invalid policy published native output");
+  });
+});

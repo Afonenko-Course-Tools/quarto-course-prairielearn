@@ -111,6 +111,46 @@ function mergePolicy(base: Record<string, unknown>, local: unknown): unknown {
   }
   return out;
 }
+function validateRawDeclarations(
+  declarations: z.output<typeof NativeBusinessSchema>["declarations"],
+) {
+  const ownAttrs = new Set([
+    "prairielearn-topic",
+    "prairielearn-submission",
+    "prairielearn-submission-layout",
+    "prairielearn-single-variant",
+    "prairielearn-grading",
+  ]);
+  for (const declaration of declarations) {
+    for (const [key, value] of Object.entries(declaration.attributes)) {
+      if (key.startsWith("prairielearn-")) {
+        if (!ownAttrs.has(key)) {
+          throw Error("PL.DECLARATION_INVALID: неизвестное поле " + key);
+        }
+        if (
+          key === "prairielearn-grading" &&
+          !["external", "manual", "mixed"].includes(value)
+        ) throw Error("PL.GRADING_INVALID: " + declaration.id);
+        if (
+          key === "prairielearn-submission" &&
+          !["editor", "upload", "workspace"].includes(value)
+        ) throw Error("PL.SUBMISSION_INVALID: " + declaration.id);
+        if (
+          key === "prairielearn-single-variant" &&
+          !["true", "false"].includes(value)
+        ) throw Error("PL.DECLARATION_INVALID: single-variant");
+        if (key === "prairielearn-topic" && !value.trim()) {
+          throw Error("PL.DECLARATION_INVALID: topic");
+        }
+      }
+    }
+    if (declaration.answer !== undefined && declaration.answer !== true) {
+      throw Error(
+        "PL.ANSWER_UNQUALIFIED: raw answer требует отдельного проверенного транспорта",
+      );
+    }
+  }
+}
 /** Полный raw канон проверяется до Core audience projection. */
 function readNativeRaw(
   value: unknown,
@@ -153,42 +193,7 @@ function readNativeRaw(
   const defaults = AssessmentDefaultsSchema.parse(
     nativePolicy(config["assessment-defaults"] ?? {}),
   );
-  const ownAttrs = new Set([
-    "prairielearn-topic",
-    "prairielearn-submission",
-    "prairielearn-submission-layout",
-    "prairielearn-single-variant",
-    "prairielearn-grading",
-  ]);
-  for (const declaration of raw.declarations) {
-    for (const [key, value] of Object.entries(declaration.attributes)) {
-      if (key.startsWith("prairielearn-")) {
-        if (!ownAttrs.has(key)) {
-          throw Error("PL.DECLARATION_INVALID: неизвестное поле " + key);
-        }
-        if (
-          key === "prairielearn-grading" &&
-          !["external", "manual", "mixed"].includes(value)
-        ) throw Error("PL.GRADING_INVALID: " + declaration.id);
-        if (
-          key === "prairielearn-submission" &&
-          !["editor", "upload", "workspace"].includes(value)
-        ) throw Error("PL.SUBMISSION_INVALID: " + declaration.id);
-        if (
-          key === "prairielearn-single-variant" &&
-          !["true", "false"].includes(value)
-        ) throw Error("PL.DECLARATION_INVALID: single-variant");
-        if (key === "prairielearn-topic" && !value.trim()) {
-          throw Error("PL.DECLARATION_INVALID: topic");
-        }
-      }
-    }
-    if (declaration.answer !== undefined && declaration.answer !== true) {
-      throw Error(
-        "PL.ANSWER_UNQUALIFIED: raw answer требует отдельного проверенного транспорта",
-      );
-    }
-  }
+  validateRawDeclarations(raw.declarations);
   const projectChecks = raw.projectChecks === undefined
     ? undefined : parseNativeChecks(raw.projectChecks);
   const materialization = raw.materialization === undefined

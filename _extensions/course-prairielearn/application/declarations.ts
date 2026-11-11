@@ -1,3 +1,4 @@
+import { courseOptions } from "./native-course-options.ts";
 import { NativeSeedTargetsSchema } from "./native-materialization.ts";
 import { submission as parseSubmission } from "./submission.ts";
 import { createMetrics as __createMetrics } from "../observability/bridge.ts";
@@ -102,7 +103,9 @@ function declarationsImplementation(value: unknown, key: string) {
     "title",
     "timezone",
     "topics",
-  ]);
+  ], ["options"]);
+  const options = courseOptions(course.options);
+  const optionalOptions = options === undefined ? {} : {options};
   const requiredText = (value: unknown, field: string): string => {
     if (typeof value !== "string" || !value.trim()) throw new Error("PL course " + field + " required");
     return value;
@@ -159,9 +162,9 @@ function declarationsImplementation(value: unknown, key: string) {
   if (!instance) throw new Error("PL instance missing");
   const defaults = question(raw["question-defaults"]);
   return {
-    raw: {...raw, delivery:{...delivery,book,course:{name,title,timezone,topics},instances}, "question-defaults":closed(raw["question-defaults"], ["topic","submission"], ["grading","single-variant"])},
+    raw: {...raw, delivery:{...delivery,book,course:{name,title,timezone,topics,...optionalOptions},instances}, "question-defaults":closed(raw["question-defaults"], ["topic","submission"], ["grading","single-variant"])},
     book,
-    course: {name,title,timezone,topics},
+    course: {name,title,timezone,topics,...optionalOptions},
     instance,
     defaults,
   };
