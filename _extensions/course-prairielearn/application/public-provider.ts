@@ -54,3 +54,19 @@ export async function installedCapture(path: string): Promise<CaptureProvider> {
   }
   return value;
 }
+
+type PublicationProvider = Pick<typeof CorePublic, "withNativePublication">;
+function publicationProvider(value: unknown): value is PublicationProvider {
+  return record(value) && typeof value.withNativePublication === "function";
+}
+/** Inspection consumes publication only; project/grading APIs do not belong to
+ * this admission stage and must not replace the public publication refusal. */
+export async function installedPublication(
+  path: string,
+): Promise<PublicationProvider> {
+  const value: unknown = await import(pathToFileURL(path).href);
+  if (!publicationProvider(value)) {
+    throw Error("PL.PUBLIC_API_REQUIRED: installed Core withNativePublication");
+  }
+  return value;
+}

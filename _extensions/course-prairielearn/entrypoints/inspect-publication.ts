@@ -1,4 +1,4 @@
-import { installedCore } from "../application/public-provider.ts";
+import { installedPublication } from "../application/public-provider.ts";
 import { join, resolve } from "node:path";
 import { inspectPublication } from "../application/native-publication.ts";
 const args = Deno.args[0] === "--" ? Deno.args.slice(1) : Deno.args;
@@ -34,7 +34,7 @@ for (
   }
 }
 if (!core) throw Error("PL.INPUT_INVALID: installed public Core required");
-const Core = await installedCore(join(core, "public.ts"));
+const Core = await installedPublication(join(core, "public.ts"));
 const output = await Core.withNativePublication({
   root: owner,
   projection,
