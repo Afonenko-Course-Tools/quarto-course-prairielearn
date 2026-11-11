@@ -17,6 +17,83 @@ const record = (value: unknown): value is Record<string, unknown> => value !== n
 export type CheckedNativeProjectFact = Omit<NativeProjectFact, "check"> & {
   check?: NativeProjectCheck;
 };
+async function projectReferences(
+  selection: Awaited<ReturnType<typeof selectNativeCompilerInputs>>,
+  check: NativeProjectCheck,
+) {
+  const origin = (file: { target: string; bytes: Uint8Array }, name: string) =>
+    selectedCheckFile(file, name);
+  const primary = new Set(selection.sources.map((f) => f.name));
+  const extras = check["additional-java-sources"];
+  const references = [];
+  for (const ref of selection.references) {
+    const names = new Set(ref.files.map((f) => f.name));
+    if (
+      ref.available &&
+      // Явная Java reference-группа без student ZIP policy — полное решение,
+      // а не копия списка starter-файлов. Выбор role/hash/limits уже проверен.
+      !(!extras &&
+        ["java25-junit-v1", "java25-gradle-junit-v1"].includes(
+          check.runtime,
+        )) &&
+      ((!extras && [...names].some((n) => !primary.has(n))) ||
+        extras?.["primary-required"] !== false &&
+          [...primary].some((n) => !names.has(n)))
+    ) {
+      throw Error(
+        "PL.SELECTION_INVALID: reference primary/helper policy mismatch",
+      );
+    }
+    references.push({
+      name: ref.name,
+      root: ref.root,
+      optional: ref.optional,
+      group: ref.group,
+      available: ref.available,
+      targets: ref.targets,
+      sources: await Promise.all(ref.files.map((f) => origin(f, f.name))),
+    });
+  }
+  return references;
+}
+function contractFixtureFiles(
+  file: ArtifactFile,
+  target: (name: string) => ArtifactFile,
+): SelectedCheckFile[] {
+  const contractFixtures: SelectedCheckFile[] = [];
+  const origin = (file: { target: string; bytes: Uint8Array }, name: string) =>
+    selectedCheckFile(file, name);
+  const raw: unknown = JSON.parse(
+    new TextDecoder("utf-8", { fatal: true }).decode(file.bytes),
+  );
+  if (!record(raw) || raw.schemaVersion !== 1 || !Array.isArray(raw.cases)) {
+    throw Error("PL.VERIFICATION_INVALID: contract cases");
+  }
+  const ids = new Set<string>();
+  const cases: unknown[] = raw.cases;
+  for (const value of cases) {
+    if (!record(value)) throw Error("PL.VERIFICATION_INVALID: contract case");
+    const row = value;
+    if (typeof row.id !== "string" || !row.id || ids.has(row.id)) {
+      throw Error("PL.VERIFICATION_INVALID: case id");
+    }
+    ids.add(row.id);
+    const mappings: unknown = row.sources ?? [];
+    if (!Array.isArray(mappings)) {
+      throw Error("PL.VERIFICATION_INVALID: fixture sources");
+    }
+    for (const item of mappings) {
+      if (
+        !record(item) || !safePath(item.fixture) ||
+        !item.fixture.startsWith("tests/fixtures/") ||
+        !safePath(item.submission)
+      ) throw Error("PL.VERIFICATION_INVALID: fixture mapping");
+      const file = target(item.fixture);
+      contractFixtures.push(origin(file, item.submission));
+    }
+  }
+  return contractFixtures;
+}
 /** Только private projection непосредственно materialized A1 inventories.
  * Это не resolver/reader; все paths/data получены от public Core той же операции.
  */
@@ -50,37 +127,7 @@ export async function projectNativeChecks(
   const trustedTests = await Promise.all(
     selection.tests.map((f) => origin(f, f.name)),
   );
-  const primary = new Set(selection.sources.map((f) => f.name));
-  const extras = check["additional-java-sources"];
-  const references = [];
-  for (const ref of selection.references) {
-    const names = new Set(ref.files.map((f) => f.name));
-    if (
-      ref.available &&
-      // Явная Java reference-группа без student ZIP policy — полное решение,
-      // а не копия списка starter-файлов. Выбор role/hash/limits уже проверен.
-      !(!extras &&
-        ["java25-junit-v1", "java25-gradle-junit-v1"].includes(
-          check.runtime,
-        )) &&
-      ((!extras && [...names].some((n) => !primary.has(n))) ||
-        extras?.["primary-required"] !== false &&
-          [...primary].some((n) => !names.has(n)))
-    ) {
-      throw Error(
-        "PL.SELECTION_INVALID: reference primary/helper policy mismatch",
-      );
-    }
-    references.push({
-      name: ref.name,
-      root: ref.root,
-      optional: ref.optional,
-      group: ref.group,
-      available: ref.available,
-      targets: ref.targets,
-      sources: await Promise.all(ref.files.map((f) => origin(f, f.name))),
-    });
-  }
+  const references = await projectReferences(selection, check);
   const chosen = (files: ArtifactFile[], patterns: string[]) =>
     files.filter((f) => patterns.some((p) => matchesGlob(f.target, p))).sort((
       a,
@@ -147,33 +194,7 @@ export async function projectNativeChecks(
     const name = check["contract-cases"], file = target(name);
     contractCaseFile = origin(file, name);
     contractCases = { ...file, name };
-    const raw: unknown = JSON.parse(
-      new TextDecoder("utf-8", { fatal: true }).decode(file.bytes),
-    );
-    if (!record(raw) || raw.schemaVersion !== 1 || !Array.isArray(raw.cases)) {
-      throw Error("PL.VERIFICATION_INVALID: contract cases");
-    }
-    const ids = new Set<string>();
-    const cases: unknown[] = raw.cases;
-    for (const value of cases) {
-      if (!record(value)) throw Error("PL.VERIFICATION_INVALID: contract case");
-      const row = value;
-      if (typeof row.id !== "string" || !row.id || ids.has(row.id)) {
-        throw Error("PL.VERIFICATION_INVALID: case id");
-      }
-      ids.add(row.id);
-      const mappings: unknown = row.sources ?? [];
-      if (!Array.isArray(mappings)) throw Error("PL.VERIFICATION_INVALID: fixture sources");
-      for (const item of mappings) {
-        if (
-          !record(item) || !safePath(item.fixture) ||
-          !item.fixture.startsWith("tests/fixtures/") ||
-          !safePath(item.submission)
-        ) throw Error("PL.VERIFICATION_INVALID: fixture mapping");
-        const file = target(item.fixture);
-        contractFixtures.push(origin(file, item.submission));
-      }
-    }
+    contractFixtures.push(...contractFixtureFiles(file, target));
   }
   const project = {
     ...input.fact,

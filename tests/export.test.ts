@@ -1,6 +1,7 @@
 import { required, property, record, setFixture, deleteFixture, array, fixtureAt, pandoc as decodePandoc, string } from "./fixture-values.ts";
 import type { PublicBodyPackage } from "course-core/public.ts";
 import { stripVTControlCharacters } from "node:util";
+import { fileURLToPath } from "node:url";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 const assert = (v: unknown, m: string) => {
   if (!v) throw Error(m);
@@ -430,10 +431,10 @@ Deno.test("staged filesystem failure removes partial delivery and retains unknow
   }
 });
 
-const cli = new URL(
+const cli = fileURLToPath(new URL(
   "../_extensions/course-prairielearn/entrypoints/export.ts",
   import.meta.url,
-).pathname;
+));
 async function runCli(args: string[]) {
   const result = await new Deno.Command(Deno.execPath(), {
     // Exercise the coloured Deno error rendering used by CI.
@@ -1578,4 +1579,42 @@ assertEquals(42, Clamp.value());
   } finally {
     await Deno.remove(root, { recursive: true });
   }
+});
+
+Deno.test("starter bundle removes duplicate downloads while legacy standalone keeps selected source downloads", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    await Deno.mkdir(root + "/project/student", { recursive: true });
+    await Deno.mkdir(root + "/project/tests", { recursive: true });
+    const starter = new TextEncoder().encode("public class Clamp {}\n");
+    await Deno.writeFile(root + "/project/student/Clamp.java", starter);
+    await Deno.writeTextFile(root + "/project/tests/grade.sh", "PRIVATE_CHECKS");
+    const context = { projectRoot: root, projects: { "exr-clamp": "/project" } };
+    const b = structuredClone(binding);
+    b.questions["exr-clamp"].submission = { mode: "upload", layout: "files" };
+    for (const bundled of [false, true]) {
+      const output = root + (bundled ? "/bundled" : "/legacy");
+      await exportPrairieLearn(p(), {
+        ...context,
+        ...(bundled ? { studentArtifacts: { "exr-clamp": {
+          files: [{ name: "Clamp.java", bytes: starter }],
+          archive: new Uint8Array([80, 75, 3, 4]),
+        } } } : {}),
+      }, b, output);
+      const base = output + "/questions/demo/exr-clamp";
+      const html = await Deno.readTextFile(base + "/question.html");
+      assert(html.includes('<pl-file-upload file-names="Clamp.java"'), "submission control lost");
+      assert(html.includes("<pl-file-download") !== bundled, "duplicate or missing starter download route");
+      if (bundled) {
+        assert(html.includes("/starter.zip"), "canonical starter archive missing");
+        assert(await Deno.readTextFile(base + "/clientFilesQuestion/starter/Clamp.java") === new TextDecoder().decode(starter), "starter changed");
+        let absent = false;
+        try { await Deno.stat(base + "/clientFilesQuestion/Clamp.java"); }
+        catch (error) { absent = error instanceof Deno.errors.NotFound; }
+        assert(absent, "bundle duplicated selected source at clientFilesQuestion root");
+      } else {
+        assert(await Deno.readTextFile(base + "/clientFilesQuestion/Clamp.java") === new TextDecoder().decode(starter), "legacy individual starter lost");
+      }
+    }
+  } finally { await Deno.remove(root, { recursive: true }); }
 });

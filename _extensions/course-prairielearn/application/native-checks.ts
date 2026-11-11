@@ -179,8 +179,13 @@ export function nativeCheckScalars(value: unknown): unknown {
   }
   return visit(out);
 }
-export function decodeNativeCheck(raw: unknown, profile: string) {
-  const config = NativeProjectChecksSchema.parse(nativeCheckScalars(raw));
+export type NativeProjectChecks = z.output<typeof NativeProjectChecksSchema>;
+/** Decode the complete source-owned policy map once at its raw boundary. */
+export function parseNativeChecks(raw: unknown): NativeProjectChecks {
+  return NativeProjectChecksSchema.parse(nativeCheckScalars(raw));
+}
+/** Typed lookup still validates each merged effective policy. No process cache. */
+export function nativeCheck(config: NativeProjectChecks, profile: string) {
   if (!Object.hasOwn(config.profiles, profile)) {
     throw Error("PL.PROJECT_CHECK_INVALID: unknown profile " + profile);
   }
@@ -195,4 +200,9 @@ export function decodeNativeCheck(raw: unknown, profile: string) {
     throw Error("PL.PROJECT_CHECK_INVALID: unknown source profile");
   }
   return NativeProjectCheckSchema.parse({ ...check, profile, sourceProfile });
+}
+
+/** Compatibility boundary for callers with an unparsed raw plane. */
+export function decodeNativeCheck(raw: unknown, profile: string) {
+  return nativeCheck(parseNativeChecks(raw), profile);
 }

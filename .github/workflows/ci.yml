@@ -31,6 +31,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Подготовить фактическую GNU mv no-replace capability
+        run: bash tools/setup-mv-ci.sh "$RUNNER_TEMP/course-gnu-mv" >> "$GITHUB_PATH"
       - name: Подготовить доступный кеш Quarto
         run: |
           mkdir -p -- "$XDG_CACHE_HOME"
@@ -46,13 +48,13 @@ jobs:
         with:
           repository: Afonenko-Course-Tools/quarto-course
           # Core 9: независимо проверенный исходный код; полный hosted CI и выпуск отдельно.
-          ref: 8aba3b47df161c98645f3fc268adefc2e96ef8d3
+          ref: 5c2b551724471ff7637aad1068f22c5f7998a687
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "8aba3b47df161c98645f3fc268adefc2e96ef8d3"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "5c2b551724471ff7637aad1068f22c5f7998a687"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -69,26 +71,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: 0b62c6501d716a634e0d1e3fcc3d21e41142b5a1
+          ref: f23797829c42b8333d5ba02469b64531f394911d
           path: .ci-deps/qrc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-publish
-          ref: 21abbbe40a66cbdc1f0185d09b9f6710e20f140b
+          ref: 63d6922074b1345a83f93449cd5a9fe9fbfeaab3
           path: .ci-deps/site
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-download
-          ref: a621ec302a701d7409616f47675d2df0afb87aca
+          ref: cb00715252d46b3758a8ac2d24a893a2602d6315
           path: .ci-deps/download
           persist-credentials: false
       - name: Проверить закреплённые QRC, Site и Download
         run: |
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "0b62c6501d716a634e0d1e3fcc3d21e41142b5a1"
-          test "$(git -C .ci-deps/site rev-parse HEAD)" = "21abbbe40a66cbdc1f0185d09b9f6710e20f140b"
-          test "$(git -C .ci-deps/download rev-parse HEAD)" = "a621ec302a701d7409616f47675d2df0afb87aca"
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "f23797829c42b8333d5ba02469b64531f394911d"
+          test "$(git -C .ci-deps/site rev-parse HEAD)" = "63d6922074b1345a83f93449cd5a9fe9fbfeaab3"
+          test "$(git -C .ci-deps/download rev-parse HEAD)" = "cb00715252d46b3758a8ac2d24a893a2602d6315"
       - name: Настоящие закрытые answers, HTML/Reveal и grading composition
         run: quarto run tests/native-answers-integration.ts .ci-deps/core --author
       - name: Отказ несовместимого cross-document grading
@@ -116,6 +118,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Подготовить фактическую GNU mv no-replace capability
+        run: bash tools/setup-mv-ci.sh "$RUNNER_TEMP/course-gnu-mv" >> "$GITHUB_PATH"
       - name: Подготовить доступный кеш Quarto
         run: |
           mkdir -p -- "$XDG_CACHE_HOME"
@@ -129,29 +133,29 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: 8aba3b47df161c98645f3fc268adefc2e96ef8d3
+          ref: 5c2b551724471ff7637aad1068f22c5f7998a687
           path: .ci-deps/core
           persist-credentials: false
       - name: Проверить закреплённый Core
         run: |
           git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "8aba3b47df161c98645f3fc268adefc2e96ef8d3"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "5c2b551724471ff7637aad1068f22c5f7998a687"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: 0b62c6501d716a634e0d1e3fcc3d21e41142b5a1
+          ref: f23797829c42b8333d5ba02469b64531f394911d
           path: .ci-deps/qrc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-download
-          ref: a621ec302a701d7409616f47675d2df0afb87aca
+          ref: cb00715252d46b3758a8ac2d24a893a2602d6315
           path: .ci-deps/download
           persist-credentials: false
       - name: Проверить закреплённые QRC и Download
         run: |
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "0b62c6501d716a634e0d1e3fcc3d21e41142b5a1"
-          test "$(git -C .ci-deps/download rev-parse HEAD)" = "a621ec302a701d7409616f47675d2df0afb87aca"
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "f23797829c42b8333d5ba02469b64531f394911d"
+          test "$(git -C .ci-deps/download rev-parse HEAD)" = "cb00715252d46b3758a8ac2d24a893a2602d6315"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5
@@ -171,11 +175,11 @@ jobs:
         run: |
           export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
           bash tools/check-java.sh
-      - run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts tests/manual-mixed.test.ts tests/functional-selected-files.test.ts tests/native-seed-policy.test.ts tests/git-transport.test.ts tests/publication-conditions.test.ts tests/public-tests.test.ts tests/body-projection.test.ts tests/java-build.test.ts tests/whole-bank.test.ts
+      - run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts tests/manual-mixed.test.ts tests/functional-selected-files.test.ts tests/native-seed-policy.test.ts tests/git-transport.test.ts tests/publication.test.ts tests/publication-conditions.test.ts tests/public-tests.test.ts tests/body-projection.test.ts tests/java-build.test.ts tests/whole-bank.test.ts
       - name: Атомарный экспорт между файловыми системами
         run: PL_EXDEV_TEST_DIR=/dev/shm deno test --no-config --import-map .ci-deps/pl-native-imports.json -A --filter "functional export v5" tests/export-course.test.ts
       - name: Профили исходников Java, starter/API/Gradle и native delivery
-        run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/java-build.test.ts tests/native-contract-batch.test.ts tests/native-batch-checkpoint.test.ts tests/native-selection.test.ts tests/native-origin-scope.test.ts tests/native-verification-inventory.test.ts tests/native-seed-policy.test.ts tests/native-auxiliary.test.ts
+        run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/java-build.test.ts tests/native-contract-batch.test.ts tests/native-batch-checkpoint.test.ts tests/native-selection.test.ts tests/native-origin-scope.test.ts tests/native-verification-inventory.test.ts tests/native-seed-policy.test.ts tests/native-auxiliary.test.ts tests/native-publication.test.ts
 
   static:
     name: Строгая проверка собственного кода
@@ -192,6 +196,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Подготовить фактическую GNU mv no-replace capability
+        run: bash tools/setup-mv-ci.sh "$RUNNER_TEMP/course-gnu-mv" >> "$GITHUB_PATH"
       - name: Подготовить доступный кеш Quarto
         run: |
           mkdir -p -- "$XDG_CACHE_HOME"
@@ -203,33 +209,33 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course
-          ref: 8aba3b47df161c98645f3fc268adefc2e96ef8d3
+          ref: 5c2b551724471ff7637aad1068f22c5f7998a687
           path: .ci-deps/core
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: 0b62c6501d716a634e0d1e3fcc3d21e41142b5a1
+          ref: f23797829c42b8333d5ba02469b64531f394911d
           path: .ci-deps/qrc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-project-download
-          ref: a621ec302a701d7409616f47675d2df0afb87aca
+          ref: cb00715252d46b3758a8ac2d24a893a2602d6315
           path: .ci-deps/download
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Afonenko-Course-Tools/quarto-course-performance
-          ref: 0781f03a11f461691d7ce116f2c53bb5d8af68d7
+          ref: bfbe23f819dfe4c7d5e5487f669c14d8e6c9846e
           path: .ci-deps/performance
           persist-credentials: false
       - name: Проверить закреплённые исходники статических проверок
         run: |
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "8aba3b47df161c98645f3fc268adefc2e96ef8d3"
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "0b62c6501d716a634e0d1e3fcc3d21e41142b5a1"
-          test "$(git -C .ci-deps/download rev-parse HEAD)" = "a621ec302a701d7409616f47675d2df0afb87aca"
-          test "$(git -C "$PERFORMANCE" rev-parse HEAD)" = "0781f03a11f461691d7ce116f2c53bb5d8af68d7"
+          test "$(git -C .ci-deps/core rev-parse HEAD)" = "5c2b551724471ff7637aad1068f22c5f7998a687"
+          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "f23797829c42b8333d5ba02469b64531f394911d"
+          test "$(git -C .ci-deps/download rev-parse HEAD)" = "cb00715252d46b3758a8ac2d24a893a2602d6315"
+          test "$(git -C "$PERFORMANCE" rev-parse HEAD)" = "bfbe23f819dfe4c7d5e5487f669c14d8e6c9846e"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: 1.11.5
@@ -252,6 +258,10 @@ jobs:
           deno run --no-config -A tools/check-types.ts --lint
       - name: Установить закреплённые зависимости CJS-проверки
         run: npm ci --ignore-scripts
+      - name: Блокирующий typed ESLint и границы модулей
+        run: |
+          npm run check-quality -- .ci-deps/pl-native-imports.json
+          npm run check-quality:controls -- .ci-deps/pl-native-imports.json
       - name: Строгая проверка собственного CJS
         run: npm run typecheck:tools -- --pretty false
       - name: Строгая проверка четырёх собственных Python-файлов
@@ -273,6 +283,9 @@ jobs:
           printf '%s\n' "$tool_dir" >> "$GITHUB_PATH"
       - name: Синтаксис и строгая проверка shell по каждому диалекту
         run: |
+          bash -n tools/check-mv-capability.sh
+          bash -n tools/setup-mv-ci.sh
+          shellcheck tools/check-mv-capability.sh tools/setup-mv-ci.sh
           bash -n tools/check-java.sh
           sh -n examples/java-gradle/bank/projects/clamp/tests/grade.sh
           shellcheck --norc --enable=all --severity=style --shell=bash tools/check-java.sh

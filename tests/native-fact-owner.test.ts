@@ -137,3 +137,29 @@ Deno.test("typed project rows сохраняют hidden/non-PL normalization и 
     );
   }
 });
+
+Deno.test("checks map parses once per provenance source, with independent owner policies", async () => {
+  const { NativeProjectChecksSchema } = await import("../_extensions/course-prairielearn/application/native-checks.ts");
+  const parse = NativeProjectChecksSchema.parse;
+  let calls = 0;
+  NativeProjectChecksSchema.parse = (...args) => { calls++; return parse(...args); };
+  try {
+    const second = structuredClone(policy);
+    second.defaults.scoring.mode = "all-pass";
+    const input: NativeAssignmentProvenance = {
+      documents: [
+        { source: "one.qmd", format: "html", projectChecks: policy, projects: [fact, {...fact, exerciseId: "exr-second"}] },
+        { source: "nested/two.qmd", format: "html", projectChecks: second, projects: [{...fact, source: "nested/two.qmd"}] },
+      ],
+    };
+    const before = structuredClone(input);
+    const rows = Provenance.nativeProjectRows(input);
+    assert.equal(calls, 2, "whole map was reparsed for each project");
+    assert.equal(required(rows[0]).fact.check?.scoring.mode, "weighted");
+    assert.equal(required(rows[2]).fact.check?.scoring.mode, "all-pass");
+    assert.deepEqual(input, before);
+    const malformed = structuredClone(input);
+    required(malformed.documents[1]).projectChecks = {...second, profiles: {...second.profiles, unrelated: {unknown: true}}};
+    assert.throws(() => Provenance.nativeProjectRows(malformed));
+  } finally { NativeProjectChecksSchema.parse = parse; }
+});

@@ -18,8 +18,8 @@ import { z } from "../vendor/zod/v4/index.js";
 import { join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { nativeWorkspaceArtifact } from "./native-workspace.ts";
-import { readNativeEntryCandidate } from "./native-entry.ts";
-import { decodeNativeCheck } from "./native-checks.ts";
+import { readNativeEntryCandidate } from "./native-request-candidate.ts";
+import { nativeCheck } from "./native-checks.ts";
 import { decodeNativeBusiness } from "./native-business.ts";
 import { safePath } from "./source-selection.ts";
 
@@ -209,6 +209,32 @@ export async function readNativeAdapterExpectation(
     },
   };
 }
+function validateAnswerPolicy(
+  declaration: NativeAdapterValidationInput["declarations"][number],
+  settings: ReturnType<typeof decodeNativeBusiness>["questions"][string],
+): boolean {
+  const answer = declaration.answer;
+  if (!answer) return false;
+  if (
+    declaration.attributes["project-check"] ||
+    declaration.attributes.project
+  ) {
+    throw Error(
+      "PL.ANSWER_UNQUALIFIED: answer form cannot acquire project runtime",
+    );
+  }
+  const hasManual = answer.type === "manual" ||
+    answer.type === "multipart" &&
+      answer.parts.some((p) => p.type === "manual");
+  const hasAuto = answer.type !== "manual" &&
+    (answer.type !== "multipart" ||
+      answer.parts.some((p) => p.type === "numeric"));
+  const expected = hasManual ? hasAuto ? "mixed" : "manual" : "external";
+  if (settings.grading.method !== expected) {
+    throw Error("PL.GRADING_INVALID: canonical answer grading method");
+  }
+  return true;
+}
 export function createNativeAdapter(
   options: { root: string; core: PublicCore; preparedIdentity?: unknown },
 ) {
@@ -262,29 +288,7 @@ export function createNativeAdapter(
       for (const declaration of input.declarations) {
         const settings = business.questions[declaration.id];
         if (!settings) throw Error("PL.ASSIGNMENT_CHANGED: missing question policy");
-        if (declaration.answer) {
-          if (
-            declaration.attributes["project-check"] ||
-            declaration.attributes.project
-          ) {
-            throw Error(
-              "PL.ANSWER_UNQUALIFIED: answer form cannot acquire project runtime",
-            );
-          }
-          const hasManual = declaration.answer.type === "manual" ||
-            declaration.answer.type === "multipart" &&
-              declaration.answer.parts.some((p) => p.type === "manual");
-          const hasAuto = declaration.answer.type !== "manual" &&
-            (declaration.answer.type !== "multipart" ||
-              declaration.answer.parts.some((p) => p.type === "numeric"));
-          const expected = hasManual
-            ? hasAuto ? "mixed" : "manual"
-            : "external";
-          if (settings.grading.method !== expected) {
-            throw Error("PL.GRADING_INVALID: canonical answer grading method");
-          }
-          continue;
-        }
+        if (validateAnswerPolicy(declaration, settings)) continue;
         const path = declaration.attributes.project?.replace(/^\//, "");
         if (!safePath(path)) {
           throw Error("PL.PROJECT_INVALID: требуется owner-relative project");
@@ -300,7 +304,8 @@ export function createNativeAdapter(
         }
         if (settings.grading.method !== "manual") {
           if (!check) throw Error("PL.PROJECT_CHECK_INVALID: требуется project-check");
-          decodeNativeCheck(raw.projectChecks, check);
+          if (!business.projectChecks) throw Error("PL.PROJECT_CHECK_INVALID: project checks required");
+          nativeCheck(business.projectChecks, check);
         }
         sources.push({ path, kind: "directory" });
         for (

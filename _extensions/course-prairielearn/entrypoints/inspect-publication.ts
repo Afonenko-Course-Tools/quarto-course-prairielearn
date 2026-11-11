@@ -1,5 +1,5 @@
+import { installedPublication } from "../application/public-provider.ts";
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { inspectPublication } from "../application/native-publication.ts";
 const args = Deno.args[0] === "--" ? Deno.args.slice(1) : Deno.args;
 const [ownerArg, ...options] = args, flags: Record<string, string> = {};
@@ -34,7 +34,7 @@ for (
   }
 }
 if (!core) throw Error("PL.INPUT_INVALID: installed public Core required");
-const Core: typeof import("course-core/public.ts") = await import(pathToFileURL(join(core, "public.ts")).href);
+const Core = await installedPublication(join(core, "public.ts"));
 const output = await Core.withNativePublication({
   root: owner,
   projection,

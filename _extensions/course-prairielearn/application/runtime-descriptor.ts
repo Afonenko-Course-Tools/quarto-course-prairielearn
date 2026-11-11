@@ -22,18 +22,61 @@ export function validateAdditionalJavaSources(value: unknown, sources: string[],
   return {archive, maxFiles:cap('maxFiles'),maxFileBytes:cap('maxFileBytes'),maxTotalBytes:cap('maxTotalBytes'),maxArchiveBytes:cap('maxArchiveBytes'), ...(typeof primaryRequired === 'boolean' ? {primaryRequired} : {}), ...(typeof allowAdditional === 'boolean' ? {allowAdditional} : {})};
 }
 export interface ApiPrecheck {files:string[];entry:string}
-export function runtimeDescriptor<C extends RuntimeCheckInput>(c: C, profile: RuntimeProfile, sources: string[], tests: string[], api?:ApiPrecheck) {
+function additionalSources(
+  c: RuntimeCheckInput,
+  sources: string[],
+  tests: string[],
+): AdditionalJavaSources | undefined {
+  const extra = c["additional-java-sources"];
+
+  if (extra !== undefined) {
+    if (
+      !extra || typeof extra !== "object" || Array.isArray(extra) ||
+      !["java25-junit-v1", "java25-gradle-junit-v1"].includes(c.runtime) ||
+      c.sourceProfile.mode !== "implementation" ||
+      Object.keys(extra).some((k) =>
+        ![
+          "archive",
+          "max-files",
+          "max-file-bytes",
+          "max-total-bytes",
+          "max-archive-bytes",
+          "primary-required",
+          "allow-additional",
+        ].includes(k)
+      )
+    ) {
+      throw new Error(
+        "PL additional Java sources require closed Java implementation policy",
+      );
+    }
+    return validateAdditionalJavaSources(
+      {
+        ...("primary-required" in extra
+          ? { primaryRequired: extra["primary-required"] }
+          : {}),
+        ...("allow-additional" in extra
+          ? { allowAdditional: extra["allow-additional"] }
+          : {}),
+        archive: extra.archive,
+        maxFiles: extra["max-files"],
+        maxFileBytes: extra["max-file-bytes"],
+        maxTotalBytes: extra["max-total-bytes"],
+        maxArchiveBytes: extra["max-archive-bytes"],
+      },
+      sources,
+      tests,
+    );
+  }
+  return undefined;
+}
+function runtimeDescriptorImplementation<C extends RuntimeCheckInput>(c: C, profile: RuntimeProfile, sources: string[], tests: string[], api?:ApiPrecheck) {
   const build=javaBuild(c,profile);
   const javaRuntime = profile.javaRelease !== undefined || !profile.sourceExtensions;
   if (!javaRuntime && c.java !== undefined) throw new Error('PL non-Java runtime cannot declare Java compiler settings');
   if(Boolean(c['api-precheck'])!==Boolean(api))throw new Error('PL API precheck selection missing or undeclared');
   if(api&&(!['java25-junit-v1','java25-gradle-junit-v1'].includes(c.runtime)||!javaRuntime||c.sourceProfile.mode!=='implementation'||!Array.isArray(api.files)||!api.files.length||new Set(api.files).size!==api.files.length||api.files.length>=tests.length||api.files.some(x=>!safePath(x)||!x.endsWith('.java')||!tests.includes(x))||!/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(api.entry)||api.entry!==c['api-precheck']?.entry))throw new Error('PL API precheck must be a proper trusted Java subset');
-  const extra=c['additional-java-sources'];
-  let additionalJavaSources:AdditionalJavaSources|undefined;
-  if(extra!==undefined){
-    if(!extra||typeof extra!=='object'||Array.isArray(extra)||!['java25-junit-v1','java25-gradle-junit-v1'].includes(c.runtime)||c.sourceProfile.mode!=='implementation'||Object.keys(extra).some(k=>!['archive','max-files','max-file-bytes','max-total-bytes','max-archive-bytes','primary-required','allow-additional'].includes(k)))throw new Error('PL additional Java sources require closed Java implementation policy');
-    additionalJavaSources=validateAdditionalJavaSources({...('primary-required' in extra?{primaryRequired:extra['primary-required']}:{}),...('allow-additional' in extra?{allowAdditional:extra['allow-additional']}:{}),archive:extra.archive,maxFiles:extra['max-files'],maxFileBytes:extra['max-file-bytes'],maxTotalBytes:extra['max-total-bytes'],maxArchiveBytes:extra['max-archive-bytes']},sources,tests);
-  }
+  const additionalJavaSources = additionalSources(c, sources, tests);
   const mode: C['sourceProfile']['mode'] = c.sourceProfile.mode;
   const field = <K extends keyof C>(key: K): C[K] => c[key];
   const scoring = field('scoring');
@@ -50,5 +93,4 @@ export function runtimeDescriptor<C extends RuntimeCheckInput>(c: C, profile: Ru
   };
 }
 
-// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-runtimeDescriptor=__metrics.wrapSync({id:"course-prairielearn.application.runtime-descriptor.runtimeDescriptor",kind:"phase"},runtimeDescriptor);
+export const runtimeDescriptor = __metrics.wrapSync({id:"course-prairielearn.application.runtime-descriptor.runtimeDescriptor",kind:"phase"},runtimeDescriptorImplementation);

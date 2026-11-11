@@ -243,3 +243,30 @@ Deno.test("PL native project-check canon rejects malformed runtime and path poli
     );
   }
 });
+
+Deno.test("PL typed check lookup parses the source map once and still validates every effective policy", async () => {
+  const { validateNativeRaw } = await import("../_extensions/course-prairielearn/application/native-business.ts");
+  const { NativeProjectChecksSchema, nativeCheck } = await import("../_extensions/course-prairielearn/application/native-checks.ts");
+  const parse = NativeProjectChecksSchema.parse;
+  let calls = 0;
+  NativeProjectChecksSchema.parse = (...args) => { calls++; return parse(...args); };
+  try {
+    const raw = {
+      config: {}, declarations: [],
+      projectChecks: {
+        defaults: {runtime:"java25-junit-v1", tests:["tests/*.java"]},
+        "source-profiles": {main:{mode:"implementation",root:"student",include:["**/*.java"]}},
+        profiles: {one:{"source-profile":"main"}, two:{"source-profile":"main", limits:{"run-seconds":"3"}}, invalid:{"source-profile":"missing"}},
+      },
+    };
+    const before = structuredClone(raw);
+    const parsed = required(validateNativeRaw(raw, {source:"nested/work.qmd"}).projectChecks);
+    nativeCheck(parsed,"one");
+    assert(nativeCheck(parsed,"two").limits?.["run-seconds"] === 3,"scalar normalization lost");
+    let rejected = false;
+    try { nativeCheck(parsed,"invalid"); } catch { rejected = true; }
+    assert(rejected,"invalid effective source profile accepted");
+    assert(calls === 1,"complete projectChecks map reparsed per lookup");
+    assert(JSON.stringify(raw) === JSON.stringify(before),"raw source mutated");
+  } finally { NativeProjectChecksSchema.parse = parse; }
+});

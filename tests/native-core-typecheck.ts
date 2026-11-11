@@ -66,7 +66,7 @@ try {
       declare const input: Parameters<typeof exportCourse>[0], selection: NativeCompilerInput;
       exportCourse({...input,nativeInputs:{example:{...selection,sources:[{name:"Main.java",data:new Uint8Array()}]}}});
     `,
-    "TS2353",
+    "TS2353|TS2769",
   ];
   const boundaryNegatives = [
     [
@@ -189,7 +189,8 @@ try {
     }).output();
     const output = new TextDecoder().decode(result.stdout) +
       new TextDecoder().decode(result.stderr);
-    if (result.success || !output.includes(diagnostic)) {
+    const expectedReason = name === "native-writer-source-bytes" ? "'data' does not exist in type" : undefined;
+    if (result.success || !diagnostic.split("|").some(code => output.includes(code)) || expectedReason !== undefined && !output.includes(expectedReason)) {
       throw Error("Не получен ожидаемый отказ " + name + ": " + output);
     }
     console.log(name + ": ожидаемый " + diagnostic);

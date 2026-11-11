@@ -15,6 +15,20 @@ function candidateList(value: unknown): value is string[] {
   return true;
 }
 
+function validateSlotAssignment(value: unknown, selection: unknown) {
+  const assignment = closed(value, ["requirement", "workMode"], ["stage"]);
+  if (
+    selection === "choice" && assignment.requirement !== "required" ||
+    assignment.requirement !== "required" &&
+      assignment.requirement !== "optional" ||
+    assignment.workMode !== "individual" && assignment.workMode !== "pair" &&
+      assignment.workMode !== "group" ||
+    assignment.stage !== undefined && assignment.stage !== "demonstration" &&
+      assignment.stage !== "classroom" && assignment.stage !== "homework"
+  ) {
+    throw Error("PL.SLOTS_INVALID: invalid assignment");
+  }
+}
 function assertSlots(value: unknown, courseId: string, workId: string, qualified: boolean): asserts value is AssessmentSlot[] {
   if (!Array.isArray(value) || !value.length || value.length > 4096) throw Error("PL.SLOTS_INVALID: required slots v2");
   const slots: unknown[] = value;
@@ -36,13 +50,7 @@ function assertSlots(value: unknown, courseId: string, workId: string, qualified
     }
     ids.add(id);
     for (const member of members) candidates.add(member);
-    const assignment = closed(slot.assignment, ["requirement", "workMode"], ["stage"]);
-    if (slot.selection === "choice" && assignment.requirement !== "required" ||
-      assignment.requirement !== "required" && assignment.requirement !== "optional" ||
-      assignment.workMode !== "individual" && assignment.workMode !== "pair" && assignment.workMode !== "group" ||
-      assignment.stage !== undefined && assignment.stage !== "demonstration" && assignment.stage !== "classroom" && assignment.stage !== "homework") {
-      throw Error("PL.SLOTS_INVALID: invalid assignment");
-    }
+    validateSlotAssignment(slot.assignment, slot.selection);
   }
 }
 export const validateSlots = metrics.wrapSync({ id: "course-prairielearn.application.slots.validateSlots", kind: "phase" },

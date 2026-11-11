@@ -2,7 +2,7 @@ import {createMetrics as __createMetrics} from "../observability/bridge.ts";
 const __metrics=__createMetrics("course-prairielearn");
 import { closed } from "./declarations.ts";
 import type { NativeProjectCheck } from "./native-checks.ts";
-export function normalizeDiscovery(value: NativeProjectCheck["discovery"] = {}) {
+function normalizeDiscoveryImplementation(value: NativeProjectCheck["discovery"] = {}) {
   closed(value, [], ["min-executed", "allow-skipped"]);
   const merged = { "min-executed": value["min-executed"] ?? 1, "allow-skipped": value["allow-skipped"] ?? false };
   if (
@@ -12,5 +12,4 @@ export function normalizeDiscovery(value: NativeProjectCheck["discovery"] = {}) 
   return merged;
 }
 
-// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-normalizeDiscovery=__metrics.wrapSync({id:"course-prairielearn.application.grading-descriptor.normalizeDiscovery",kind:"phase"},normalizeDiscovery);
+export const normalizeDiscovery = __metrics.wrapSync({id:"course-prairielearn.application.grading-descriptor.normalizeDiscovery",kind:"phase"},normalizeDiscoveryImplementation);

@@ -607,6 +607,7 @@ async function inventoryCourseFixture(
   run: (
     input: CourseFixtureInput,
     root: string,
+    metrics: { pandocCalls(): number },
   ) => Promise<void>,
 ) {
   const root = await Deno.makeTempDir({ prefix: "pl-inventory-test-" });
@@ -783,7 +784,7 @@ async function inventoryCourseFixture(
     };
     const start = performance.now();
     try {
-      await run(input, root);
+      await run(input, root, { pandocCalls: () => pandocCalls });
     } finally {
       Deno.Command = Command;
       console.info(
@@ -946,8 +947,8 @@ Deno.test("inventory: уникальный вопрос не перечитыв�
   });
 });
 
-Deno.test("inventory: одинаковый повтор проверяет реальные готовые байты", async () => {
-  await inventoryCourseFixture(async (input) => {
+Deno.test("inventory: одинаковый повтор рендерится один раз и проверяет реальные готовые байты", async () => {
+  await inventoryCourseFixture(async (input, _root, metrics) => {
     const read = Deno.readFile;
     const calls: { name: string; bytes: number }[] = [];
     const readDir = Deno.readDir;
@@ -963,6 +964,7 @@ Deno.test("inventory: одинаковый повтор проверяет ре�
     let result;
     try {
       result = await exportCourse(input);
+      assert(metrics.pandocCalls() === 3, "Повтор вызвал Pandoc заново: ожидаются два обзора и один вопрос");
     } finally {
       Deno.readFile = read;
       Deno.readDir = readDir;
@@ -1012,6 +1014,7 @@ for (
     "resource-binding",
     "public-question",
     "source-map",
+    "grading-policy",
     "existing-file",
     "extra-file",
     "missing-file",
@@ -1020,7 +1023,7 @@ for (
   Deno.test(
     "inventory: отказ при конфликте повторного вопроса — " + conflict,
     async () => {
-      await inventoryCourseFixture(async (input, root) => {
+      await inventoryCourseFixture(async (input, root, metrics) => {
         const body = input.body;
         input.body = async (id) => {
           const value = await body(id);
@@ -1069,6 +1072,9 @@ for (
             if (conflict === "public-question") {
               required(value.questions[0]).source = "other.qmd";
             }
+            if (conflict === "grading-policy") {
+              required(required(input.checks.projects[0]).check).scoring = {mode:"all-pass"};
+            }
             if (conflict === "source-map") {
               required(required(input.checks.projects[0]).sources[0]).target =
                 "student/other/A.java";
@@ -1110,6 +1116,8 @@ for (
           String(error).includes("PL конфликт повторного вопроса"),
           "Конфликт не отклонён: " + String(error),
         );
+        const sameInputs = ["existing-file", "extra-file", "missing-file"].includes(conflict);
+        assert(metrics.pandocCalls() === (sameInputs ? 3 : 4), "Повтор переиспользован при изменении входных данных: " + conflict);
         for (const path of [input.output, input.checksOutput]) {
           assert(
             !await Deno.lstat(path).then(() => true, () => false),
@@ -1187,6 +1195,24 @@ Deno.test("inventory: fresh output повторно проверяется пе�
   });
 });
 
+for (const kind of ["course", "instance", "question"]) {
+  Deno.test("inventory: assessment UUID collision with " + kind + " is rejected before publication", async () => {
+    await inventoryCourseFixture(async (input) => {
+      const course = await identity("course/demo");
+      const collision = kind === "course" ? course : kind === "instance"
+        ? await identity("instance/pilot", course)
+        : await (await import("../_extensions/course-prairielearn/application/export.ts")).uuid("demo/exr-a");
+      required(input.content.assessments[0]).extensions.prairielearn.uuid = collision.toUpperCase();
+      let error: unknown;
+      try { await exportCourse(input); } catch (caught) { error = caught; }
+      assert(String(error).includes("повторный UUID"), "Cross-kind collision accepted: " + error);
+      for (const path of [input.output, input.checksOutput]) {
+        assert(!await Deno.lstat(path).then(() => true, () => false), "Collision published output");
+      }
+    });
+  });
+}
+
 Deno.test("inventory: одинаковые Unicode имена не зависят от порядка обхода", async () => {
   await inventoryCourseFixture(async (input) => {
     const artifact = input.studentArtifact;
@@ -1228,5 +1254,30 @@ Deno.test("inventory: одинаковые Unicode имена не завися�
     } finally {
       Deno.readDir = readDir;
     }
+  });
+});
+
+Deno.test("integer manual course option is opt-in, survives native output, and rejects fractional maxima before publication", async () => {
+  for (const enabled of [undefined, false, true]) {
+    await inventoryCourseFixture(async (input) => {
+      if (enabled !== undefined) input.config.delivery.course.options = {integerManualPoints: enabled};
+      if (enabled === false) for (const work of input.content.assessments) {
+        work.extensions.prairielearn = {...work.extensions.prairielearn, "question-points": 2.5};
+      }
+      await exportCourse(input);
+      const course = record(JSON.parse(await Deno.readTextFile(input.output + "/infoCourse.json")));
+      if (enabled === undefined) assert(!Object.hasOwn(course, "options"), "default changed");
+      else assert(record(course.options).integerManualPoints === enabled, "explicit opt-in lost");
+    });
+  }
+  await inventoryCourseFixture(async (input) => {
+    input.config.delivery.course.options = {integerManualPoints: true};
+    for (const work of input.content.assessments) work.extensions.prairielearn = {...work.extensions.prairielearn, "question-points": 2.5};
+    let failure = "";
+    try { await exportCourse(input); } catch (error) { failure = String(error); }
+    assert(failure.includes("PL.GRADING_INVALID:") && failure.includes("integerManualPoints"), "fractional maximum accepted");
+    let absent = false;
+    try { await Deno.stat(input.output); } catch (error) { absent = error instanceof Deno.errors.NotFound; }
+    assert(absent, "invalid policy published native output");
   });
 });
