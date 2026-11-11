@@ -40,7 +40,7 @@ quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 Выпущенные версии устанавливайте по неизменяемым тегам после их публикации:
 
 ```sh
-quarto add Afonenko-Course-Tools/quarto-course@v9.1.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v9.4.0 --no-prompt
 quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v9.1.0 --no-prompt
 ```
 

@@ -17,6 +17,7 @@ async function inspect(dir: string) {
       [".git", "node_modules", "_generated", ".quarto"].includes(entry.name)
     ) continue;
     const path = join(dir, entry.name);
+    if (path === join(root, "tests/dependencies") || path === join(root, "vendor-sources")) continue;
     if (entry.isDirectory) await inspect(path);
     else if (entry.isFile) {
       files++;
