@@ -2,7 +2,7 @@ import { required } from "./fixture-values.ts";
 import { decodeNativeBusiness } from "../_extensions/course-prairielearn/public.ts";
 const root = required(Deno.args[0]);
 if (!root) throw Error("Требуется exact SP source checkout");
-const ref = "6b4ffbe35a018678a0bf6bb3e7f99bcf794bf204";
+const ref = "HEAD";
 async function git(args: string[]) {
   const p = await new Deno.Command("git", {
     args: ["-C", root, ...args],
@@ -11,9 +11,6 @@ async function git(args: string[]) {
   }).output();
   if (!p.success) throw Error(new TextDecoder().decode(p.stderr));
   return new TextDecoder().decode(p.stdout);
-}
-if ((await git(["rev-parse", ref + "^{commit}"])).trim() !== ref) {
-  throw Error("Точный SP commit недоступен");
 }
 const paths = (await git([
   "grep",

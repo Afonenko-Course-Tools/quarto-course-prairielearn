@@ -55,3 +55,12 @@ public/full, полномочий, capability/token/currentness/expiry и физ
 Новые README, документацию и описания PR пишите по-русски по
 [общему языковому правилу](https://github.com/Afonenko-Course-Tools/quarto-course/blob/main/docs/russian-language-policy.md).
 Команды, идентификаторы API, пути, имена пакетов и URL сохраняйте буквально.
+
+## Исходные зависимости
+
+Внешний исходник выбирает только native Git gitlink. `tests/dependencies` —
+интеграционные fixtures, а не runtime dependencies: `git submodule update --init`
+готовит только прямые leaf checkouts, без рекурсивной установки чужих fixtures.
+CI записывает фактические HEAD для evidence; companion SHA/версии в workflow
+и отдельные compatibility matrices не поддерживаются. Пакеты устанавливаются
+штатным `quarto add` из выбранного checkout.

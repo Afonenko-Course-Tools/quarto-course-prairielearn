@@ -11,6 +11,7 @@ if ((lint && args.length !== 0) || (!lint && args.length !== 1)) {
 async function sources(directory: string): Promise<string[]> {
   const paths: string[] = [];
   for await (const entry of Deno.readDir(join(root, directory))) {
+    if (directory === "tests" && entry.name === "dependencies") continue;
     if (["vendor", "node_modules", "_generated", ".quarto", ".git"].includes(entry.name) ||
       directory.startsWith("examples/") && entry.name === "_extensions") continue;
     const path = directory + "/" + entry.name;

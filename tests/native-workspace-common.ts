@@ -9,7 +9,7 @@ const sp = required(Deno.args[0]),
 const { zip }: Pick<typeof import("project-download/public.ts"), "zip"> = await import(
   pathToFileURL(join(download, "_extensions/project-download/public.ts")).href
 );
-const ref = "6b4ffbe35a018678a0bf6bb3e7f99bcf794bf204",
+const ref = "HEAD",
   prefix = "tasks/projects/version-control/restore-selected-state/";
 async function original(path: string) {
   const r = await new Deno.Command("git", {
