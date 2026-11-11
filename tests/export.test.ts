@@ -1,6 +1,7 @@
 import { required, property, record, setFixture, deleteFixture, array, fixtureAt, pandoc as decodePandoc, string } from "./fixture-values.ts";
 import type { PublicBodyPackage } from "course-core/public.ts";
 import { stripVTControlCharacters } from "node:util";
+import { fileURLToPath } from "node:url";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 const assert = (v: unknown, m: string) => {
   if (!v) throw Error(m);
@@ -430,10 +431,10 @@ Deno.test("staged filesystem failure removes partial delivery and retains unknow
   }
 });
 
-const cli = new URL(
+const cli = fileURLToPath(new URL(
   "../_extensions/course-prairielearn/entrypoints/export.ts",
   import.meta.url,
-).pathname;
+));
 async function runCli(args: string[]) {
   const result = await new Deno.Command(Deno.execPath(), {
     // Exercise the coloured Deno error rendering used by CI.

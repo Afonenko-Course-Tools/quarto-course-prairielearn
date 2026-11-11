@@ -3,7 +3,7 @@ const __metrics=__createMetrics("course-prairielearn");
 // JSON Schema does not express this pinned Community sync rule:
 // PrairieLearn/PrairieLearn 92584fe, src/sync/course-db.ts:1368.
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
-export function validateAssessmentSemantics(assessment: unknown, source: string) {
+function validateAssessmentSemanticsImplementation(assessment: unknown, source: string) {
   if (!record(assessment) || !Array.isArray(assessment.zones)) throw Error(`PL upstream semantic ${source}: invalid assessment zones`);
   if (assessment.type === "Homework" && assessment.multipleInstance === true) {
     throw new Error(
@@ -56,5 +56,4 @@ export function validateAssessmentSemantics(assessment: unknown, source: string)
   }
 }
 
-// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-validateAssessmentSemantics=__metrics.wrapSync({id:"course-prairielearn.application.native-semantics.validateAssessmentSemantics",kind:"phase"},validateAssessmentSemantics);
+export const validateAssessmentSemantics = __metrics.wrapSync({id:"course-prairielearn.application.native-semantics.validateAssessmentSemantics",kind:"phase"},validateAssessmentSemanticsImplementation);

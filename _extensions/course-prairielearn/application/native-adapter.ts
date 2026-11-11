@@ -18,8 +18,8 @@ import { z } from "../vendor/zod/v4/index.js";
 import { join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { nativeWorkspaceArtifact } from "./native-workspace.ts";
-import { readNativeEntryCandidate } from "./native-entry.ts";
-import { decodeNativeCheck } from "./native-checks.ts";
+import { readNativeEntryCandidate } from "./native-request-candidate.ts";
+import { nativeCheck } from "./native-checks.ts";
 import { decodeNativeBusiness } from "./native-business.ts";
 import { safePath } from "./source-selection.ts";
 
@@ -300,7 +300,8 @@ export function createNativeAdapter(
         }
         if (settings.grading.method !== "manual") {
           if (!check) throw Error("PL.PROJECT_CHECK_INVALID: требуется project-check");
-          decodeNativeCheck(raw.projectChecks, check);
+          if (!business.projectChecks) throw Error("PL.PROJECT_CHECK_INVALID: project checks required");
+          nativeCheck(business.projectChecks, check);
         }
         sources.push({ path, kind: "directory" });
         for (

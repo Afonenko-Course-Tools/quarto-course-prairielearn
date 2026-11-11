@@ -4,7 +4,7 @@ import { createMetrics as __createMetrics } from "../observability/bridge.ts";
 const __metrics = __createMetrics("course-prairielearn");
 export const object = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
-export function closed(v: unknown, required: string[], optional: string[] = []) {
+function closedImplementation(v: unknown, required: string[], optional: string[] = []) {
   if (!object(v)) throw new Error("PL.DECLARATION_INVALID: expected map");
   const missing = required.filter((k) => !Object.hasOwn(v, k));
   const unknown = Object.keys(v).filter((k) =>
@@ -60,7 +60,7 @@ export function publicationQuestion(v: unknown) {
     ...(submission?.mode === "workspace" ? { singleVariant: true } : {}),
   };
 }
-export function question(v: unknown) {
+function questionImplementation(v: unknown) {
   const { submission, grading, topic, singleVariant } = readQuestion(v, true);
   if (topic === undefined || submission === undefined) throw Error("PL question requires topic and submission");
   return {
@@ -80,7 +80,7 @@ export function gradingMethod(value: unknown): { method: "external" | "manual" |
   }
   return { method };
 }
-export function declarations(value: unknown, key: string) {
+function declarationsImplementation(value: unknown, key: string) {
   const raw = closed(value, ["delivery", "question-defaults"], [
     "assessment-defaults",
     "seed-targets",
@@ -167,18 +167,15 @@ export function declarations(value: unknown, key: string) {
   };
 }
 
-// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-closed = __metrics.wrapSync({
+export const closed = __metrics.wrapSync({
   id: "course-prairielearn.application.declarations.closed",
   kind: "phase",
-}, closed);
-// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-question = __metrics.wrapSync({
+}, closedImplementation);
+export const question = __metrics.wrapSync({
   id: "course-prairielearn.application.declarations.question",
   kind: "phase",
-}, question);
-// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-declarations = __metrics.wrapSync({
+}, questionImplementation);
+export const declarations = __metrics.wrapSync({
   id: "course-prairielearn.application.declarations.declarations",
   kind: "phase",
-}, declarations);
+}, declarationsImplementation);

@@ -1,0 +1,37 @@
+{
+  "forbidden": [
+    {
+      "name": "no-production-cycles",
+      "severity": "error",
+      "from": {
+        "path": "^(?:_extensions/course-prairielearn)/",
+        "pathNot": "(^|/)(node_modules|vendor|generated|_generated)(/|$)"
+      },
+      "to": {
+        "circular": true,
+        "viaOnly": {
+          "dependencyTypesNot": [
+            "type-only"
+          ]
+        }
+      }
+    },
+    {
+      "name": "providers-use-public-api",
+      "severity": "error",
+      "from": {
+        "path": "^_extensions/course-prairielearn/"
+      },
+      "to": {
+        "path": "(?:^|/)(?:course-core|reference-catalog|project-download)/(?!public\\.ts$)"
+      }
+    }
+  ],
+  "options": {
+    "doNotFollow": {
+      "path": "(^|/)(node_modules|vendor|generated|_generated)(/|$)"
+    },
+    "exclude": "(^|/)(node_modules|vendor|generated|_generated)(/|$)",
+    "tsPreCompilationDeps": true
+  }
+}

@@ -328,28 +328,111 @@ for (const course of [false, true]) {
     },
   );
 }
-Deno.test("Course rollback после private rename удаляет private output при ошибке второго rename", async () => {
-  const f = await fixture(true), actual = Deno.rename;
+Deno.test("Course rollback после private link сохраняет конкурентный пустой output и удаляет свои checks", async () => {
+  const f = await fixture(true), actual = Deno.link;
   let privateVisible = false;
   try {
-    Deno.rename = async (from, to) => {
-      if (to === f.out) {
+    Deno.link = async (from, to) => {
+      const result = await actual(from, to);
+      if (to === f.privateOut) {
         privateVisible = await Deno.stat(f.privateOut).then(
           (s) => s.isFile,
           () => false,
         );
-        throw Error("SECOND_RENAME_FAILURE");
+        await Deno.mkdir(f.out);
       }
-      return await actual(from, to);
+      return result;
     };
     await reject(
       () => publishNativePrepared(f.scope, f.build),
-      "SECOND_RENAME_FAILURE",
+      "cannot publish fresh output",
     );
     assert(privateVisible, "Private-first порядок потерян");
+    assert((await Deno.stat(f.out)).isDirectory, "Foreign empty directory replaced");
+    await Deno.remove(f.out);
     await f.clean();
   } finally {
-    Deno.rename = actual;
+    Deno.link = actual;
+    await Deno.remove(f.root, { recursive: true });
+  }
+});
+
+for (const course of [false, true]) {
+  Deno.test((course ? "course" : "standalone") + ": empty directory created after final lstat survives, retry succeeds", async () => {
+    const f = await fixture(course), lstat = Deno.lstat;
+    try {
+      const prepared = await f.build();
+      let injected = false;
+      Deno.lstat = async (path) => {
+        try { return await lstat(path); } catch (error) {
+          if (path === f.out && !injected && error instanceof Deno.errors.NotFound) {
+            injected = true;
+            await Deno.mkdir(f.out);
+          }
+          throw error;
+        }
+      };
+      await reject(prepared.publish, "cannot publish fresh output");
+      Deno.lstat = lstat;
+      assert(injected && (await Deno.lstat(f.out)).isDirectory, "Race not exercised or foreign output overwritten");
+      const entries = Array.fromAsync(Deno.readDir(f.out));
+      assert((await entries).length === 0, "Foreign output populated");
+      await Deno.remove(f.out);
+      await f.clean();
+      await (await f.build()).publish();
+    } finally {
+      Deno.lstat = lstat;
+      await Deno.remove(f.root, { recursive: true });
+    }
+  });
+}
+
+Deno.test("course: частичная запись checks очищается сразу, сохраняет первичную ошибку и допускает повтор", async () => {
+  const f = await fixture(true), write = Deno.writeTextFile, remove = Deno.remove;
+  try {
+    Deno.writeTextFile = async (path, data, options) => {
+      if (String(path).includes(".pl-checks-")) {
+        await write(path, "PRIVATE_PARTIAL");
+        throw Error("PRIMARY_CHECKS_WRITE_FAILURE");
+      }
+      return await write(path, data, options);
+    };
+    await reject(f.build, "PRIMARY_CHECKS_WRITE_FAILURE");
+    await f.clean();
+    // Secondary cleanup errors must not replace the cause returned to the caller.
+    Deno.remove = async (path, options) => {
+      if (String(path).includes(".pl-course-")) throw Error("SECONDARY_CLEANUP_FAILURE");
+      return await remove(path, options);
+    };
+    await reject(f.build, "PRIMARY_CHECKS_WRITE_FAILURE");
+    Deno.writeTextFile = write;
+    Deno.remove = remove;
+    const prepared = await f.build();
+    await prepared.publish();
+    assert((await Deno.stat(f.out)).isDirectory, "Retry failed");
+  } finally {
+    Deno.writeTextFile = write;
+    Deno.remove = remove;
+    await Deno.remove(f.root, { recursive: true });
+  }
+});
+
+Deno.test("course: checks, созданный после последнего lstat, сохраняется", async () => {
+  const f = await fixture(true), link = Deno.link;
+  try {
+    const prepared = await f.build();
+    Deno.link = async (from, to) => {
+      if (to === f.privateOut) await Deno.writeTextFile(to, "FOREIGN_CHECKS");
+      return await link(from, to);
+    };
+    await reject(prepared.publish, "AlreadyExists");
+    assert(await Deno.readTextFile(f.privateOut) === "FOREIGN_CHECKS", "Concurrent checks overwritten");
+    await Deno.remove(f.privateOut);
+    await f.clean();
+    Deno.link = link;
+    await (await f.build()).publish();
+  } finally {
+    Deno.link = link;
     await Deno.remove(f.root, { recursive: true });
   }
 });

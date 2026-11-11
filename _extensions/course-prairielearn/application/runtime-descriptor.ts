@@ -22,7 +22,7 @@ export function validateAdditionalJavaSources(value: unknown, sources: string[],
   return {archive, maxFiles:cap('maxFiles'),maxFileBytes:cap('maxFileBytes'),maxTotalBytes:cap('maxTotalBytes'),maxArchiveBytes:cap('maxArchiveBytes'), ...(typeof primaryRequired === 'boolean' ? {primaryRequired} : {}), ...(typeof allowAdditional === 'boolean' ? {allowAdditional} : {})};
 }
 export interface ApiPrecheck {files:string[];entry:string}
-export function runtimeDescriptor<C extends RuntimeCheckInput>(c: C, profile: RuntimeProfile, sources: string[], tests: string[], api?:ApiPrecheck) {
+function runtimeDescriptorImplementation<C extends RuntimeCheckInput>(c: C, profile: RuntimeProfile, sources: string[], tests: string[], api?:ApiPrecheck) {
   const build=javaBuild(c,profile);
   const javaRuntime = profile.javaRelease !== undefined || !profile.sourceExtensions;
   if (!javaRuntime && c.java !== undefined) throw new Error('PL non-Java runtime cannot declare Java compiler settings');
@@ -50,5 +50,4 @@ export function runtimeDescriptor<C extends RuntimeCheckInput>(c: C, profile: Ru
   };
 }
 
-// @ts-expect-error JS допускает замену function binding; сигнатура публичного API сохраняется.
-runtimeDescriptor=__metrics.wrapSync({id:"course-prairielearn.application.runtime-descriptor.runtimeDescriptor",kind:"phase"},runtimeDescriptor);
+export const runtimeDescriptor = __metrics.wrapSync({id:"course-prairielearn.application.runtime-descriptor.runtimeDescriptor",kind:"phase"},runtimeDescriptorImplementation);

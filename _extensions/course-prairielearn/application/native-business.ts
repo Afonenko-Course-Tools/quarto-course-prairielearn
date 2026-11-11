@@ -25,10 +25,7 @@ import {
   gradingPolicy,
   validateGradingComponents,
 } from "./grading-policy.ts";
-import {
-  nativeCheckScalars,
-  NativeProjectChecksSchema,
-} from "./native-checks.ts";
+import { parseNativeChecks } from "./native-checks.ts";
 
 const amount = z.number().nonnegative().finite();
 const points = z.union([amount, z.array(amount).min(1).max(4096)]);
@@ -192,13 +189,12 @@ function readNativeRaw(
       );
     }
   }
-  if (raw.projectChecks !== undefined) {
-    NativeProjectChecksSchema.parse(nativeCheckScalars(raw.projectChecks));
-  }
+  const projectChecks = raw.projectChecks === undefined
+    ? undefined : parseNativeChecks(raw.projectChecks);
   const materialization = raw.materialization === undefined
     ? undefined
     : decodeNativeMaterialization(raw.materialization, context.source);
-  return { raw, config, defaults, materialization };
+  return { raw, config, defaults, materialization, projectChecks };
 }
 /** Чистая PL business validation: не создаёт Core capability/release proof. */
 export function validateNativeRaw(
@@ -216,7 +212,7 @@ function decodeBusiness<
   parseQuestion: (value: unknown) => Q,
   completeGrading: boolean,
 ) {
-  const { raw, config, defaults, materialization } = readNativeRaw(value, input.origin ? {source: input.origin.source} : {}, parseQuestion);
+  const { raw, config, defaults, materialization, projectChecks } = readNativeRaw(value, input.origin ? {source: input.origin.source} : {}, parseQuestion);
   const questions: Record<
     string,
     Q & {
@@ -318,6 +314,7 @@ function decodeBusiness<
     assessment,
     raw,
     materialization,
+    projectChecks,
     seedTargets: NativeSeedTargetsSchema.parse(config["seed-targets"] ?? {}),
   };
 }

@@ -18,7 +18,7 @@ import { createNativeAdapter } from "./native-adapter.ts";
 import { nativeProjectRows } from "./native-provenance.ts";
 import type { NativeEntryOptions } from "./native-entry.ts";
 import { canonical } from "./source-selection.ts";
-import { decodeNativeCheck } from "./native-checks.ts";
+import { nativeCheck } from "./native-checks.ts";
 import { validateNativeRaw } from "./native-business.ts";
 import { nativeChecksManifest } from "./native-check-inventory.ts";
 import { type ExportCourseContent, exportCourse, nativeUnitMenus } from "./export-course.ts";
@@ -304,9 +304,13 @@ export async function prepareNativeCourse(
         exercises: [],
         projects: projectRows.map((p) => p.fact),
       };
+      const sourcePolicies = new Map(selection.expectedSources.map(source => [source, {
+        input: adapter.validatedInput(source), business: adapter.business(source),
+      }]));
       for (const source of selection.expectedSources) {
-        const value = adapter.validatedInput(source),
-          business = adapter.business(source);
+        const policy = sourcePolicies.get(source);
+        if (!policy) throw Error("PL.CAPTURE_MISSING: source policy");
+        const value = policy.input, business = policy.business;
         if (value.assessment) {
           if (!business.assessment) throw Error("PL.ASSIGNMENT_CHANGED: missing assessment policy");
           content.assessments.push({
@@ -446,18 +450,20 @@ export async function prepareNativeCourse(
           if (facts.length !== 1 || pairs.length !== 1 || !row || !pair) {
             throw Error("PL.PROVENANCE_CHANGED: selected project/plan");
           }
+          const policy = sourcePolicies.get(q.source);
+          if (!policy) throw Error("PL.CAPTURE_MISSING: source policy");
           const fact = row.fact,
-            business = adapter.business(q.source),
-            declaration = adapter.validatedInput(q.source).declarations.find((
+            business = policy.business,
+            declaration = policy.input.declarations.find((
               d,
             ) =>
               d.id === q.id
             );
           if (
             fact.check &&
-            (!declaration || canonical(
-                  decodeNativeCheck(
-                    business.raw.projectChecks,
+            (!declaration || !business.projectChecks || canonical(
+                  nativeCheck(
+                    business.projectChecks,
                     declaration.attributes["project-check"] ?? "",
                   ),
                 ) !== canonical(fact.check))

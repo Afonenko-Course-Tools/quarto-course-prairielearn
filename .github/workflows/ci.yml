@@ -171,11 +171,11 @@ jobs:
         run: |
           export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
           bash tools/check-java.sh
-      - run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts tests/manual-mixed.test.ts tests/functional-selected-files.test.ts tests/native-seed-policy.test.ts tests/git-transport.test.ts tests/publication-conditions.test.ts tests/public-tests.test.ts tests/body-projection.test.ts tests/java-build.test.ts tests/whole-bank.test.ts
+      - run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts tests/manual-mixed.test.ts tests/functional-selected-files.test.ts tests/native-seed-policy.test.ts tests/git-transport.test.ts tests/publication.test.ts tests/publication-conditions.test.ts tests/public-tests.test.ts tests/body-projection.test.ts tests/java-build.test.ts tests/whole-bank.test.ts
       - name: Атомарный экспорт между файловыми системами
         run: PL_EXDEV_TEST_DIR=/dev/shm deno test --no-config --import-map .ci-deps/pl-native-imports.json -A --filter "functional export v5" tests/export-course.test.ts
       - name: Профили исходников Java, starter/API/Gradle и native delivery
-        run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/java-build.test.ts tests/native-contract-batch.test.ts tests/native-batch-checkpoint.test.ts tests/native-selection.test.ts tests/native-origin-scope.test.ts tests/native-verification-inventory.test.ts tests/native-seed-policy.test.ts tests/native-auxiliary.test.ts
+        run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/java-build.test.ts tests/native-contract-batch.test.ts tests/native-batch-checkpoint.test.ts tests/native-selection.test.ts tests/native-origin-scope.test.ts tests/native-verification-inventory.test.ts tests/native-seed-policy.test.ts tests/native-auxiliary.test.ts tests/native-publication.test.ts
 
   static:
     name: Строгая проверка собственного кода
@@ -252,6 +252,8 @@ jobs:
           deno run --no-config -A tools/check-types.ts --lint
       - name: Установить закреплённые зависимости CJS-проверки
         run: npm ci --ignore-scripts
+      - name: Блокирующий typed ESLint и границы модулей
+        run: npm run check-quality -- .ci-deps/pl-native-imports.json
       - name: Строгая проверка собственного CJS
         run: npm run typecheck:tools -- --pretty false
       - name: Строгая проверка четырёх собственных Python-файлов

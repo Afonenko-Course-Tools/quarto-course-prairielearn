@@ -65,8 +65,10 @@ UUID можно оставить: оно без изменения записы�
 Без поля действует прежний алгоритм UUIDv5: `assessment/<work.id>` в namespace
 course UUID, вычисленном из `course/<course.id>`. Для новых работ поле не требуется.
 В `prairielearn.assessment-defaults` поле `uuid` запрещено. Неверная форма и
-совпадение UUID выбранных работ, включая совпадение с автоматически вычисленным
-UUID и различие только регистром, останавливают экспорт до создания поставки.
+совпадение UUID в общей области курса, instances, выбранных работ и вопросов,
+включая автоматически вычисленные UUID и различие только регистром,
+останавливают экспорт до публикации поставки. Platform независимо проверяет
+тот же договор при чтении внешнего пакета.
 Поле сохраняет identity исходников; соответствие UUID уже установленному курсу
 проверяется отдельно при интеграции с PrairieLearn.
 
@@ -287,7 +289,16 @@ server-side `serverFilesQuestion/starter` сохраняет его точный
 все явно подключённые проекты, в том числе demonstrations без native export.
 
 Pinned upstream schemas (`spec/upstream/provenance.json`) проверяют native JSON
-перед atomic rename свежего каталога. `delivery.json` хранит sourceSnapshotHash,
+перед атомарной публикацией свежего каталога. Directory publication полного и
+standalone export требует системный GNU `mv` с возможностями
+`--no-copy --update=none-fail -T` (проверены GNU coreutils 9.12 на Linux/Arch).
+Возможности проверяются перед публикацией; отсутствие команды или этих ключей
+даёт явный отказ. Обычный BSD/macOS `mv` и Windows не объявляются совместимыми
+с этой границей. Пустой каталог, созданный конкурентом после проверки
+отсутствия output, сохраняется. Stage создаётся рядом с output на его файловой
+системе; копирование вместо atomic move, включая fallback при EXDEV, запрещено.
+Приватный checks публикуется через исключительное создание hard link; при отказе
+удаляются только stage и checks текущей попытки. `delivery.json` хранит sourceSnapshotHash,
 неизменный Core inventoryHash, file→SHA256 inventory и deliveryHash SHA256 от
 canonical sorted-key JSON без deliveryHash. Inventory исключает сам delivery.json.
 Question UUID сохраняет прежний exporter algorithm. Course UUID — UUIDv5 DNS
