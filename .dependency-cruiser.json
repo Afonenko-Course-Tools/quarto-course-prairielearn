@@ -29,9 +29,9 @@
   ],
   "options": {
     "doNotFollow": {
-      "path": "(^|/)(node_modules|vendor|generated|_generated)(/|$)"
+      "path": "(^|/)(node_modules|vendor|generated|_generated)(/|$)|^tests/dependencies/"
     },
-    "exclude": "(^|/)(node_modules|vendor|generated|_generated)(/|$)",
+    "exclude": "(^|/)(node_modules|vendor|generated|_generated)(/|$)|^tests/dependencies/",
     "tsPreCompilationDeps": true
   }
 }

@@ -31,6 +31,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Подготовить native Git dependencies и записать фактические HEAD
+        run: |
+          git submodule update --init
+          git submodule foreach 'git rev-parse HEAD'
       - name: Подготовить фактическую GNU mv no-replace capability
         run: bash tools/setup-mv-ci.sh "$RUNNER_TEMP/course-gnu-mv" >> "$GITHUB_PATH"
       - name: Подготовить доступный кеш Quarto
@@ -43,18 +47,6 @@ jobs:
         run: |
           git rev-parse HEAD
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
-      - name: Получение проверяемого ядра курса
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: Afonenko-Course-Tools/quarto-course
-          # Core 9: независимо проверенный исходный код; полный hosted CI и выпуск отдельно.
-          ref: 5c2b551724471ff7637aad1068f22c5f7998a687
-          path: .ci-deps/core
-          persist-credentials: false
-      - name: Проверить закреплённый Core
-        run: |
-          git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "5c2b551724471ff7637aad1068f22c5f7998a687"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: ${{ matrix.quarto }}
@@ -68,44 +60,21 @@ jobs:
         run: quarto run tests/performance-native-auxiliary.ts
       - name: Граница native capture без legacy child
         run: quarto run tests/performance-native-boundary.ts
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: f23797829c42b8333d5ba02469b64531f394911d
-          path: .ci-deps/qrc
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: Afonenko-Course-Tools/quarto-project-publish
-          ref: 63d6922074b1345a83f93449cd5a9fe9fbfeaab3
-          path: .ci-deps/site
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: Afonenko-Course-Tools/quarto-project-download
-          ref: cb00715252d46b3758a8ac2d24a893a2602d6315
-          path: .ci-deps/download
-          persist-credentials: false
-      - name: Проверить закреплённые QRC, Site и Download
-        run: |
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "f23797829c42b8333d5ba02469b64531f394911d"
-          test "$(git -C .ci-deps/site rev-parse HEAD)" = "63d6922074b1345a83f93449cd5a9fe9fbfeaab3"
-          test "$(git -C .ci-deps/download rev-parse HEAD)" = "cb00715252d46b3758a8ac2d24a893a2602d6315"
       - name: Настоящие закрытые answers, HTML/Reveal и grading composition
-        run: quarto run tests/native-answers-integration.ts .ci-deps/core --author
+        run: quarto run tests/native-answers-integration.ts tests/dependencies/core --author
       - name: Отказ несовместимого cross-document grading
-        run: quarto run tests/native-answers-integration.ts .ci-deps/core --wrong-grading
+        run: quarto run tests/native-answers-integration.ts tests/dependencies/core --wrong-grading
       - name: Выбранные байты и точные имена без source origin
-        run: quarto run tests/native-raw-origin-values.ts .ci-deps/core
+        run: quarto run tests/native-raw-origin-values.ts tests/dependencies/core
       - name: Полные reference sources без student ZIP policy
-        run: quarto run tests/native-reference-projection.ts .ci-deps/core
+        run: quarto run tests/native-reference-projection.ts tests/dependencies/core
       - name: Обычная публикация и скрытые common sources
-        run: quarto run tests/native-publication-sources.ts .ci-deps/core
+        run: quarto run tests/native-publication-sources.ts tests/dependencies/core
       - name: Версии инструментов
         run: |
           quarto --version
       - name: Проверка правил PrairieLearn и сборка примера student/full
-        run: quarto run tests/check.ts .ci-deps/core .ci-deps/qrc .ci-deps/download
+        run: quarto run tests/check.ts tests/dependencies/core tests/dependencies/qrc tests/dependencies/download
 
   java-delivery:
     name: Installed native questions and Java/Gradle
@@ -118,6 +87,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Подготовить native Git dependencies и записать фактические HEAD
+        run: |
+          git submodule update --init
+          git submodule foreach 'git rev-parse HEAD'
       - name: Подготовить фактическую GNU mv no-replace capability
         run: bash tools/setup-mv-ci.sh "$RUNNER_TEMP/course-gnu-mv" >> "$GITHUB_PATH"
       - name: Подготовить доступный кеш Quarto
@@ -130,37 +103,11 @@ jobs:
         run: |
           git rev-parse HEAD
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: Afonenko-Course-Tools/quarto-course
-          ref: 5c2b551724471ff7637aad1068f22c5f7998a687
-          path: .ci-deps/core
-          persist-credentials: false
-      - name: Проверить закреплённый Core
-        run: |
-          git -C .ci-deps/core rev-parse HEAD
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "5c2b551724471ff7637aad1068f22c5f7998a687"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: f23797829c42b8333d5ba02469b64531f394911d
-          path: .ci-deps/qrc
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: Afonenko-Course-Tools/quarto-project-download
-          ref: cb00715252d46b3758a8ac2d24a893a2602d6315
-          path: .ci-deps/download
-          persist-credentials: false
-      - name: Проверить закреплённые QRC и Download
-        run: |
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "f23797829c42b8333d5ba02469b64531f394911d"
-          test "$(git -C .ci-deps/download rev-parse HEAD)" = "cb00715252d46b3758a8ac2d24a893a2602d6315"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b
         with:
           version: 1.11.5
       - name: Карта типов фактического Core для штатных compiler entries
-        run: quarto run tools/native-core-import-map.ts .ci-deps/core .ci-deps/pl-native-imports.json .ci-deps/qrc .ci-deps/download
+        run: quarto run tools/native-core-import-map.ts tests/dependencies/core .ci-deps/pl-native-imports.json tests/dependencies/qrc tests/dependencies/download
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
         with:
           deno-version: v2.7.14
@@ -187,8 +134,8 @@ jobs:
     timeout-minutes: 15
     env:
       XDG_CACHE_HOME: ${{ github.workspace }}/.ci/course-pl-cache
-      PERFORMANCE: ${{ github.workspace }}/.ci-deps/performance
-      COURSE_PERFORMANCE_SOURCE: ${{ github.workspace }}/.ci-deps/performance
+      PERFORMANCE: ${{ github.workspace }}/tests/dependencies/performance
+      COURSE_PERFORMANCE_SOURCE: ${{ github.workspace }}/tests/dependencies/performance
       LUA_LANGUAGE_SERVER: ${{ github.workspace }}/.ci/luals/bin/lua-language-server
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
@@ -196,6 +143,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Подготовить native Git dependencies и записать фактические HEAD
+        run: |
+          git submodule update --init
+          git submodule foreach 'git rev-parse HEAD'
       - name: Подготовить фактическую GNU mv no-replace capability
         run: bash tools/setup-mv-ci.sh "$RUNNER_TEMP/course-gnu-mv" >> "$GITHUB_PATH"
       - name: Подготовить доступный кеш Quarto
@@ -206,36 +157,6 @@ jobs:
         env:
           EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: Afonenko-Course-Tools/quarto-course
-          ref: 5c2b551724471ff7637aad1068f22c5f7998a687
-          path: .ci-deps/core
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: Afonenko-Course-Tools/quarto-reference-catalog
-          ref: f23797829c42b8333d5ba02469b64531f394911d
-          path: .ci-deps/qrc
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: Afonenko-Course-Tools/quarto-project-download
-          ref: cb00715252d46b3758a8ac2d24a893a2602d6315
-          path: .ci-deps/download
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: Afonenko-Course-Tools/quarto-course-performance
-          ref: bfbe23f819dfe4c7d5e5487f669c14d8e6c9846e
-          path: .ci-deps/performance
-          persist-credentials: false
-      - name: Проверить закреплённые исходники статических проверок
-        run: |
-          test "$(git -C .ci-deps/core rev-parse HEAD)" = "5c2b551724471ff7637aad1068f22c5f7998a687"
-          test "$(git -C .ci-deps/qrc rev-parse HEAD)" = "f23797829c42b8333d5ba02469b64531f394911d"
-          test "$(git -C .ci-deps/download rev-parse HEAD)" = "cb00715252d46b3758a8ac2d24a893a2602d6315"
-          test "$(git -C "$PERFORMANCE" rev-parse HEAD)" = "bfbe23f819dfe4c7d5e5487f669c14d8e6c9846e"
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           version: 1.11.5
@@ -251,7 +172,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Карта типов фактических публичных providers
-        run: quarto run tools/native-core-import-map.ts .ci-deps/core .ci-deps/pl-native-imports.json .ci-deps/qrc .ci-deps/download
+        run: quarto run tools/native-core-import-map.ts tests/dependencies/core .ci-deps/pl-native-imports.json tests/dependencies/qrc tests/dependencies/download
       - name: Полный строгий TS graph и запрет explicit any
         run: |
           timeout --kill-after=3s 180s deno run --no-config -A tools/check-types.ts .ci-deps/pl-native-imports.json
@@ -264,7 +185,7 @@ jobs:
           npm run check-quality:controls -- .ci-deps/pl-native-imports.json
       - name: Строгая проверка собственного CJS
         run: npm run typecheck:tools -- --pretty false
-      - name: Строгая проверка четырёх собственных Python-файлов
+      - name: Строгая проверка собственных Python-файлов
         run: npm exec --yes --package=pyright@1.1.414 -- pyright --project pyrightconfig.json --pythonpath "${{ steps.python.outputs.python-path }}" --outputjson
       - name: Единственная установка canonical LuaLS
         run: bash "$PERFORMANCE/tools/setup-lua-ci.sh" "$GITHUB_WORKSPACE/.ci/luals"

@@ -3,7 +3,8 @@
     "tests/trusted-git-helper.py",
     "tests/trusted-git-probe.py",
     "tests/sp_bundle_transport_test.py",
-    "tools/vendor-pl-zod.py"
+    "tools/vendor-pl-zod.py",
+    "tools/vendor-trusted-git.py"
   ],
   "typeCheckingMode": "strict",
   "pythonVersion": "3.12",

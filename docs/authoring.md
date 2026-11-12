@@ -7,17 +7,17 @@ updated: 2026-10-31
 
 # Спецификация заданий и контрольных работ
 
-Кандидат Exporter 9.0.0 продолжает принятую линию 8.2.5. Optional-primary
+Кандидат Exporter 9.1.0 продолжает принятую линию 8.2.5. Optional-primary
 требует отдельно проверенного exact Core/Platform состава и image digest.
-Адресные проверки выполнены с Core `198927766da83882b9c13bc13516c74fab35711d`;
-новая paired Core CI и release compatibility остаются OPEN.
+Исходники для интеграционных проверок выбраны gitlinks в `tests/dependencies`;
+paired Core CI и release compatibility проверяются отдельно.
 Теги и OCI digests не подтверждаются version metadata; Body v2/native v3 сохранены.
 
-Общую модель банка и producer Body определяет [Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/0613a4c6409d6cf766f926b8e096fd35d2a88422/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
+Общую модель банка и producer Body определяет [Core](../tests/dependencies/core/docs/body-export.md). Этот документ описывает действующие правила потребителя на выбранном Git ref. [Индекс](../spec/index.md) связывает текущие контракты владельцев; документация выпуска читается из того же тега, что и код.
 
 Документ задаёт текущие правила разметки и нормализованной модели
 `course-prairielearn`. Ядро и адаптер используют единый текущий контракт без
-переключения версий схемы. Контракты этого ref: адаптер-кандидат9.0.0, delivery v3/v4, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
+переключения версий схемы. Контракты этого ref: адаптер-кандидат 9.1.0, delivery v3/v4, Body v2 и public results v2; публикация тегов и runtime OCI digest проверяется отдельно у владельцев. Прежние service releases не подтверждают совместимость нового reader. Полный экспорт создаёт native курс, вопросы, работы и декларации доступа; Gateway применяет назначения и авторитетный predicate выполнения.
 Канонические `#exr-*` имеют уникальные ID внутри явной области
 `exercise-bank: true`, собственные обязательные `difficulty` и положительное
 целое `time`. Эффективная `statement-visibility` берётся из атрибута задачи либо
@@ -32,8 +32,8 @@ Native TS Core 9 и C 9 используют публичные capture/current-
 границы. `contract.json` содержит только `name: "prairielearn"`; старые поля
 версий API и пути внешних схем отсутствуют. Предметную форму, defaults и
 валидацию задают TS owner contracts; типы используют те же исполняемые правила.
-Точный source pin Core задаёт CI, а `core-version: 9.0.0` в descriptor —
-информация о companion, не runtime authority. Полная совместимость installed
+Точный исходник Core выбирает gitlink `tests/dependencies/core`; descriptor
+описывает стандартную версию этого расширения. Полная совместимость installed
 состава, независимый prior P и итоговый paired CI проверяются отдельно.
 
 ## Область ответственности

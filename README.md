@@ -17,7 +17,7 @@ updated: 2026-10-31
 Общий банк и `.task-items` принадлежат Core; правила попыток, назначения и
 оценки принадлежат PrairieLearn.
 
-Кандидат этого ref — **9.0.5**, рассчитанный на native TS Core 9.
+Кандидат этого ref — **9.1.0**, рассчитанный на native TS Core 9.
 `contract.json` содержит только installed owner name; исполняемая форма,
 нормализация и валидация принадлежат TypeScript этого адаптера.
 Прежний Lua-маршрут предметной модели и производные схемы не устанавливаются.
@@ -25,7 +25,7 @@ updated: 2026-10-31
 готовность установленного состава, prior P или опубликованного OCI digest.
 Кандидат требует независимой рецензии и итогового paired CI перед выпуском.
 
-Пара этой версии — Core 9.1.0 и экспортёр 9.0.1. Core собирает факты API-предпроверки
+Этот ref использует публичные native TS-контракты Core. Core собирает факты API-предпроверки
 и политики дополнительных Java-исходников, которые переносит экспортёр.
 Расширение экспортирует полный native курс, сохраняет правила выполнения работ и
 создаёт source editor с отдельной закрытой поставкой проверок. Для разработки
@@ -40,11 +40,11 @@ quarto add /absolute/path/to/quarto-course-prairielearn --no-prompt
 Выпущенные версии устанавливайте по неизменяемым тегам после их публикации:
 
 ```sh
-quarto add Afonenko-Course-Tools/quarto-course@v9.1.0 --no-prompt
-quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v9.0.1 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course@v9.4.0 --no-prompt
+quarto add Afonenko-Course-Tools/quarto-course-prairielearn@v9.1.0 --no-prompt
 ```
 
-Экспортёр 9.0.1 сохраняет Body v2 и public results v2. Native body, native answers и Workspace экспортируются в delivery v4; соответствующую ветку выбирает native-экспортёр. Парная Core CI и установленный состав проверяются отдельно.
+Экспортёр 9.1.0 сохраняет Body v2 и public results v2. Native body, native answers и Workspace экспортируются в delivery v4; соответствующую ветку выбирает native-экспортёр. Парная Core CI и установленный состав проверяются отдельно.
 Platform/Gateway требуют отдельной проверки exact source/digest/interface; прежние
 service releases не объявляются совместимыми. Наличие тегов проверяется у владельцев,
 а production registry требует опубликованный OCI digest. Эта матрица не
@@ -194,7 +194,7 @@ Quarto `--profile`, сохраняются при экспорте.
 или вопроса, поле и подсказку. Исходные ошибки Core и Pandoc сохраняются.
 См. [справочник диагностики](docs/diagnostics.md).
 
-Контракт этого ref использует exporter-кандидат `9.0.1`, Quarto 1.11.5. Body использует отдельную
+Контракт этого ref использует exporter-кандидат `9.1.0`, Quarto 1.11.5. Body использует отдельную
 `statementVisibility` и обязательные qualified `slots`; binding продолжает
 использовать локальные ID. Restricted условия допустимы в выбранной participant
 поставке, закрытые ключи и решения запрещены. Код и документация выпуска читаются
@@ -348,3 +348,27 @@ origin DTO и свидетельств актуальности. Public delivery
 
 См. [договор контекстов](docs/native-operation-reuse-consumer.md) и
 [правила автора](docs/authoring.md#допустимый-состав-java-ответа).
+
+## Исходники для разработки
+
+```bash
+git submodule update --init
+git submodule foreach 'git rev-parse HEAD'
+export CORE="$PWD/tests/dependencies/core"
+export QRC="$PWD/tests/dependencies/qrc"
+export DOWNLOAD="$PWD/tests/dependencies/download"
+export PERFORMANCE="$PWD/tests/dependencies/performance"
+export COURSE_PERFORMANCE_SOURCE="$PERFORMANCE"
+```
+
+`tests/dependencies` содержит только интеграционные fixtures. Их gitlinks —
+единственные selectors исходников; CI использует фактические HEAD как evidence.
+Инициализация намеренно без `--recursive`: чужие fixture graphs не являются
+зависимостями установленного расширения. Для локальной установки используйте
+`quarto add` с путём выбранного checkout.
+
+Runtime bundle `application/trusted-git` остаётся автономным. Его source выбирает
+gitlink `vendor-sources/system-practice`; обновление выполняется обычным Git,
+затем `python tools/vendor-trusted-git.py` собирает минимальный closure и fixtures.
+`python tests/trusted-git-helper.py` сравнивает реальные Git states прежнего
+upstream helper и поставляемого bundle.

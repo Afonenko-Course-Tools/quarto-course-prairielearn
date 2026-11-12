@@ -2,7 +2,7 @@
 type: specification-index
 component: course-prairielearn
 status: current
-version: 9.0.7
+version: 9.1.0
 updated: 2026-10-26
 ---
 
@@ -17,8 +17,8 @@ updated: 2026-10-26
 | --- | --- | --- | --- | --- |
 | [PrairieLearn: действующий контракт](../docs/authoring.md) | specification | course-prairielearn | current | native TS binding и selected participant delivery; client/tests/reference |
 | [Диагностика](../docs/diagnostics.md) | reference | course-prairielearn | current | Собственные ID и внешние причины этого адаптера |
-| [Body Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/946ad619830aa1affcbdaf4b5b447324e3d41002/docs/body-export.md) | specification | course-core | current exact source pin | Общий producer transport и selected source input |
-| [Авторская модель Core](https://github.com/Afonenko-Course-Tools/quarto-course/blob/946ad619830aa1affcbdaf4b5b447324e3d41002/spec/index.md) | specification/index | course-core | current exact source pin | Банк, условия, решения и назначения |
+| [Body Core](../tests/dependencies/core/docs/body-export.md) | specification | course-core | current Git dependency | Общий producer transport и selected source input |
+| [Авторская модель Core](../tests/dependencies/core/spec/index.md) | specification/index | course-core | current Git dependency | Банк, условия, решения и назначения |
 
 Банк и назначения принадлежат текущему Core; этот адаптер проверяет свой вход
 на собственной границе. Неизменяемые выпуски и assets находятся в [GitHub Releases](https://github.com/Afonenko-Course-Tools/quarto-course-prairielearn/releases).
@@ -36,12 +36,12 @@ operation, а `export-course.ts` атомарно публикует полны�
 описаны в `spec/upstream/provenance.json`. Descriptor runner принадлежит
 Platform и не становится второй авторской конфигурацией или private GradingJob.
 
-## Текущая совместимость кандидата 9.0.5
+## Текущая совместимость кандидата 9.1.0
 
 Кандидат использует native TS Core 9. Body v2, public results v2 и строгие
 delivery v3/v4 сохраняют собственные версии. `contract.json.name` устанавливает
 владельца; исполняемые business contracts находятся в TypeScript.
-Точная source dependency задаётся CI; номера descriptor не дают runtime authority.
+Точная source dependency задаётся gitlink `tests/dependencies/core`; номера descriptor не дают runtime authority.
 Полная поставка требует genuine Core operation, independent prior P и проверенного
 Platform image digest. Обычный `Core.withNativePublication` + `inspectPublication(publication)` —
 типизированная business inspection без full grading/seed gate и release certificate;
@@ -64,8 +64,7 @@ witness; SHA256, filesystem identity и currentness проверяет Core до
 адаптера. Restored/completed run не разрешает новую запись. Ordinary/v2
 поведение сохраняется; публичных author flags и новых delivery schemas нет.
 
-Точный CI pin Core 9 указан в workflow данного Git ref после независимой
-технической рецензии исходников. Настоящий paired CI и публикация выпуска
+Точный исходник Core выбран gitlink `tests/dependencies/core` данного Git ref. Настоящий paired CI и публикация выпуска
 проверяются отдельно; локальные проверки не заменяют эти этапы.
 
 ## Сохранение ABI 1 при объединении main
@@ -75,7 +74,7 @@ child snapshot/clearEnv и identity scoped permissions. Новый native entry
 использует только публичный Core capture seam, а C auxiliary children —
 принятый frozen env с pre/post currentness. Подробности и граница проверок
 приведены в [спецификации](../docs/authoring.md#контекст-наблюдения-после-объединения-main).
-Информационное `core-version: 9.0.0` не заменяет точный CI SHA или runtime qualification.
+Descriptor содержит стандартную версию пакета; runtime qualification проверяет публичные business contracts.
 
 ## Контекст при повторной native-проверке
 

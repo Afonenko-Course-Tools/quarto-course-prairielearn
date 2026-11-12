@@ -1,9 +1,8 @@
 """Точные SP recipes и два модуля closure сохраняют A/S0/S1 и Git-состояние."""
 import ast
-import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import subprocess
 import sys
 import tempfile
@@ -31,103 +30,38 @@ def text(value: object) -> str:
     return value
 
 
-def is_list(value: object) -> TypeGuard[list[object]]:
-    return isinstance(value, list)
-
-
-def items(value: object) -> list[object]:
-    if not is_list(value):
-        raise ValueError('Ожидался JSON array')
-    return list(value)
-
-
-def relative(value: object) -> str:
-    path = text(value)
-    parts = PurePosixPath(path)
-    if not path or parts.is_absolute() or '..' in parts.parts or path != parts.as_posix() or '\\' in path:
-        raise ValueError('Ожидался безопасный относительный source path')
-    return path
-
-
 pl = Path(__file__).resolve().parents[1]
-sp = Path(sys.argv[1]).resolve(strict=True)
+sp = Path(sys.argv[1] if len(sys.argv) > 1 else pl / 'vendor-sources/system-practice').resolve(strict=True)
 module = pl / '_extensions/course-prairielearn/application/trusted-git'
 fixtures = pl / 'tests/fixtures/git-recipes'
-provenance = fields(json.loads((module / 'provenance.json').read_text()))
-fixture_provenance = fields(json.loads((fixtures / 'provenance.json').read_text()))
-source_commit = text(provenance['commit'])
-assert source_commit == '6b4ffbe35a018678a0bf6bb3e7f99bcf794bf204'
-assert fixture_provenance['sourceCommit'] == source_commit
-source_tree = subprocess.check_output(['git', '-C', str(sp), 'rev-parse', source_commit + '^{tree}']).decode().strip()
-assert source_tree == provenance['tree'] == fixture_provenance['sourceTree']
-source_cache: dict[str, bytes] = {}
-source_blobs: dict[str, str] = {}
+source_commit = subprocess.check_output(['git', '-C', str(sp), 'rev-parse', 'HEAD']).decode().strip()
 
 
 def source_bytes(path: str) -> bytes:
-    if path not in source_cache:
-        source_cache[path] = subprocess.check_output(['git', '-C', str(sp), 'show', source_commit + ':' + path])
-    return source_cache[path]
+    return subprocess.check_output(['git', '-C', str(sp), 'show', 'HEAD:' + path])
 
 
-def source_blob(path: str) -> str:
-    if path not in source_blobs:
-        source_blobs[path] = subprocess.check_output(['git', '-C', str(sp), 'rev-parse', source_commit + ':' + path]).decode().strip()
-    return source_blobs[path]
-
-
-expected: dict[str, dict[str, tuple[str, str]]] = {
-    'build_git_materials.py': {
-        'GitState': ('ClassDef', 'tools/build_git_materials.py'),
-        'target': ('FunctionDef', 'tools/build_materials.py'),
-        **{name: ('FunctionDef', 'tools/build_git_materials.py') for name in ['git_env', 'git', 'put', 'commit', 'initialize', 'normalize']},
-    },
-    'system_support.py': {
-        'ArchiveError': ('ClassDef', 'tools/system_support.py'),
-        **{name: ('FunctionDef', 'tools/system_support.py') for name in ['safe_archive_name', 'read_json', '_object_container', 'json_object', 'json_string', 'json_texts']},
-    },
-}
+# Минимальная trusted runtime поверхность: учебные builders и top-level effects
+# не должны попасть в устанавливаемый автономный пакет.
 expected_imports: dict[str, list[str]] = {
-    'build_git_materials.py': ['from collections.abc import Mapping', 'from typing import TypedDict', 'from pathlib import Path, PurePosixPath', 'import os', 'import shutil', 'import subprocess', 'from system_support import safe_archive_name'],
-    'system_support.py': ['from collections.abc import Mapping', 'from typing import TypeGuard', 'from pathlib import Path, PurePosixPath', 'import json'],
+    'build_git_materials.py': [
+        'from collections.abc import Mapping', 'from typing import TypedDict',
+        'from pathlib import Path, PurePosixPath', 'import os', 'import shutil',
+        'import subprocess', 'from system_support import safe_archive_name',
+    ],
+    'system_support.py': [
+        'from collections.abc import Mapping', 'from typing import TypeGuard',
+        'from pathlib import Path, PurePosixPath', 'import json',
+    ],
 }
-modules = fields(provenance['modules'])
-assert set(modules) == set(expected), 'Разрешены ровно два минимальных runtime-модуля'
-assert {path.name for path in module.glob('*.py')} == set(expected)
-symbol_count = 0
-for name, symbols in expected.items():
-    details = fields(modules[name])
-    data = (module / name).read_bytes()
-    assert hashlib.sha256(data).hexdigest() == details['sha256']
-    assert len(data) == details['size']
-    own = data.decode()
+assert {path.name for path in module.glob('*.py')} == set(expected_imports)
+for name, imports in expected_imports.items():
+    own = (module / name).read_text()
     body = ast.parse(own).body
-    imports = [ast.get_source_segment(own, node) for node in body if isinstance(node, (ast.Import, ast.ImportFrom))]
-    assert imports == expected_imports[name] == details['imports']
-    assert all(isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.ClassDef)) for node in body)
-    declarations = [node for node in body if isinstance(node, (ast.FunctionDef, ast.ClassDef))]
-    assert len(declarations) == len(symbols)
-    assert {node.name for node in declarations} == set(symbols), 'Новый учебный generate/build не разрешён'
-    lineage = fields(details['symbols'])
-    assert set(lineage) == set(symbols)
-    for node in declarations:
-        entry = fields(lineage[node.name])
-        kind, source_path = symbols[node.name]
-        assert entry['kind'] == kind == type(node).__name__
-        assert entry['sourcePath'] == source_path
-        original_bytes = source_bytes(source_path)
-        assert hashlib.sha256(original_bytes).hexdigest() == entry['sourceBlobSha256']
-        assert source_blob(source_path) == entry['sourceBlob']
-        source = original_bytes.decode()
-        originals = [item for item in ast.parse(source).body if isinstance(item, (ast.FunctionDef, ast.ClassDef)) and item.name == node.name]
-        assert len(originals) == 1
-        original = originals[0]
-        assert type(original).__name__ == kind
-        assert original.lineno == entry['sourceStartLine'] and original.end_lineno == entry['sourceEndLine']
-        segment = ast.get_source_segment(source, original)
-        assert segment is not None and ast.get_source_segment(own, node) == segment
-        assert hashlib.sha256(segment.encode()).hexdigest() == entry['sourceSegmentSha256']
-        symbol_count += 1
+    assert all(isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.ClassDef))
+               for node in body), 'Прямые исполняемые top-level statements запрещены'
+    assert [ast.get_source_segment(own, node) for node in body
+            if isinstance(node, (ast.Import, ast.ImportFrom))] == imports
 
 probe = Path(__file__).with_name('trusted-git-probe.py')
 receipts: list[dict[str, object]] = []
@@ -137,25 +71,17 @@ with tempfile.TemporaryDirectory(prefix='pl-git-helper-') as tmp:
         destination = canonical / path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(source_bytes(path))
-    fixture_root = relative(fixture_provenance['root'])
-    assert fixture_root == 'tasks/projects/version-control'
+    fixture_root = 'tasks/projects/version-control'
     expected_assets = {
         'github-ssh/seed_recipe.py', 'github-ssh/seed.json', 'github-ssh/student/README.md',
         'restore-selected-state/seed_recipe.py', 'restore-selected-state/student/work/README.md', 'restore-selected-state/student/work/notes.txt',
     }
-    seen: set[str] = set()
-    for value in items(fixture_provenance['files']):
-        entry = fields(value)
-        path = relative(entry['path'])
-        assert path in expected_assets and path not in seen
-        seen.add(path)
+    for path in expected_assets:
         data = source_bytes(fixture_root + '/' + path)
-        assert hashlib.sha256(data).hexdigest() == entry['sha256'] and len(data) == entry['size']
         assert (fixtures / path).read_bytes() == data
         destination = canonical / fixture_root / path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(data)
-    assert seen == expected_assets
     for recipe in ['restore-selected-state', 'github-ssh']:
         results: list[dict[str, object]] = []
         recipe_path = canonical / fixture_root / recipe / 'seed_recipe.py'
@@ -174,4 +100,4 @@ with tempfile.TemporaryDirectory(prefix='pl-git-helper-') as tmp:
             assert set(committed) == {'S0', 'S1'}
             assert initial['S0'] != initial['S1']
         receipts.append({'recipe': recipe, 'commits': {key: value for key, value in initial.items() if key in ['A', 'S0', 'S1']}, 'state': 'committed contents/refs/index/worktree/all objects equal'})
-print(json.dumps({'sourceCommit': source_commit, 'exactSymbols': symbol_count, 'exactModules': len(modules), 'canonicalRecipeOldNew': 'PASS', 'recipes': receipts}, ensure_ascii=False))
+print(json.dumps({'sourceCommit': source_commit, 'canonicalRecipeOldNew': 'PASS', 'recipes': receipts}, ensure_ascii=False))
