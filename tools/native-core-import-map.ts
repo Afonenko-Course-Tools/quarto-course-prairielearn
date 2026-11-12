@@ -56,6 +56,7 @@ export async function writeNativeCoreImportMap(
       }
     }
   }
+  await Deno.mkdir(dirname(resolve(destination)), { recursive: true });
   await Deno.writeTextFile(
     destination,
     JSON.stringify({
