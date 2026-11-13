@@ -21,7 +21,11 @@ export const fields = (
   Object.keys(v).every((k) => [...required, ...optional].includes(k));
 export async function publicProjectFiles(root: string) {
   const result = await files(root, { field: "project.student" }, true);
-  for (const file of result) {
+  assertPublicStudentFiles(result);
+  return result;
+}
+export function assertPublicStudentFiles(files: readonly { name: string }[]) {
+  for (const file of files) {
     if (
       file.name.split("/").some((part) =>
         [
@@ -41,7 +45,6 @@ export async function publicProjectFiles(root: string) {
       });
     }
   }
-  return result;
 }
 export async function files(
   root: string,

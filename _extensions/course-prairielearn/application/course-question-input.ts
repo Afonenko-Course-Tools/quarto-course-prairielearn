@@ -1,5 +1,7 @@
 import type { PublicBodyPackage } from "course-core/public.ts";
 import type { StudentArtifact } from "./export-types.ts";
+import { Buffer } from "node:buffer";
+import { withStudentSubmissionNames } from "./student-artifact.ts";
 import type {
   CourseExportPlan,
   NativeCompilerInput,
@@ -268,7 +270,14 @@ export async function courseQuestionInput(
     );
     if (!fact) throw Error("PL student artifact project fact missing");
     const artifact = await input.studentArtifact(fact);
-    studentArtifacts[q.id] = artifact;
+    studentArtifacts[q.id] = withStudentSubmissionNames(
+      artifact,
+      input.checks.projects.find((project) => project.exerciseId === q.id)?.sources.map((file) => ({
+        name: file.name,
+        target: file.target,
+        bytes: new Uint8Array(Buffer.from(file.data, "base64")),
+      })) ?? [],
+    );
     const task = { plan, q, settings, scratch };
     const projection = method === "manual"
       ? await manualProjectInput(task, artifact)

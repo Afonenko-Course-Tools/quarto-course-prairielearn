@@ -1618,3 +1618,91 @@ Deno.test("starter bundle removes duplicate downloads while legacy standalone ke
     }
   } finally { await Deno.remove(root, { recursive: true }); }
 });
+
+Deno.test("four bundled Java sources remove only byte-identical mapped downloads and preserve extra resources", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const names = ["A.java", "B.java", "C.java", "D.java"];
+    const sources = names.map((name) => ({ name, data: new TextEncoder().encode("class " + name.slice(0, -5) + " {}\n") }));
+    const extras = [
+      { name: "assets/input.csv", data: new TextEncoder().encode("input,value\n1,2\n") },
+      { name: "other/A.java", data: required(sources[0]).data },
+      { name: "Changed.java", data: new TextEncoder().encode("class Changed { int newer; }\n") },
+    ];
+    for (const file of [...sources, ...extras]) {
+      const path = root + "/project/student/" + file.name;
+      await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
+      await Deno.writeFile(path, file.data);
+    }
+    await Deno.mkdir(root + "/project/tests", { recursive: true });
+    await Deno.writeTextFile(root + "/project/tests/grade.sh", "PRIVATE_CHECKS");
+    await Deno.mkdir(root + "/project/reference");
+    await Deno.writeTextFile(root + "/project/reference/A.java", "PRIVATE_REFERENCE");
+    const context = { projectRoot: root, projects: { "exr-clamp": "/project" } };
+    const b = structuredClone(binding);
+    Object.assign(b.questions["exr-clamp"], { files: names, submission: { mode: "upload", layout: "files" } });
+    const files = [
+      ...sources.map((file) => ({ name: "src/main/java/" + file.name, submissionName: file.name, bytes: file.data })),
+      { name: "README.md", bytes: new TextEncoder().encode("PUBLIC_README") },
+      { name: "src/test/java/PublicTest.java", bytes: new TextEncoder().encode("PUBLIC_JUNIT") },
+      { name: "Changed.java", bytes: new TextEncoder().encode("class Changed {}\n") },
+    ];
+    for (const bundled of [true, false]) {
+      const output = root + (bundled ? "/bundled" : "/legacy");
+      await exportPrairieLearn(p(), {
+        ...context,
+        ...(bundled ? { studentArtifacts: { "exr-clamp": { files, archive: new Uint8Array([80, 75, 3, 4]) } } } : {}),
+      }, b, output);
+      const base = output + "/questions/demo/exr-clamp";
+      const html = await Deno.readTextFile(base + "/question.html");
+      assert((html.match(/<pl-file-upload /g) ?? []).length === 1 && html.includes('file-names="A.java,B.java,C.java,D.java"'), "submission control changed");
+      for (const file of sources) {
+        assert(html.includes('<pl-file-download file-name="' + file.name + '"') !== bundled, "mapped source download duplicated or lost: " + file.name);
+        const raw = await Deno.readFile(base + "/clientFilesQuestion/" + file.name).catch((error) => {
+          if (!(error instanceof Deno.errors.NotFound)) throw error;
+          return undefined;
+        });
+        assert(bundled ? raw === undefined : raw?.every((byte, index) => byte === file.data[index]), "source root copy duplicated or lost");
+      }
+      for (const file of extras) {
+        assert(html.includes('<pl-file-download file-name="' + file.name + '"'), "extra resource download lost: " + file.name);
+        const raw = await Deno.readFile(base + "/clientFilesQuestion/" + file.name);
+        assert(raw.length === file.data.length && raw.every((byte, index) => byte === file.data[index]), "extra bytes changed");
+      }
+      if (bundled) {
+        assert(html.includes("/starter.zip") && html.includes("/starter/README.md"), "bundle links lost");
+        for (const file of files) {
+          const raw = await Deno.readFile(base + "/clientFilesQuestion/starter/" + file.name);
+          assert(raw.length === file.bytes.length && raw.every((byte, index) => byte === file.bytes[index]), "starter bytes changed");
+        }
+      }
+      assert(!html.includes("PRIVATE_CHECKS") && !html.includes("PRIVATE_REFERENCE"), "private content leaked into controls");
+      assert(await Deno.readTextFile(base + "/tests/grade.sh") === "PRIVATE_CHECKS", "trusted test changed");
+      const privateFile = await Deno.stat(base + "/clientFilesQuestion/reference/A.java").catch(() => undefined);
+      assert(privateFile === undefined, "reference file became public");
+    }
+  } finally { await Deno.remove(root, { recursive: true }); }
+});
+
+Deno.test("bundled extra resources cannot publish private or service files from student", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const context = await projectFixture(root);
+    const starter = new TextEncoder().encode("starter");
+    for (const name of ["private/notes.txt", "reference/Answer.java", "Generated.class"]) {
+      const path = root + "/projects/clamp/student/" + name;
+      await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
+      await Deno.writeTextFile(path, "PRIVATE_EXTRA");
+      let refused = false;
+      try {
+        await exportPrairieLearn(p(), {
+          ...context,
+          studentArtifacts: { "exr-clamp": { files: [{ name: "Clamp.java", bytes: starter }], archive: new Uint8Array([80, 75, 3, 4]) } },
+        }, binding, root + "/out");
+      } catch (error) { refused = String(error).includes("Закрытый или служебный файл"); }
+      assert(refused, "private/service extra became public: " + name);
+      await noDelivery(root);
+      await Deno.remove(path);
+    }
+  } finally { await Deno.remove(root, { recursive: true }); }
+});

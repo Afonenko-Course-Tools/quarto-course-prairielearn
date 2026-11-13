@@ -13,6 +13,7 @@ import { publicationConditionFile } from "./publication-conditions.ts";
 import { validateAdditionalJavaSources } from "./runtime-descriptor.ts";
 import { gradingMethod } from "./declarations.ts";
 import type { SelectedExportPlan } from "./selected-export-plan.ts";
+import { additionalStudentFiles } from "./student-artifact.ts";
 function metadata(
   q: Pick<PublicBodyPackage["questions"][number], "difficulty" | "time">,
 ): string {
@@ -371,7 +372,7 @@ async function starterArtifacts(
       });
     }
   }
-  for (const f of submission.mode === "editor" || artifact ? [] : student) {
+  for (const f of submission.mode === "editor" ? [] : additionalStudentFiles(student, artifact)) {
     prepared.push({
       name: base + "/clientFilesQuestion/" + f.name,
       data: f.data,
@@ -484,7 +485,7 @@ function uploadControls(
   const { b, submission, manual } = policy,
     questionFail = questionFailure(task);
 
-  const downloads = task.context.studentArtifacts?.[task.question.id] ? "" : student.map((f) =>
+  const downloads = additionalStudentFiles(student, task.context.studentArtifacts?.[task.question.id]).map((f) =>
     '<pl-file-download file-name="' + escape(f.name) +
     '"></pl-file-download>'
   ).join("\n");

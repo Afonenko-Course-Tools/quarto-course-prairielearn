@@ -1,6 +1,8 @@
 import { required } from "./fixture-values.ts";
 import * as Core from "course-core/public.ts";
 import { Buffer } from "node:buffer";
+import strictAssert from "node:assert/strict";
+import { withStudentSubmissionNames, additionalStudentFiles } from "../_extensions/course-prairielearn/application/student-artifact.ts";
 import { isDeepStrictEqual } from "node:util";
 import {
   selectNativeCompilerInputs,
@@ -13,6 +15,36 @@ function assert(value: unknown, message: string): asserts value {
   if (!value) throw Error(message);
 }
 const bytes = (text: string) => new TextEncoder().encode(text);
+Deno.test("starter aliases require exact Core targets and bytes without mutating the artifact", () => {
+  const artifact = {
+    files: [
+      { name: "src/main/java/A.java", bytes: bytes("class A {}") },
+      { name: "examples/A.java", bytes: bytes("class A {}") },
+      { name: "src/main/java/B.java", bytes: bytes("class B { int value; }") },
+      { name: "dependencies/runtime.jar", bytes: bytes("BINARY") },
+    ],
+    archive: bytes("ZIP"),
+  };
+  const before = structuredClone(artifact);
+  const projected = withStudentSubmissionNames(artifact, [
+    { name: "A.java", target: "src/main/java/A.java", bytes: bytes("class A {}") },
+    { name: "B.java", target: "src/main/java/B.java", bytes: bytes("class B {}") },
+  ]);
+  strictAssert.deepEqual(artifact, before);
+  strictAssert.equal(projected.files[0]?.submissionName, "A.java");
+  strictAssert.equal(projected.files[1]?.submissionName, undefined);
+  strictAssert.equal(projected.files[2]?.submissionName, undefined);
+  strictAssert.equal(projected.archive, artifact.archive);
+  const student = [
+    { name: "A.java", data: bytes("class A {}") },
+    { name: "other/A.java", data: bytes("class A {}") },
+    { name: "B.java", data: bytes("class B {}") },
+    { name: "src/main/java/A.java", data: bytes("class A { int value; }") },
+    { name: "dependencies/runtime.jar", data: bytes("BINARY") },
+  ];
+  strictAssert.deepEqual(additionalStudentFiles(student, projected), student.slice(1, 4));
+  strictAssert.deepEqual(additionalStudentFiles(student), student);
+});
 function fixture() {
   const studentPlan = Core.ProjectPlanSchema.parse({
     id: crypto.randomUUID(),

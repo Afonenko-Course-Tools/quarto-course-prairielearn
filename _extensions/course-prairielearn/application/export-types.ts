@@ -2,7 +2,13 @@ import type { AnswerFacts } from "course-core/public.ts";
 import type { NativeAuxiliary } from "./native-auxiliary.ts";
 import type { PublicationCondition } from "./publication-conditions.ts";
 export interface StudentArtifact {
-  files: { name: string; bytes: Uint8Array; reason?: string }[];
+  files: {
+    name: string;
+    bytes: Uint8Array;
+    reason?: string;
+    /** Логическое имя сдачи из точного Core target/bytes, без вывода basename. */
+    submissionName?: string;
+  }[];
   archive: Uint8Array;
 }
 export interface ProjectContext {
