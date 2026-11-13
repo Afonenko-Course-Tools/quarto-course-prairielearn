@@ -6,7 +6,7 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    - cron: '23 5 * * 1'
+    - cron: "23 5 * * 1"
 
 permissions:
   contents: read
@@ -167,17 +167,19 @@ jobs:
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: "25"
       - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
         with:
-          gradle-version: '9.1.0'
+          gradle-version: "9.1.0"
       - name: Настоящий Gradle эталон и отказ незавершённого starter
         run: |
           export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
           bash tools/check-java.sh
       - run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/export.test.ts tests/export-course.test.ts tests/text-runtime.test.ts tests/completion.test.ts tests/grading-policy.test.ts tests/slots.test.ts tests/manual-mixed.test.ts tests/functional-selected-files.test.ts tests/native-seed-policy.test.ts tests/git-transport.test.ts tests/publication.test.ts tests/publication-conditions.test.ts tests/public-tests.test.ts tests/body-projection.test.ts tests/java-build.test.ts tests/whole-bank.test.ts
       - name: Атомарный экспорт между файловыми системами
-        run: PL_EXDEV_TEST_DIR=/dev/shm deno test --no-config --import-map .ci-deps/pl-native-imports.json -A --filter "functional export v5" tests/export-course.test.ts
+        run: |
+          PL_EXDEV_TEST_DIR=/dev/shm deno test --no-config --import-map .ci-deps/pl-native-imports.json -A --filter "functional export v5" tests/export-course.test.ts
+          PL_EXDEV_TEST_DIR=/dev/shm deno test --no-config --import-map .ci-deps/pl-native-imports.json -A --filter EXDEV tests/publication.test.ts
       - name: Профили исходников Java, starter/API/Gradle и native delivery
         run: deno test --no-config --import-map .ci-deps/pl-native-imports.json --allow-read --allow-write --allow-run --allow-env tests/java-build.test.ts tests/native-contract-batch.test.ts tests/native-batch-checkpoint.test.ts tests/native-selection.test.ts tests/native-origin-scope.test.ts tests/native-verification-inventory.test.ts tests/native-seed-policy.test.ts tests/native-auxiliary.test.ts tests/native-publication.test.ts
 
@@ -190,7 +192,7 @@ jobs:
       PERFORMANCE: ${{ github.workspace }}/.ci-deps/performance
       COURSE_PERFORMANCE_SOURCE: ${{ github.workspace }}/.ci-deps/performance
       LUA_LANGUAGE_SERVER: ${{ github.workspace }}/.ci/luals/bin/lua-language-server
-      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -244,12 +246,12 @@ jobs:
           deno-version: v2.7.14
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '24'
+          node-version: "24"
           package-manager-cache: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         id: python
         with:
-          python-version: '3.12'
+          python-version: "3.12"
       - name: Карта типов фактических публичных providers
         run: quarto run tools/native-core-import-map.ts .ci-deps/core .ci-deps/pl-native-imports.json .ci-deps/qrc .ci-deps/download
       - name: Полный строгий TS graph и запрет explicit any
@@ -258,18 +260,6 @@ jobs:
           deno run --no-config -A tools/check-types.ts --lint
       - name: Установить закреплённые зависимости CJS-проверки
         run: npm ci --ignore-scripts
-      - name: Блокирующий typed ESLint и границы модулей
-        run: |
-          npm run check-quality -- .ci-deps/pl-native-imports.json
-          npm run check-quality:controls -- .ci-deps/pl-native-imports.json
-      - name: Строгая проверка собственного CJS
-        run: npm run typecheck:tools -- --pretty false
-      - name: Строгая проверка четырёх собственных Python-файлов
-        run: npm exec --yes --package=pyright@1.1.414 -- pyright --project pyrightconfig.json --pythonpath "${{ steps.python.outputs.python-path }}" --outputjson
-      - name: Единственная установка canonical LuaLS
-        run: bash "$PERFORMANCE/tools/setup-lua-ci.sh" "$GITHUB_WORKSPACE/.ci/luals"
-      - name: Строгая проверка двух собственных Lua-файлов
-        run: timeout --kill-after=3s 60s quarto run "$PERFORMANCE/tools/check-lua.ts" --root "$GITHUB_WORKSPACE" --server "$LUA_LANGUAGE_SERVER" --scope _extensions/course-prairielearn/observability/bridge.lua --scope _extensions/course-prairielearn/filter.lua
       - name: Установить закреплённый ShellCheck
         run: |
           tool_dir="$RUNNER_TEMP/shellcheck-0.11.0"
@@ -281,12 +271,31 @@ jobs:
           tar -xJf "$tool_dir/archive.tar.xz" --directory "$tool_dir" --strip-components=1
           "$tool_dir/shellcheck" --version
           printf '%s\n' "$tool_dir" >> "$GITHUB_PATH"
-      - name: Синтаксис и строгая проверка shell по каждому диалекту
+      - name: Установить штатные форматтеры и анализаторы
         run: |
-          bash -n tools/check-mv-capability.sh
-          bash -n tools/setup-mv-ci.sh
-          shellcheck tools/check-mv-capability.sh tools/setup-mv-ci.sh
-          bash -n tools/check-java.sh
-          sh -n examples/java-gradle/bank/projects/clamp/tests/grade.sh
-          shellcheck --norc --enable=all --severity=style --shell=bash tools/check-java.sh
-          shellcheck --norc --enable=all --severity=style --shell=sh examples/java-gradle/bank/projects/clamp/tests/grade.sh
+          npm install --global prettier@3.8.1 pyright@1.1.414 @taplo/cli@0.7.0
+          python -m pip install ruff==0.17.5 yamllint==1.38.0
+          cargo install stylua --version 2.6.0 --locked
+          go install mvdan.cc/sh/v3/cmd/shfmt@v3.14.1
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          printf '%s\n' "$HOME/go/bin" "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          sudo apt-get update
+          sudo apt-get install --yes luarocks
+          sudo luarocks install luacheck 1.2.0
+      - name: Единственная установка canonical LuaLS
+        run: bash "$PERFORMANCE/tools/setup-lua-ci.sh" "$GITHUB_WORKSPACE/.ci/luals"
+      - name: Получить неизменяемый исторический SP snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: BSU-RFCT-Afonenko-Courses/System-Practice
+          ref: 6b4ffbe35a018678a0bf6bb3e7f99bcf794bf204
+          path: .ci-deps/sp-pinned
+          persist-credentials: false
+      - name: Проверить точные сегменты и байты исторических Git helpers
+        run: python tests/trusted-git-helper.py .ci-deps/sp-pinned
+      - name: Блокирующие типы, структура, форматы и анализаторы
+        run: |
+          npm run check-quality -- .ci-deps/pl-native-imports.json
+          npm run check-quality:controls -- .ci-deps/pl-native-imports.json
+      - name: Строгая проверка собственного CJS
+        run: npm run typecheck:tools -- --pretty false

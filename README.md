@@ -8,6 +8,8 @@ updated: 2026-10-31
 # Задания курса в PrairieLearn
 
 [Индекс спецификаций](spec/index.md) описывает контракт текущего Git ref.
+[Среда разработки Arch Linux](https://github.com/Afonenko-Course-Tools/quarto-course/blob/main/docs/development-arch.md)
+описывает установку системных инструментов и зависимости проекта.
 Версия определяется descriptor этого ref; код и документация устанавливаемого
 выпуска читаются из одного тега. Изменения main после выпущенного тега —
 **unreleased**. Минимум — Quarto 1.11.5.
@@ -75,7 +77,7 @@ exercise-bank: true
 exercise-statement-visibility: restricted
 ```
 
-````qmd
+```qmd
 :::: {#exr-clamp difficulty="introductory" time="25" target="prairielearn" project="/projects/clamp"}
 
 ## Ограничение значения
@@ -86,11 +88,11 @@ exercise-statement-visibility: restricted
 Закрытые критерии проверки.
 :::
 ::::
-````
+```
 
 Страница работы имеет собственный стабильный ID (`[a-z][a-z0-9-]*`) и список заданий:
 
-````qmd
+```qmd
 ---
 assessment:
   kind: test
@@ -105,7 +107,7 @@ assessment:
 ::: {.task-items stage="classroom"}
 1. @exr-clamp
 :::
-````
+```
 
 При `assignment.mode: assessment-id` устойчивая метка зависит только от
 `course.id` и ID работы. Явная `assignment.student-label` заменяет вычисление.
@@ -141,11 +143,20 @@ workspace или VSCode не требуется. `aceMode` необязател�
 при `"submission":{"mode":"upload"}` сохраняется загрузка файлов.
 Полные проекты и их ZIP для автономной работы обслуживает `project-download`.
 
-
 ```json
-{"questions":{"exr-clamp":{"topic":"Java","files":["Clamp.java"],
-"externalGradingOptions":{"image":"docker.io/library/gradle:9.1.0-jdk25",
-"entrypoint":["sh","/grade/tests/grade.sh"],"timeout":60}}}}
+{
+  "questions": {
+    "exr-clamp": {
+      "topic": "Java",
+      "files": ["Clamp.java"],
+      "externalGradingOptions": {
+        "image": "docker.io/library/gradle:9.1.0-jdk25",
+        "entrypoint": ["sh", "/grade/tests/grade.sh"],
+        "timeout": 60
+      }
+    }
+  }
+}
 ```
 
 Результат: `questions/<course-id>/<exr-id>/info.json`, `question.html`,
@@ -221,7 +232,7 @@ Question variant repetition is also authored metadata. Normal Quarto course,
 prairielearn:
   question-defaults:
     topic: Java
-    submission: {mode: editor, ace-mode: ace/mode/java}
+    submission: { mode: editor, ace-mode: ace/mode/java }
     single-variant: true
 ```
 

@@ -5,17 +5,16 @@ async function main() {
   const [root, book, work, bindingPath, output, ...explicitProfiles] = args;
   const profiles = explicitProfiles.length
     ? explicitProfiles
-    : (Deno.env.get("QUARTO_PROFILE") || "").split(",").filter((p) =>
-      p && p !== "student" && p !== "full"
-    );
+    : (Deno.env.get("QUARTO_PROFILE") || "")
+        .split(",")
+        .filter((p) => p && p !== "student" && p !== "full");
   if (!root || !book || !work || !bindingPath || !output) {
     throw diagnostic(
       "PL.INPUT_INVALID",
       "Недостаточно аргументов для экспорта",
       {
         field: "arguments",
-        hint:
-          "Запуск: export.ts COURSE_ROOT BOOK WORK BINDING OUTPUT [FUNCTIONAL_PROFILE...]",
+        hint: "Запуск: export.ts COURSE_ROOT BOOK WORK BINDING OUTPUT [FUNCTIONAL_PROFILE...]",
       },
     );
   }
@@ -27,16 +26,18 @@ try {
   if (
     !(error instanceof Error) ||
     !["ExtensionDiagnostic", "ExternalToolFailure"].includes(error.name)
-  ) throw error;
+  )
+    throw error;
   let cause: unknown = error;
   let shown = "";
   const seen = new Set<Error>();
   while (cause instanceof Error && !seen.has(cause)) {
     seen.add(cause);
-    const message =
-      ["ExtensionDiagnostic", "ExternalToolFailure"].includes(cause.name)
-        ? cause.message
-        : cause.stack || cause.message;
+    const message = ["ExtensionDiagnostic", "ExternalToolFailure"].includes(
+      cause.name,
+    )
+      ? cause.message
+      : cause.stack || cause.message;
     if (!shown.includes(message)) {
       console.error(message);
       shown += "\n" + message;

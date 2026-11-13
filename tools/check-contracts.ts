@@ -13,9 +13,8 @@ if (JSON.stringify(contract) !== '{"name":"prairielearn"}') {
 let files = 0;
 async function inspect(dir: string) {
   for await (const entry of Deno.readDir(dir)) {
-    if (
-      [".git", "node_modules", "_generated", ".quarto"].includes(entry.name)
-    ) continue;
+    if ([".git", "node_modules", "_generated", ".quarto"].includes(entry.name))
+      continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory) await inspect(path);
     else if (entry.isFile) {
@@ -24,21 +23,26 @@ async function inspect(dir: string) {
         throw Error("Удалённая schema dependency в final tree: " + path);
       }
       if (
-        path.endsWith(".ts") || path.endsWith(".lua") ||
-        path.endsWith(".yml") || path.endsWith(".json")
+        path.endsWith(".ts") ||
+        path.endsWith(".lua") ||
+        path.endsWith(".yml") ||
+        path.endsWith(".json")
       ) {
         const text = await Deno.readTextFile(path);
         if (
           !path.endsWith("check-contracts.ts") &&
-          /(?:setup-cue|spec\/(?:core|prairielearn)\.cue|Deno\.env\.get\(["']CUE["']\)|contract\.rules)/
-            .test(text)
-        ) throw Error("Удалённая tool/schema dependency: " + path);
+          /(?:setup-cue|spec\/(?:core|prairielearn)\.cue|Deno\.env\.get\(["']CUE["']\)|contract\.rules)/.test(
+            text,
+          )
+        )
+          throw Error("Удалённая tool/schema dependency: " + path);
       }
     }
   }
 }
 await inspect(root);
 console.log(
-  "PASS installed owner name, TS contracts и final source inventory: " + files +
+  "PASS installed owner name, TS contracts и final source inventory: " +
+    files +
     " файлов",
 );

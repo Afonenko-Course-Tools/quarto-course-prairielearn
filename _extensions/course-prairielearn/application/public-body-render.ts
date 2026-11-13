@@ -43,10 +43,12 @@ async function commandImplementation(
   const ordinaryEnvironment = () => {
     const baseEnv = {};
     const env = __metrics.childEnv(baseEnv);
-    return env === baseEnv ? { env } : {
-      env: __metrics.childEnv(Deno.env.toObject()),
-      clearEnv: true,
-    };
+    return env === baseEnv
+      ? { env }
+      : {
+          env: __metrics.childEnv(Deno.env.toObject()),
+          clearEnv: true,
+        };
   };
   const environment = auxiliary
     ? { env: await auxiliary.before(), clearEnv: true }
@@ -116,7 +118,7 @@ export async function renderPublicBody(
     }
     declaredResources.set(resource.target, resource);
   }
-  const anchorPrefix = "pl-" + await uuid(key) + "-";
+  const anchorPrefix = "pl-" + (await uuid(key)) + "-";
   const anchors = new Map<string, string>();
   // TableHead/Body/Foot, Row and Cell carry semantic Attr arrays, not t nodes.
   const list = (value: unknown): unknown[] => {
@@ -128,13 +130,17 @@ export async function renderPublicBody(
   const attr = (value: unknown): unknown[] => {
     const parts = list(value);
     if (
-      parts.length !== 3 || typeof parts[0] !== "string" ||
+      parts.length !== 3 ||
+      typeof parts[0] !== "string" ||
       !list(parts[1]).every((v) => typeof v === "string") ||
-      !list(parts[2]).every((v) =>
-        Array.isArray(v) && v.length === 2 &&
-        v.every((x: unknown) => typeof x === "string")
+      !list(parts[2]).every(
+        (v) =>
+          Array.isArray(v) &&
+          v.length === 2 &&
+          v.every((x: unknown) => typeof x === "string"),
       )
-    ) return questionFail("Неверный Attr native AST", "condition");
+    )
+      return questionFail("Неверный Attr native AST", "condition");
     return parts;
   };
   const nodeAttrs = (node: unknown): unknown[][] => {
@@ -161,8 +167,15 @@ export async function renderPublicBody(
         ]),
       ];
     }
-    return ["Div", "Span", "CodeBlock", "Code", "Link", "Image", "Figure"]
-        .includes(node.t)
+    return [
+      "Div",
+      "Span",
+      "CodeBlock",
+      "Code",
+      "Link",
+      "Image",
+      "Figure",
+    ].includes(node.t)
       ? [attr(list(node.c)[0])]
       : [];
   };
@@ -191,35 +204,39 @@ export async function renderPublicBody(
     if (
       !links &&
       (value.t === "Cite" ||
-        value.t === "Div" &&
+        (value.t === "Div" &&
           (attr(list(value.c)[0])[0] === "refs" ||
-            list(attr(list(value.c)[0])[1]).some((c) =>
-              typeof c === "string" &&
-              ["references", "csl-bib-body"].includes(c)
-            )))
+            list(attr(list(value.c)[0])[1]).some(
+              (c) =>
+                typeof c === "string" &&
+                ["references", "csl-bib-body"].includes(c),
+            ))))
     ) {
       collectBibliographyTargets(value);
       return undefined;
     }
     if (
-      links && value.t === "Link" &&
+      links &&
+      value.t === "Link" &&
       typeof list(list(value.c)[2])[0] === "string"
     ) {
       let target = "";
       try {
         const href = list(list(value.c)[2])[0];
-        target = typeof href === "string" && href.startsWith("#")
-          ? decodeURIComponent(href.slice(1))
-          : "";
+        target =
+          typeof href === "string" && href.startsWith("#")
+            ? decodeURIComponent(href.slice(1))
+            : "";
       } catch {
         target = "";
       }
       if (bibliographyTargets.has(target)) return undefined;
     }
     return Object.fromEntries(
-      Object.entries(value).map((
-        [key, item],
-      ) => [key, projectBibliography(item, links)]),
+      Object.entries(value).map(([key, item]) => [
+        key,
+        projectBibliography(item, links),
+      ]),
     );
   };
   // A copy; bibliography links are removed only for targets removed above.
@@ -277,7 +294,8 @@ export async function renderPublicBody(
       targetPair[0] = "#" + actual;
     } else if (resource) {
       if (
-        !safe(resource.target) || /[?#]/.test(resource.target) ||
+        !safe(resource.target) ||
+        /[?#]/.test(resource.target) ||
         resource.owner !== p.owner ||
         resource.visibility !== "public" ||
         typeof resource.data !== "string"
@@ -308,10 +326,12 @@ export async function renderPublicBody(
     }
     if (
       ["RawBlock", "RawInline", "Note"].includes(node.t) ||
-      node.t === "Cite" &&
-        (!options.preserveBibliography || !Array.isArray(node.c) ||
-          node.c.length !== 2 || !Array.isArray(node.c[0]) ||
-          !Array.isArray(node.c[1]))
+      (node.t === "Cite" &&
+        (!options.preserveBibliography ||
+          !Array.isArray(node.c) ||
+          node.c.length !== 2 ||
+          !Array.isArray(node.c[0]) ||
+          !Array.isArray(node.c[1])))
     ) {
       questionFail("Неподдерживаемый узел условия: " + node.t, "condition");
     }
@@ -326,12 +346,19 @@ export async function renderPublicBody(
     }
     if (
       ["Div", "Span", "CodeBlock", "Code"].includes(node.t) &&
-      list(attr(list(node.c)[0])[1]).some((c) =>
-        typeof c === "string" &&
-        ["answer", "answer-spec", "correct", "solution", "grading-notes"]
-          .includes(c)
+      list(attr(list(node.c)[0])[1]).some(
+        (c) =>
+          typeof c === "string" &&
+          [
+            "answer",
+            "answer-spec",
+            "correct",
+            "solution",
+            "grading-notes",
+          ].includes(c),
       )
-    ) questionFail("Закрытая отметка в публичном условии", "condition");
+    )
+      questionFail("Закрытая отметка в публичном условии", "condition");
     if (node.t === "Image" || node.t === "Link") mapReference(node);
     if (node.t === "Link") {
       const href = list(list(node.c)[2])[0];
@@ -344,22 +371,25 @@ export async function renderPublicBody(
       if (!href.startsWith("#")) {
         const attributes = attr(list(node.c)[0]),
           pairs = list(attributes[2]).map(list);
-        const filtered = pairs.filter((pair) =>
-          pair[0] !== "target" && pair[0] !== "rel"
+        const filtered = pairs.filter(
+          (pair) => pair[0] !== "target" && pair[0] !== "rel",
         );
         const oldRel = pairs.find((pair) => pair[0] === "rel")?.[1];
-        filtered.push(["target", "_blank"], [
-          "rel",
+        filtered.push(
+          ["target", "_blank"],
           [
-            ...new Set([
-              ...(typeof oldRel === "string"
-                ? oldRel.split(/\s+/).filter(Boolean)
-                : []),
-              "noopener",
-              "noreferrer",
-            ]),
-          ].join(" "),
-        ]);
+            "rel",
+            [
+              ...new Set([
+                ...(typeof oldRel === "string"
+                  ? oldRel.split(/\s+/).filter(Boolean)
+                  : []),
+                "noopener",
+                "noreferrer",
+              ]),
+            ].join(" "),
+          ],
+        );
         attributes[2] = filtered;
       }
     }
@@ -391,13 +421,16 @@ export async function renderPublicBody(
     questionContext,
     options.auxiliary,
   );
-  const html = authoredHtml.replaceAll("{{", "&#123;&#123;").replaceAll(
-    "}}",
-    "&#125;&#125;",
-  ).replaceAll(resourceMarker + "/", clientFilesToken + "/");
+  const html = authoredHtml
+    .replaceAll("{{", "&#123;&#123;")
+    .replaceAll("}}", "&#125;&#125;")
+    .replaceAll(resourceMarker + "/", clientFilesToken + "/");
   return { html, files };
 }
-const command = __metrics.wrapAsync({
-  id: "course-prairielearn.application.export.command",
-  kind: "command",
-}, commandImplementation);
+const command = __metrics.wrapAsync(
+  {
+    id: "course-prairielearn.application.export.command",
+    kind: "command",
+  },
+  commandImplementation,
+);

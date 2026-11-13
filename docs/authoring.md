@@ -74,11 +74,11 @@ course UUID, вычисленном из `course/<course.id>`. Для новых
 
 После объединения требуются все поля:
 
-| Поле | Значение |
-|---|---|
-| `attempts` | Положительное целое число оцениваемых попыток для каждого задания. |
+| Поле            | Значение                                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `attempts`      | Положительное целое число оцениваемых попыток для каждого задания.                                                |
 | `pass.at-least` | Положительное целое число полностью выполненных required заданий, не больше числа required позиций `.task-items`. |
-| `assignment` | Одна стратегия назначения: `mode: assessment-id` либо `student-label: <метка>`. |
+| `assignment`    | Одна стратегия назначения: `mode: assessment-id` либо `student-label: <метка>`.                                   |
 
 Локальные поля переопределяют общие; карты объединяются рекурсивно. Исключение —
 `assignment`: локальная стратегия целиком заменяет общую. В одной стратегии
@@ -215,7 +215,7 @@ attempts/pass/assignment и права доступа задаются отде�
 В binding вопроса необязательное поле `submission` явно выбирает способ сдачи:
 
 ```json
-{"submission":{"mode":"editor","aceMode":"ace/mode/java"}}
+{ "submission": { "mode": "editor", "aceMode": "ace/mode/java" } }
 ```
 
 `mode: editor` использует штатный `pl-file-editor`. Для каждого имени из `files`
@@ -325,7 +325,6 @@ UUID. Обычная лабораторная доступна enrolled Student 
 участников и сохраняет raw grade; он не является completion threshold.
 `works[].completion` задаёт отдельный required-only completion predicate.
 
-
 ### Доверенный completion bridge
 
 `application/completion.ts` экспортирует `completionPolicy(courseId, work)` и
@@ -382,7 +381,7 @@ prairielearn:
   assessment-defaults:
     attempts: 3
     question-points: 1
-    pass: {at-least: 2}
+    pass: { at-least: 2 }
     # Необязательные author-controlled параметры:
     grade-rate-minutes: 0
     advance-score-perc: 0
@@ -476,7 +475,7 @@ triesPerVariant наследуются только выбранным вопр�
 подмножества всей зоны отклоняются. В native БД fixed также имеет alternative group.
 
 `slot-overrides` заменяет прежнее поле question-overrides и адресует местный ID
-позиции exr-* или alt-*. Баллы, потолок и попытки действуют на всю группу: варианты
+позиции exr-_ или alt-_. Баллы, потолок и попытки действуют на всю группу: варианты
 имеют одинаковую максимальную цену. Completion v2 использует slotIds/requiredSlotIds,
 `mode: required-slot-completion`, `source: per-slot-results-v2`. Порог pass.at-least
 считает обязательные позиции; частичный балл и optional их не заменяют.
@@ -717,7 +716,6 @@ Core currentness/private/physical guards не заменены новым proof.
 descriptor. Проверяющий Platform формирует отдельный private reference job с
 точным списком этих авторских файлов после проверки student delivery binding.
 Ветвь явно заданной student ZIP policy и другие runtimes остаются прежними.
-
 
 ### Callback-local checkpoint Core (кандидат 9.0.5)
 

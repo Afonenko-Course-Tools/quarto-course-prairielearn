@@ -17,7 +17,8 @@ export function diagnostic(
   }
   for (const related of context.related || []) {
     const facts = (["source", "id", "field"] as const)
-      .filter((key) => related[key]).map((key) => `${key}: ${related[key]}`);
+      .filter((key) => related[key])
+      .map((key) => `${key}: ${related[key]}`);
     lines.push(`  связано: ${facts.join(", ")}`);
   }
   if (context.hint) lines.push(`  подсказка: ${context.hint}`);

@@ -79,11 +79,13 @@ const input: Parameters<typeof projectNativeChecks>[0] = {
       },
       tests: ["tests/*.java"],
       scoring: { mode: "weighted" },
-      references: [{
-        name: "alternate",
-        root: "author/alternate/src",
-        optional: false,
-      }],
+      references: [
+        {
+          name: "alternate",
+          root: "author/alternate/src",
+          optional: false,
+        },
+      ],
     },
   },
   student,
@@ -100,8 +102,9 @@ const input: Parameters<typeof projectNativeChecks>[0] = {
 const before = JSON.stringify(student);
 const positive = await projectNativeChecks(input);
 assert(
-  required(positive.project.references[0]).sources.map((f) => f.name).join(",") ===
-    "Helper.java,Replacement.java",
+  required(positive.project.references[0])
+    .sources.map((f) => f.name)
+    .join(",") === "Helper.java,Replacement.java",
   "Полное решение потеряло helper/replacement",
 );
 assert(
@@ -110,24 +113,29 @@ assert(
   "Student descriptor изменён",
 );
 const rejected: string[] = [];
-for (
-  const [name, mutate] of [
-    ["role", (v: typeof input) => required(required(v.full).files[2]).reason = "starter"],
-    ["bytes", (v: typeof input) => required(required(v.full).files[2]).bytes[0] = 0],
-    ["missing-group", (v: typeof input) => v.fullPlan.groups = []],
-    [
-      "configured-primary",
-      (v: typeof input) =>
-        v.fact.check!["additional-java-sources"] = {
-          archive: "extra.zip",
-          "max-files": 8,
-          "max-file-bytes": 1024,
-          "max-total-bytes": 8192,
-          "max-archive-bytes": 8192,
-        },
-    ],
-  ] as const
-) {
+for (const [name, mutate] of [
+  [
+    "role",
+    (v: typeof input) =>
+      (required(required(v.full).files[2]).reason = "starter"),
+  ],
+  [
+    "bytes",
+    (v: typeof input) => (required(required(v.full).files[2]).bytes[0] = 0),
+  ],
+  ["missing-group", (v: typeof input) => (v.fullPlan.groups = [])],
+  [
+    "configured-primary",
+    (v: typeof input) =>
+      (v.fact.check!["additional-java-sources"] = {
+        archive: "extra.zip",
+        "max-files": 8,
+        "max-file-bytes": 1024,
+        "max-total-bytes": 8192,
+        "max-archive-bytes": 8192,
+      }),
+  ],
+] as const) {
   const { Core: core, ...copy } = input;
   const v = { ...structuredClone(copy), Core: core };
   mutate(v);

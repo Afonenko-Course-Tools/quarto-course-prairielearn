@@ -18,25 +18,30 @@ const descriptor = {
     projection: "author",
     runtime: "quarto-1.11.5",
   },
-  inputs: [{
-    source: "labs/work.qmd",
-    captureWitness: "33333333-3333-4333-8333-333333333333",
-  }],
+  inputs: [
+    {
+      source: "labs/work.qmd",
+      captureWitness: "33333333-3333-4333-8333-333333333333",
+    },
+  ],
   assessments: [{ source: "labs/work.qmd", id: "sec-work" }],
 };
 const request = await PL.nativePreparedRequest(Core, descriptor);
 if (
-  request.identity.operation !== B || JSON.stringify(request).includes(A) ||
-  required(request.inputs[0]).captureWitness !== required(descriptor.inputs[0]).captureWitness ||
+  request.identity.operation !== B ||
+  JSON.stringify(request).includes(A) ||
+  required(request.inputs[0]).captureWitness !==
+    required(descriptor.inputs[0]).captureWitness ||
   request.outputDirectory !== descriptor.outputDirectory
-) throw Error("new request B not derived from descriptor B");
-for (
-  const mutate of [
-    (v: typeof descriptor) => { Reflect.set(v, "extra", true); },
-    (v: typeof descriptor) => v.identity.operation = "bad",
-    (v: typeof descriptor) => required(v.inputs[0]).captureWitness = "bad",
-  ]
-) {
+)
+  throw Error("new request B not derived from descriptor B");
+for (const mutate of [
+  (v: typeof descriptor) => {
+    Reflect.set(v, "extra", true);
+  },
+  (v: typeof descriptor) => (v.identity.operation = "bad"),
+  (v: typeof descriptor) => (required(v.inputs[0]).captureWitness = "bad"),
+]) {
   const bad = structuredClone(descriptor);
   mutate(bad);
   let refused = false;

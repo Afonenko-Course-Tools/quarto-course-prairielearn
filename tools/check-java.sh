@@ -8,6 +8,7 @@ cp -R "${repo}/examples/java-gradle/bank/projects/clamp/." "${stage}/"
 cd "${stage}/tests"
 gradle --offline -Psolution=../reference test
 if gradle --offline -Psolution=../student test; then
-  echo 'Незавершённый starter неожиданно прошёл checks' >&2; exit 1
+  echo 'Незавершённый starter неожиданно прошёл checks' >&2
+  exit 1
 fi
 printf '%s\n' 'PASS настоящее Java/Gradle: reference PASS, starter ожидаемо FAILED'

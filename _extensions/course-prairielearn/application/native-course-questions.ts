@@ -77,9 +77,7 @@ async function materializeCourseQuestion(
   if (!value || !condition) {
     throw Error("PL.ASSIGNMENT_CHANGED: missing settings/condition");
   }
-  if (
-    settings[q.id] && canonical(settings[q.id]) !== canonical(value)
-  ) {
+  if (settings[q.id] && canonical(settings[q.id]) !== canonical(value)) {
     throw Error("PL.ASSIGNMENT_CHANGED: repeated question policy");
   }
   settings[q.id] = value;
@@ -104,13 +102,14 @@ async function materializeCourseQuestion(
   if (artifacts[q.id]) {
     return;
   }
-  const facts = projectRows.filter((p) =>
-    p.source === q.source && p.fact.exerciseId === q.id
+  const facts = projectRows.filter(
+    (p) => p.source === q.source && p.fact.exerciseId === q.id,
   );
-  const pairs = projectPlans.filter((p) =>
-    p.source === q.source && p.exerciseId === q.id
+  const pairs = projectPlans.filter(
+    (p) => p.source === q.source && p.exerciseId === q.id,
   );
-  const row = facts[0], pair = pairs[0];
+  const row = facts[0],
+    pair = pairs[0];
   if (facts.length !== 1 || pairs.length !== 1 || !row || !pair) {
     throw Error("PL.PROVENANCE_CHANGED: selected project/plan");
   }
@@ -118,18 +117,19 @@ async function materializeCourseQuestion(
   if (!policy) throw Error("PL.CAPTURE_MISSING: source policy");
   const fact = row.fact,
     business = policy.business,
-    declaration = policy.input.declarations.find((
-      d,
-    ) => d.id === q.id);
+    declaration = policy.input.declarations.find((d) => d.id === q.id);
   if (
     fact.check &&
-    (!declaration || !business.projectChecks || canonical(
-          nativeCheck(
-            business.projectChecks,
-            declaration.attributes["project-check"] ?? "",
-          ),
-        ) !== canonical(fact.check))
-  ) throw Error("PL.CHECKS_CHANGED: Core/C policy parity");
+    (!declaration ||
+      !business.projectChecks ||
+      canonical(
+        nativeCheck(
+          business.projectChecks,
+          declaration.attributes["project-check"] ?? "",
+        ),
+      ) !== canonical(fact.check))
+  )
+    throw Error("PL.CHECKS_CHANGED: Core/C policy parity");
   const runtime = fact.check
     ? (await registry()).profiles?.[fact.check.runtime]
     : undefined;
@@ -162,9 +162,10 @@ async function materializeCourseQuestion(
     expectedSources: expectedSources,
   });
   console.error(
-    `PrairieLearn: подготовка задания ${progressIndex}/${materializationTotal} ${q.key} — готово (${
-      ((performance.now() - started) / 1000).toFixed(1)
-    } с)`,
+    `PrairieLearn: подготовка задания ${progressIndex}/${materializationTotal} ${q.key} — готово (${(
+      (performance.now() - started) /
+      1000
+    ).toFixed(1)} с)`,
   );
   artifacts[q.id] = materialized;
   if (materialized.project) {
@@ -180,19 +181,16 @@ export async function prepareCourseQuestions(input: MaterializationInput) {
   const { bodies } = input.state;
   const materializationTotal = new Set(
     deliveries.flatMap((d) =>
-      d.publicPackage.questions.filter((q) => !d.nativeAnswers[q.id]).map((
-        q,
-      ) => q.id)
+      d.publicPackage.questions
+        .filter((q) => !d.nativeAnswers[q.id])
+        .map((q) => q.id),
     ),
   ).size;
   let materializationIndex = 0;
   for (const delivered of deliveries) {
     const deliveredWork = delivered.publicPackage.works[0];
     if (!deliveredWork) throw Error("PL.ASSIGNMENT_CHANGED: missing work");
-    bodies.set(
-      deliveredWork.id,
-      delivered.publicPackage,
-    );
+    bodies.set(deliveredWork.id, delivered.publicPackage);
     for (const q of delivered.publicPackage.questions) {
       await materializeCourseQuestion({
         ...input,

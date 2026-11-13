@@ -10,14 +10,19 @@ export const fail = (
 export const record = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
 export const safe = (v: unknown): v is string =>
-  typeof v === "string" && !!v && !v.includes("\\") && !v.includes("\0") &&
-  !isAbsolute(v) && !v.split("/").some((p) => !p || p === "." || p === "..");
+  typeof v === "string" &&
+  !!v &&
+  !v.includes("\\") &&
+  !v.includes("\0") &&
+  !isAbsolute(v) &&
+  !v.split("/").some((p) => !p || p === "." || p === "..");
 export const fields = (
   v: unknown,
   required: string[],
   optional: string[] = [],
 ): v is Record<string, unknown> =>
-  record(v) && required.every((k) => Object.hasOwn(v, k)) &&
+  record(v) &&
+  required.every((k) => Object.hasOwn(v, k)) &&
   Object.keys(v).every((k) => [...required, ...optional].includes(k));
 export async function publicProjectFiles(root: string) {
   const result = await files(root, { field: "project.student" }, true);
@@ -27,17 +32,20 @@ export async function publicProjectFiles(root: string) {
 export function assertPublicStudentFiles(files: readonly { name: string }[]) {
   for (const file of files) {
     if (
-      file.name.split("/").some((part) =>
-        [
-          "private",
-          "reference",
-          "solution",
-          "solutions",
-          "grading-notes",
-          "rubric.md",
-          "contract.md",
-        ].includes(part)
-      ) || /\.(?:qmd|rmd|ipynb|class|jar)$/i.test(file.name)
+      file.name
+        .split("/")
+        .some((part) =>
+          [
+            "private",
+            "reference",
+            "solution",
+            "solutions",
+            "grading-notes",
+            "rubric.md",
+            "contract.md",
+          ].includes(part),
+        ) ||
+      /\.(?:qmd|rmd|ipynb|class|jar)$/i.test(file.name)
     ) {
       fail("Закрытый или служебный файл в student partition", {
         field: "project.student",
@@ -61,12 +69,17 @@ export async function files(
       if (entry.isSymlink) fail("Символьная ссылка в файлах проекта", context);
       if (
         (entry.name.startsWith(".") &&
-          !(allowStudentGitignore && directory === root &&
-            entry.name === ".gitignore" && entry.isFile)) ||
+          !(
+            allowStudentGitignore &&
+            directory === root &&
+            entry.name === ".gitignore" &&
+            entry.isFile
+          )) ||
         ["build", "node_modules", "_generated", "_extensions"].includes(
           entry.name,
         )
-      ) continue;
+      )
+        continue;
       if (entry.isDirectory) await walk(path);
       else if (entry.isFile) {
         collected.push({

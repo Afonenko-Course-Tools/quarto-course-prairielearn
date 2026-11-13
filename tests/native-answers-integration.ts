@@ -12,8 +12,12 @@ const corePath = resolve(required(Deno.args[0]), "_extensions/course-core"),
     dirname(dirname(fileURLToPath(import.meta.url))),
     "_extensions/course-prairielearn",
   );
-const Core: typeof CorePublic = await import(pathToFileURL(join(corePath, "public.ts")).href),
-  PL: typeof PLPublic = await import(pathToFileURL(join(plPath, "public.ts")).href);
+const Core: typeof CorePublic = await import(
+    pathToFileURL(join(corePath, "public.ts")).href
+  ),
+  PL: typeof PLPublic = await import(
+    pathToFileURL(join(plPath, "public.ts")).href
+  );
 const root = await Deno.makeTempDir({ prefix: "pl-scope-" }),
   checks: string[] = [];
 async function put(path: string, text: string) {
@@ -46,23 +50,22 @@ filters:
 await put(".gitignore", "/.quarto/\n**/*.quarto_ipynb\n");
 await put(
   "_quarto.yml",
-  config.replace("default: student", "default: " + profile).replace(
-    "view: student",
-    "view: " + profile,
-  ) +
+  config
+    .replace("default: student", "default: " + profile)
+    .replace("view: student", "view: " + profile) +
     "\nproject-checks: {source-profiles: {}, profiles: {}}\nproject-materialization: {projects: {}}\n",
 );
 await put("_quarto-" + profile + ".yml", "course: {view: " + profile + "}\n");
 await put("_extensions/prairielearn/contract.json", '{"name":"prairielearn"}');
 await put(
   "pre.ts",
-  `import * as Core from ${
-    JSON.stringify(pathToFileURL(join(corePath, "public.ts")).href)
-  };import * as PL from ${
-    JSON.stringify(pathToFileURL(join(plPath, "public.ts")).href)
-  };await PL.prepareNativeAdapter(Core,{root:Deno.cwd(),projection:${
-    JSON.stringify(projection)
-  },outputDirectory:Deno.cwd()+'/_site'});`,
+  `import * as Core from ${JSON.stringify(
+    pathToFileURL(join(corePath, "public.ts")).href,
+  )};import * as PL from ${JSON.stringify(
+    pathToFileURL(join(plPath, "public.ts")).href,
+  )};await PL.prepareNativeAdapter(Core,{root:Deno.cwd(),projection:${JSON.stringify(
+    projection,
+  )},outputDirectory:Deno.cwd()+'/_site'});`,
 );
 await put(
   "index.qmd",
@@ -105,142 +108,152 @@ await Core.withNativeCaptureScope(
     }
   },
 );
-await Core.withCurrentNativeOperation({
-  root,
-  profiles: [profile],
-  projection,
-  outputDirectory: root + "/_site",
-  expectedDocuments: [{ source: "index.qmd", format: "html" }, {
-    source: "slides.qmd",
-    format: "revealjs",
-  }],
-}, async (op) => {
-  const adapter = PL.createNativeAdapter({ root, core: Core });
-  if (wrongGrading) {
-    let error = "";
-    try {
-      await adapter.validateCourse(op, {
-        expectedSources: ["index.qmd", "slides.qmd"],
-      });
-    } catch (e) {
-      error = String(e);
+await Core.withCurrentNativeOperation(
+  {
+    root,
+    profiles: [profile],
+    projection,
+    outputDirectory: root + "/_site",
+    expectedDocuments: [
+      { source: "index.qmd", format: "html" },
+      {
+        source: "slides.qmd",
+        format: "revealjs",
+      },
+    ],
+  },
+  async (op) => {
+    const adapter = PL.createNativeAdapter({ root, core: Core });
+    if (wrongGrading) {
+      let error = "";
+      try {
+        await adapter.validateCourse(op, {
+          expectedSources: ["index.qmd", "slides.qmd"],
+        });
+      } catch (e) {
+        error = String(e);
+      }
+      if (!error.includes("PL.GRADING_INVALID")) {
+        throw Error("cross-document wrong grading accepted: " + error);
+      }
+      let retained = false;
+      try {
+        adapter.business("index.qmd");
+        retained = true;
+      } catch {}
+      if (retained) {
+        throw Error("failed composition retained consumable business");
+      }
+      console.log(
+        JSON.stringify(
+          {
+            root,
+            refused:
+              "authentic cross-document manual question with automatic points",
+            error,
+          },
+          null,
+          2,
+        ),
+      );
+      return;
     }
-    if (!error.includes("PL.GRADING_INVALID")) {
-      throw Error("cross-document wrong grading accepted: " + error);
+    const proof = await adapter.validateCourse(op, {
+      expectedSources: ["index.qmd", "slides.qmd"],
+    });
+    const input = adapter.validatedInput("index.qmd");
+    if (Deno.args.includes("--assignment-consumer-refusal")) {
+      let error = "";
+      try {
+        await adapter.assignmentDelivery(
+          op,
+          { source: "slides.qmd", assessmentId: "sec-all" },
+          { projectPlans: [] },
+          { expectedSources: ["index.qmd", "slides.qmd"] },
+        );
+      } catch (cause) {
+        error = String(cause);
+      }
+      if (!error.includes("BODY.ASSIGNMENT_REQUIRED")) {
+        throw Error(
+          "ordinary operation acquired assignment or wrong refusal: " + error,
+        );
+      }
+      console.log(
+        JSON.stringify(
+          {
+            status: "REAL_ORDINARY_OPERATION_REFUSED_NOT_ASSIGNMENT_POSITIVE",
+            error,
+            metrics: op.metrics,
+          },
+          null,
+          2,
+        ),
+      );
+      return;
     }
-    let retained = false;
+    // Сериализованный input — данные, не Core authority: чистый вызов не
+    // наполняет cache и не даёт читать business/private answers.
+    const external = PL.createNativeAdapter({ root, core: Core });
+    await external.validate(structuredClone(input));
+    let cached = false;
     try {
-      adapter.business("index.qmd");
-      retained = true;
+      external.business("index.qmd");
+      cached = true;
     } catch {}
-    if (retained) {
-      throw Error("failed composition retained consumable business");
+    if (cached) throw Error("DTO validation created business authority");
+    for (const nativeMetadata of [
+      undefined,
+      { foreign: {} },
+      { readSet: ["configuration"], values: {} },
+    ]) {
+      const bad = structuredClone(input);
+      setFixture(bad, ["nativeMetadata"], nativeMetadata);
+      let refused = false;
+      try {
+        await external.validate(bad);
+      } catch {
+        refused = true;
+      }
+      if (!refused)
+        throw Error("Missing/unknown native metadata or old envelope accepted");
     }
+
+    if (
+      input.declarations
+        .map((d) => d.answer?.type)
+        .sort()
+        .join(",") !== "manual,matching,multipart,numeric,single-choice"
+    )
+      throw Error("canonical answers lost");
+    const publicBytes = JSON.stringify({
+      catalog: op.catalog,
+      documents: [
+        op.document({ source: "index.qmd" }),
+        op.document({ source: "slides.qmd" }),
+      ],
+      proof,
+    });
+    if (
+      publicBytes.includes("734129") ||
+      publicBytes.includes('"correct"') ||
+      publicBytes.includes('"pairs"')
+    )
+      throw Error("closed answer leaked to public DTO");
     console.log(
       JSON.stringify(
         {
           root,
-          refused:
-            "authentic cross-document manual question with automatic points",
-          error,
-        },
-        null,
-        2,
-      ),
-    );
-    return;
-  }
-  const proof = await adapter.validateCourse(op, {
-    expectedSources: ["index.qmd", "slides.qmd"],
-  });
-  const input = adapter.validatedInput("index.qmd");
-  if (Deno.args.includes("--assignment-consumer-refusal")) {
-    let error = "";
-    try {
-      await adapter.assignmentDelivery(
-        op,
-        { source: "slides.qmd", assessmentId: "sec-all" },
-        { projectPlans: [] },
-        { expectedSources: ["index.qmd", "slides.qmd"] },
-      );
-    } catch (cause) {
-      error = String(cause);
-    }
-    if (!error.includes("BODY.ASSIGNMENT_REQUIRED")) {
-      throw Error(
-        "ordinary operation acquired assignment or wrong refusal: " + error,
-      );
-    }
-    console.log(
-      JSON.stringify(
-        {
-          status: "REAL_ORDINARY_OPERATION_REFUSED_NOT_ASSIGNMENT_POSITIVE",
-          error,
+          proof,
+          forms: input.declarations.map((d) => ({
+            id: d.id,
+            type: required(d.answer).type,
+          })),
           metrics: op.metrics,
         },
         null,
         2,
       ),
     );
-    return;
-  }
-  // Сериализованный input — данные, не Core authority: чистый вызов не
-  // наполняет cache и не даёт читать business/private answers.
-  const external = PL.createNativeAdapter({ root, core: Core });
-  await external.validate(structuredClone(input));
-  let cached = false;
-  try {
-    external.business("index.qmd");
-    cached = true;
-  } catch {}
-  if (cached) throw Error("DTO validation created business authority");
-  for (
-    const nativeMetadata of [
-      undefined,
-      { foreign: {} },
-      { readSet: ["configuration"], values: {} },
-    ]
-  ) {
-    const bad = structuredClone(input);
-    setFixture(bad, ["nativeMetadata"], nativeMetadata);
-    let refused = false;
-    try {
-      await external.validate(bad);
-    } catch {
-      refused = true;
-    }
-    if (!refused) throw Error("Missing/unknown native metadata or old envelope accepted");
-  }
-
-  if (
-    input.declarations.map((d) => d.answer?.type).sort().join(",") !==
-      "manual,matching,multipart,numeric,single-choice"
-  ) throw Error("canonical answers lost");
-  const publicBytes = JSON.stringify({
-    catalog: op.catalog,
-    documents: [
-      op.document({ source: "index.qmd" }),
-      op.document({ source: "slides.qmd" }),
-    ],
-    proof,
-  });
-  if (
-    publicBytes.includes("734129") || publicBytes.includes('"correct"') ||
-    publicBytes.includes('"pairs"')
-  ) throw Error("closed answer leaked to public DTO");
-  console.log(
-    JSON.stringify(
-      {
-        root,
-        proof,
-        forms: input.declarations.map((d) => ({
-          id: d.id,
-          type: required(d.answer).type,
-        })),
-        metrics: op.metrics,
-      },
-      null,
-      2,
-    ),
-  );
-});
+  },
+);

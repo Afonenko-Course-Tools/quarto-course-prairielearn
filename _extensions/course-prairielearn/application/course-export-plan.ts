@@ -31,8 +31,10 @@ export function nativeUnitMenus<T extends MenuWork>(
     const expected = "exr-" + work.id.slice("sec-unit-".length);
     const slot = work.slots?.[0];
     if (
-      work.slots?.length !== 1 || slot?.selection !== "fixed" ||
-      slot.id !== expected || slot.candidates?.length !== 1 ||
+      work.slots?.length !== 1 ||
+      slot?.selection !== "fixed" ||
+      slot.id !== expected ||
+      slot.candidates?.length !== 1 ||
       slot.candidates[0] !== expected ||
       slot.assignment?.requirement !== "required"
     ) {
@@ -41,12 +43,14 @@ export function nativeUnitMenus<T extends MenuWork>(
           work.id,
       );
     }
-    const menus = assessments.filter((menu) =>
-      menu.id !== work.id &&
-      menu.slots.some((member) =>
-        member.assignment.requirement === "optional" &&
-        member.candidates.includes(expected)
-      )
+    const menus = assessments.filter(
+      (menu) =>
+        menu.id !== work.id &&
+        menu.slots.some(
+          (member) =>
+            member.assignment.requirement === "optional" &&
+            member.candidates.includes(expected),
+        ),
     );
     if (new Set(menus.map((menu) => menu.id)).size !== menus.length) {
       throw Error("PL неоднозначный источник контекста меню: " + work.id);
@@ -55,28 +59,27 @@ export function nativeUnitMenus<T extends MenuWork>(
   }
   return unitMenus;
 }
-type ExportAssessment =
-  & Pick<
-    NonNullable<NativeAdapterValidationInput["assessment"]>,
-    "id" | "title" | "kind" | "slots" | "relatedExercise"
-  >
-  & {
-    source: string;
-    extensions: {
-      prairielearn: ReturnType<typeof AssessmentPolicySchema.parse>;
-    };
+type ExportAssessment = Pick<
+  NonNullable<NativeAdapterValidationInput["assessment"]>,
+  "id" | "title" | "kind" | "slots" | "relatedExercise"
+> & {
+  source: string;
+  extensions: {
+    prairielearn: ReturnType<typeof AssessmentPolicySchema.parse>;
   };
-type ExportExercise =
-  & Pick<NativeAdapterValidationInput["declarations"][number], "id">
-  & {
-    target: string;
-    // Авторские значения повторно проверяет существующий question() reader.
-    extensions?: {
-      prairielearn?: Partial<
-        Record<"topic" | "submission" | "grading" | "single-variant", unknown>
-      >;
-    };
+};
+type ExportExercise = Pick<
+  NativeAdapterValidationInput["declarations"][number],
+  "id"
+> & {
+  target: string;
+  // Авторские значения повторно проверяет существующий question() reader.
+  extensions?: {
+    prairielearn?: Partial<
+      Record<"topic" | "submission" | "grading" | "single-variant", unknown>
+    >;
   };
+};
 export interface ExportCourseContent {
   assessments: ExportAssessment[];
   exercises: ExportExercise[];
@@ -107,9 +110,10 @@ export type CourseExportInput = {
     schemaVersion: number;
     profiles?: Record<
       string,
-      Pick<RuntimeProfile, "mode"> & Partial<RuntimeProfile> & {
-        image?: string;
-      }
+      Pick<RuntimeProfile, "mode"> &
+        Partial<RuntimeProfile> & {
+          image?: string;
+        }
     >;
   };
   instance: string;
@@ -130,7 +134,8 @@ export type CourseExportInput = {
 export async function planCourseExport(input: CourseExportInput) {
   const content = input.content;
   if (
-    !content || !Array.isArray(content.assessments) ||
+    !content ||
+    !Array.isArray(content.assessments) ||
     !Array.isArray(content.exercises)
   ) {
     throw Error("PL.INPUT_INVALID: course content required");
@@ -171,8 +176,9 @@ export async function planCourseExport(input: CourseExportInput) {
   const assessmentUuids = new Map<string, string>();
   const uuidOwners = new Map<string, string>();
   for (const work of works) {
-    const uuid = work.extensions.prairielearn.uuid ??
-      await identity("assessment/" + work.id, courseUuid);
+    const uuid =
+      work.extensions.prairielearn.uuid ??
+      (await identity("assessment/" + work.id, courseUuid));
     const previous = uuidOwners.get(uuid.toLowerCase());
     if (previous !== undefined) {
       throw Error(

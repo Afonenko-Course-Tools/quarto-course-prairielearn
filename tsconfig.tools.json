@@ -7,7 +7,15 @@
     "checkJs": true,
     "strict": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "allowImportingTsExtensions": true
   },
-  "include": ["tools/build-native-validators.cjs"]
+  "include": [
+    "tools/**/*.cjs",
+    "tools/**/*.mjs",
+    "tests/**/*.cjs",
+    "tests/**/*.mjs",
+    "*.mjs",
+    "*.cjs"
+  ]
 }

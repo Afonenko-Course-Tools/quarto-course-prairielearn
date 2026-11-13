@@ -9,18 +9,19 @@ import { exportPrairieLearn } from "../_extensions/course-prairielearn/applicati
 import { captureNativeAuxiliary } from "../_extensions/course-prairielearn/application/native-auxiliary.ts";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
-const output = required(Deno.args[0]), download = required(Deno.args[1]), only = Deno.args[2];
-const { zip }: Pick<typeof import("project-download/public.ts"), "zip"> = await import(
-  pathToFileURL(join(download, "_extensions/project-download/public.ts")).href
-);
+const output = required(Deno.args[0]),
+  download = required(Deno.args[1]),
+  only = Deno.args[2];
+const { zip }: Pick<typeof import("project-download/public.ts"), "zip"> =
+  await import(
+    pathToFileURL(join(download, "_extensions/project-download/public.ts")).href
+  );
 const rows = [];
-for (
-  const [recipe, mode, label] of [
-    ["restore-selected-state", "workspace", "actual-restore-workspace"],
-    ["github-ssh", "upload", "actual-github-upload"],
-    ["github-ssh", "workspace", "conditional-github-workspace-harness"],
-  ] satisfies [string, string, string][]
-) {
+for (const [recipe, mode, label] of [
+  ["restore-selected-state", "workspace", "actual-restore-workspace"],
+  ["github-ssh", "upload", "actual-github-upload"],
+  ["github-ssh", "workspace", "conditional-github-workspace-harness"],
+] satisfies [string, string, string][]) {
   if (only && only !== label) continue;
   const f = await fixture(recipe);
   try {
@@ -47,11 +48,10 @@ for (
       await Deno.writeFile(path, file.bytes);
     }
     const kind: PublicBodyPackage["works"][number]["kind"] = "lab";
-    const selection:
-      PublicBodyPackage["works"][number]["slots"][number]["selection"] =
-        "fixed";
-    const assignment:
-      PublicBodyPackage["works"][number]["slots"][number]["assignment"] = {
+    const selection: PublicBodyPackage["works"][number]["slots"][number]["selection"] =
+      "fixed";
+    const assignment: PublicBodyPackage["works"][number]["slots"][number]["assignment"] =
+      {
         requirement: "required",
         workMode: "individual",
       };
@@ -60,12 +60,14 @@ for (
       source: "work.qmd",
       kind,
       title: "Работа",
-      slots: [{
-        id,
-        selection,
-        candidates: [id],
-        assignment,
-      }],
+      slots: [
+        {
+          id,
+          selection,
+          candidates: [id],
+          assignment,
+        },
+      ],
       extensions: {
         prairielearn: {
           attempts: 3,
@@ -81,35 +83,43 @@ for (
       owner: "fixture",
       release: "native",
       apiVersion: [1, 23, 1],
-      questions: [{
-        owner: "fixture",
-        id,
-        key,
-        title: "Заготовка",
-        source: "bank.qmd",
-        visibility: "public",
-        statementVisibility: "open",
-        hasPublicSolution: false,
-        answerType: "manual",
-        condition: [{
-          t: "Para",
-          c: [{ t: "Str", c: "Полное условие. Сохраните историю." }],
-        }],
-        publicAnswer: [],
-      }],
-      works: [{
-        owner: "fixture",
-        id: work.id,
-        key: "fixture/sec-work",
-        source: work.source,
-        kind: work.kind,
-        title: work.title,
-        slots: [{
-          ...required(work.slots[0]),
-          id: "fixture/sec-work/" + id,
-          candidates: [key],
-        }],
-      }],
+      questions: [
+        {
+          owner: "fixture",
+          id,
+          key,
+          title: "Заготовка",
+          source: "bank.qmd",
+          visibility: "public",
+          statementVisibility: "open",
+          hasPublicSolution: false,
+          answerType: "manual",
+          condition: [
+            {
+              t: "Para",
+              c: [{ t: "Str", c: "Полное условие. Сохраните историю." }],
+            },
+          ],
+          publicAnswer: [],
+        },
+      ],
+      works: [
+        {
+          owner: "fixture",
+          id: work.id,
+          key: "fixture/sec-work",
+          source: work.source,
+          kind: work.kind,
+          title: work.title,
+          slots: [
+            {
+              ...required(work.slots[0]),
+              id: "fixture/sec-work/" + id,
+              candidates: [key],
+            },
+          ],
+        },
+      ],
       resources: [],
     };
     const config = {
@@ -138,43 +148,52 @@ for (
     const courseOut = join(output, label, "course"),
       standalone = join(output, label, "standalone");
     await Deno.mkdir(join(output, label), { recursive: true });
-    await exportPrairieLearn(pkg, {
-      projectRoot: f.root,
-      projects: { [id]: "/" + f.options.project },
-      studentArtifacts: { [id]: artifact },
-      nativeAuxiliary: auxiliary,
-      deferPublish: true,
-    }, {
-      questions: {
-        [id]: {
-          topic: "Java",
-          grading: { method: "manual" },
-          submission: settings,
-          files: [],
+    await exportPrairieLearn(
+      pkg,
+      {
+        projectRoot: f.root,
+        projects: { [id]: "/" + f.options.project },
+        studentArtifacts: { [id]: artifact },
+        nativeAuxiliary: auxiliary,
+        deferPublish: true,
+      },
+      {
+        questions: {
+          [id]: {
+            topic: "Java",
+            grading: { method: "manual" },
+            submission: settings,
+            files: [],
+          },
         },
       },
-    }, standalone).then((p) => p!.publish());
+      standalone,
+    ).then((p) => p!.publish());
     const delivery = await exportCourse({
       courseId: "fixture",
       projectRoot: f.root,
       content: {
         assessments: [work],
-        exercises: [{
-          id,
-          target: "prairielearn",
-          extensions: {
-            prairielearn: {
-              topic: "Java",
-              grading: { method: "manual" },
-              submission: settings,
+        exercises: [
+          {
+            id,
+            target: "prairielearn",
+            extensions: {
+              prairielearn: {
+                topic: "Java",
+                grading: { method: "manual" },
+                submission: settings,
+              },
             },
           },
-        }],
-        projects: [{
-          exerciseId: id,
-          bankMember: true,
-          projectRoot: f.options.project,
-        }],
+        ],
+        projects: [
+          {
+            exerciseId: id,
+            bankMember: true,
+            projectRoot: f.options.project,
+          },
+        ],
       },
       checks: {
         schemaVersion: 3,

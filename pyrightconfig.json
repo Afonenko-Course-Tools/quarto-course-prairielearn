@@ -1,11 +1,15 @@
 {
-  "include": [
-    "tests/trusted-git-helper.py",
-    "tests/trusted-git-probe.py",
-    "tests/sp_bundle_transport_test.py",
-    "tools/vendor-pl-zod.py"
-  ],
+  "include": ["tools", "tests", "_extensions/course-prairielearn", "examples"],
   "typeCheckingMode": "strict",
   "pythonVersion": "3.12",
-  "pythonPlatform": "Linux"
+  "pythonPlatform": "Linux",
+  "exclude": [
+    "**/vendor",
+    "**/node_modules",
+    ".ci-deps",
+    ".ci",
+    "tests/fixtures/git-recipes",
+    "examples/**/_extensions"
+  ],
+  "reportUnnecessaryTypeIgnoreComment": "error"
 }
