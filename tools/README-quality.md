@@ -10,7 +10,7 @@ npm run check-quality:controls
 
 `scope` в `eslint.config.mjs` задаёт production-каталоги. Все существующие и
 новые tracked/untracked `.ts`, `.js`, `.cjs` обнаруживаются автоматически.
-Vendor, node_modules, generated и _generated не входят в собственный код.
+Vendor, node_modules, generated и \_generated не входят в собственный код.
 Пустой scope и `strict: false` запрещены. Структурные правила действуют на весь
 собственный production-код: `complexity <= 30`, `max-depth <= 5`, `max-params <= 5`.
 Исключение PL — существующий именованный ABI `renderPublicBody` с семью аргументами.

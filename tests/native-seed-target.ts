@@ -8,59 +8,62 @@ const [sp, download, output] = Deno.args;
 if (!sp || !download || !output) {
   throw Error("Требуются exact SP, Download и собственный output");
 }
-const { zip }: Pick<typeof import("project-download/public.ts"), "zip"> = await import(
-  pathToFileURL(join(download, "_extensions/project-download/public.ts")).href
-);
+const { zip }: Pick<typeof import("project-download/public.ts"), "zip"> =
+  await import(
+    pathToFileURL(join(download, "_extensions/project-download/public.ts")).href
+  );
 await Deno.mkdir(output, { recursive: true });
 const results: Record<string, unknown>[] = [];
-const originalCommand = Deno.Command, commands: Record<string, unknown>[] = [];
+const originalCommand = Deno.Command,
+  commands: Record<string, unknown>[] = [];
 Deno.Command = class extends originalCommand {
   constructor(command: string | URL, options?: Deno.CommandOptions) {
-    commands.push({executable: String(command), args: options?.args, cwd: options?.cwd, clearEnv: options?.clearEnv});
+    commands.push({
+      executable: String(command),
+      args: options?.args,
+      cwd: options?.cwd,
+      clearEnv: options?.clearEnv,
+    });
     super(command, options);
   }
 };
-for (
-  const [recipe, mode, target] of [[
-    "github-ssh",
-    "upload",
-    "versioning/project",
-  ], ["restore-selected-state", "workspace", "work"]] satisfies [string, string, string][]
-) {
+for (const [recipe, mode, target] of [
+  ["github-ssh", "upload", "versioning/project"],
+  ["restore-selected-state", "workspace", "work"],
+] satisfies [string, string, string][]) {
   const root = await Deno.makeTempDir({ prefix: "pl-seed-target-" }),
     project = "projects/seed",
     source = join(sp, "tasks/projects/version-control", recipe),
     bindings: string[] = [];
-  for (
-    const p of recipe === "github-ssh"
-      ? ["seed_recipe.py", "seed.json", "student/README.md"]
-      : ["seed_recipe.py", "student/work/README.md", "student/work/notes.txt"]
-  ) {
+  for (const p of recipe === "github-ssh"
+    ? ["seed_recipe.py", "seed.json", "student/README.md"]
+    : ["seed_recipe.py", "student/work/README.md", "student/work/notes.txt"]) {
     const bytes = await Deno.readFile(join(source, p)),
       to = join(root, project, p);
     await Deno.mkdir(dirname(to), { recursive: true });
     await Deno.writeFile(to, bytes);
     bindings.push(p);
   }
-  let guards = 0, zipCalls = 0;
+  let guards = 0,
+    zipCalls = 0;
   async function current() {
     guards++;
   }
   const readme = {
     name: "README.md",
     bytes: await Deno.readFile(join(source, "student/README.md")).catch(() =>
-      new TextEncoder().encode("Полное условие собственного bounded harness.")
+      new TextEncoder().encode("Полное условие собственного bounded harness."),
     ),
   };
   const files = [
     readme,
     ...(recipe === "restore-selected-state"
       ? await Promise.all(
-        ["README.md", "notes.txt"].map(async (p) => ({
-          name: "work/" + p,
-          bytes: await Deno.readFile(join(source, "student/work", p)),
-        })),
-      )
+          ["README.md", "notes.txt"].map(async (p) => ({
+            name: "work/" + p,
+            bytes: await Deno.readFile(join(source, "student/work", p)),
+          })),
+        )
       : []),
     {
       name: target + "-neighbor/keep.txt",
@@ -72,21 +75,24 @@ for (
     project,
     seedTarget: target,
     exerciseId: "exr-seed",
-    settings: mode === "upload" ? { mode: "upload" } : {
-      mode: "workspace",
-      workspaceOptions: {
-        image: "fixture.invalid/unused@sha256:" + "0".repeat(64),
-        home: "/workspace",
-        port: 8080,
-        gradedFiles: [
-          "work/**",
-          "work/.git/**",
-          "work/.*",
-          "explanation.m[d]",
-          ".pl-seed/identity.jso[n]",
-        ],
-      },
-    },
+    settings:
+      mode === "upload"
+        ? { mode: "upload" }
+        : {
+            mode: "workspace",
+            workspaceOptions: {
+              image: "fixture.invalid/unused@sha256:" + "0".repeat(64),
+              home: "/workspace",
+              port: 8080,
+              gradedFiles: [
+                "work/**",
+                "work/.git/**",
+                "work/.*",
+                "explanation.m[d]",
+                ".pl-seed/identity.jso[n]",
+              ],
+            },
+          },
     materialization: {
       projects: { "exr-seed": { "include-git": true, "common-files": [] } },
     },
@@ -101,8 +107,10 @@ for (
   if (
     !positive.files.some((f) => f.name === target + "/.git/HEAD") ||
     !positive.files.some((f) => f.name === target + "-neighbor/keep.txt") ||
-    target !== "work" && positive.files.some((f) => f.name.startsWith("work/"))
-  ) throw Error("Target prefix/соседний target изменены");
+    (target !== "work" &&
+      positive.files.some((f) => f.name.startsWith("work/")))
+  )
+    throw Error("Target prefix/соседний target изменены");
   await Deno.writeFile(join(output, recipe + ".zip"), positive.archive);
   if (mode === "workspace") await workspaceSeed(positive);
   let rejects = 0;
@@ -125,47 +133,46 @@ for (
     }
     rejects++;
   }
+  await refuse("ancestor collision", (o) =>
+    o.files.push({
+      name: required(required(target).split("/")[0]),
+      bytes: new Uint8Array(),
+    }),
+  );
+  await refuse("file-prefix collision", (o) =>
+    o.files.push({ name: "README.md/escape", bytes: new Uint8Array() }),
+  );
+  await refuse("artifact escape", (o) =>
+    o.files.push({ name: "../escape", bytes: new Uint8Array() }),
+  );
+  await refuse("git injected", (o) =>
+    o.files.push({ name: target + "/.git/config", bytes: new Uint8Array() }),
+  );
+  await refuse("service injected", (o) =>
+    o.files.push({ name: ".pl-seed/identity.json", bytes: new Uint8Array() }),
+  );
+  await refuse("recipe bytes mismatch", (o) =>
+    o.files.push({
+      name: target + "/catalog.tsv",
+      bytes: new TextEncoder().encode("WRONG"),
+    }),
+  );
+  await refuse("missing include-git", (o) =>
+    setFixture(
+      o.materialization,
+      ["projects", "exr-seed", "include-git"],
+      false,
+    ),
+  );
   await refuse(
-    "ancestor collision",
+    "currentness",
     (o) =>
-      o.files.push({ name: required(required(target).split("/")[0]), bytes: new Uint8Array() }),
-  );
-  await refuse(
-    "file-prefix collision",
-    (o) => o.files.push({ name: "README.md/escape", bytes: new Uint8Array() }),
-  );
-  await refuse(
-    "artifact escape",
-    (o) => o.files.push({ name: "../escape", bytes: new Uint8Array() }),
-  );
-  await refuse(
-    "git injected",
-    (o) =>
-      o.files.push({ name: target + "/.git/config", bytes: new Uint8Array() }),
-  );
-  await refuse(
-    "service injected",
-    (o) =>
-      o.files.push({ name: ".pl-seed/identity.json", bytes: new Uint8Array() }),
-  );
-  await refuse(
-    "recipe bytes mismatch",
-    (o) =>
-      o.files.push({
-        name: target + "/catalog.tsv",
-        bytes: new TextEncoder().encode("WRONG"),
+      (o.assertCurrent = async () => {
+        throw Error("CURRENTNESS_SENTINEL");
       }),
   );
-  await refuse(
-    "missing include-git",
-    (o) => setFixture(o.materialization, ["projects", "exr-seed", "include-git"], false),
-  );
-  await refuse("currentness", (o) =>
-    o.assertCurrent = async () => {
-      throw Error("CURRENTNESS_SENTINEL");
-    });
   if (mode === "workspace") {
-    await refuse("non-work workspace", (o) => o.seedTarget = "another/repo");
+    await refuse("non-work workspace", (o) => (o.seedTarget = "another/repo"));
   }
   results.push({
     recipe,

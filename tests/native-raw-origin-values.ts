@@ -16,26 +16,29 @@ const file = ArtifactFileSchema.parse({
 });
 const selected = selectedCheckFile(file, "example/Study.java");
 if (
-  selected.name !== "example/Study.java" || selected.target !== file.target ||
+  selected.name !== "example/Study.java" ||
+  selected.target !== file.target ||
   !Buffer.from(selected.data, "base64").equals(bytes)
-) throw Error("selected filename/target/content lost");
+)
+  throw Error("selected filename/target/content lost");
 if (Object.keys(selected).sort().join(",") !== "data,name,target") {
   throw Error("selected contract includes obsolete proof fields");
 }
-const changed = selectedCheckFile({
-  ...file,
-  bytes: new TextEncoder().encode("class Revised {}"),
-}, "example/Study.java");
+const changed = selectedCheckFile(
+  {
+    ...file,
+    bytes: new TextEncoder().encode("class Revised {}"),
+  },
+  "example/Study.java",
+);
 if (changed.data === selected.data) {
   throw Error("current bytes not transferred");
 }
-for (
-  const extra of [
-    { sha256: "a".repeat(64) },
-    { rawSource: "private/raw.java" },
-    { size: bytes.length },
-  ]
-) {
+for (const extra of [
+  { sha256: "a".repeat(64) },
+  { rawSource: "private/raw.java" },
+  { size: bytes.length },
+]) {
   if (ArtifactFileSchema.safeParse({ ...file, ...extra }).success) {
     throw Error("obsolete artifact field accepted");
   }

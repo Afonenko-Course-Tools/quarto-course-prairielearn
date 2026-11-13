@@ -12,7 +12,9 @@ const prior = Deno.env.get("COURSE_PERF_MODE");
 try {
   Deno.env.set("COURSE_PERF_MODE", "off");
   const off = createMetrics("course-prairielearn");
-  const fn = () => 42, promise = Promise.resolve(7), asyncFn = () => promise;
+  const fn = () => 42,
+    promise = Promise.resolve(7),
+    asyncFn = () => promise;
   assert.equal(off.wrapSync({ id: "off", kind: "function" }, fn), fn);
   assert.equal(
     off.wrapWalk({ id: "off-walk", kind: "ast_walk", scope: "fragment" }, fn),
@@ -45,13 +47,19 @@ try {
   };
   metrics.wrapSync(spec, fn)();
   metrics.wrapSync({ id: "batch", kind: "function" }, fn)();
-  const begins = agent.events.filter(event => event.event === "begin");
-  assert.equal(required(begins[0], "first begin event").document_id, "source.qmd");
+  const begins = agent.events.filter((event) => event.event === "begin");
+  assert.equal(
+    required(begins[0], "first begin event").document_id,
+    "source.qmd",
+  );
   assert.deepEqual(required(begins[0], "first begin event").attributes, {
     extension_id: "course-prairielearn",
     functional: 7,
   });
-  assert.equal(required(begins[1], "second begin event").document_id, undefined);
+  assert.equal(
+    required(begins[1], "second begin event").document_id,
+    undefined,
+  );
   assert.equal(spec.attributes.extension_id, "wrong");
   console.log(
     "PASS фасад: extension/document, batch без document, off identity",
@@ -61,7 +69,8 @@ try {
   const probe = join(root, "probe.ts");
   await Deno.writeTextFile(
     probe,
-    `#!${Deno.execPath()} run -A\n` + `
+    `#!${Deno.execPath()} run -A\n` +
+      `
 const docker=Deno.args[0]==='image';
 const record={args:Deno.args,cwd:Deno.cwd(),pid:Deno.pid,ppid:Deno.ppid,span:Deno.env.get('COURSE_PERF_PARENT_SPAN_ID')??null,process:Deno.env.get('COURSE_PERF_PARENT_PROCESS_ID')??null,functional:Deno.env.get('PL_FUNCTIONAL_SENTINEL'),profile:Deno.env.get('QUARTO_PROFILE'),removed:Deno.env.get('PL_REMOVE_SENTINEL')??null,snapshot:Deno.env.get('PL_BASE_FUNCTIONAL_SENTINEL')};
 await Deno.writeTextFile(Deno.env.get('PL_PROBE_LOG')!,JSON.stringify(record)+'\\n',{append:true});
@@ -69,8 +78,7 @@ if(docker)console.log('sha256:test-image');else{console.error('native inspect pr
 `,
   );
   // Linux shebang допускает один аргумент: shell передаёт неизменные argv Deno.
-  const executable =
-    `#!/bin/sh\nexec '${Deno.execPath()}' run -A '${probe}' "$@"\n`;
+  const executable = `#!/bin/sh\nexec '${Deno.execPath()}' run -A '${probe}' "$@"\n`;
   await Deno.writeTextFile(join(root, "quarto"), executable);
   await Deno.writeTextFile(join(root, "docker"), executable);
   await Deno.chmod(join(root, "quarto"), 0o755);
@@ -79,14 +87,12 @@ if(docker)console.log('sha256:test-image');else{console.error('native inspect pr
   await Deno.writeTextFile(
     wrapper,
     `
-import {installTsAgent} from ${
-      JSON.stringify(
-        new URL("./fixtures/performance-agent.ts", import.meta.url).href,
-      )
-    };
-const agent=installTsAgent({experimentId:'pl',runId:'test',processId:'actual-entrypoint',outputDirectory:${
-      JSON.stringify(root)
-    },mode:'summary'});
+import {installTsAgent} from ${JSON.stringify(
+      new URL("./fixtures/performance-agent.ts", import.meta.url).href,
+    )};
+const agent=installTsAgent({experimentId:'pl',runId:'test',processId:'actual-entrypoint',outputDirectory:${JSON.stringify(
+      root,
+    )},mode:'summary'});
 const run=async()=>{const mod=await import(Deno.env.get('PL_ENTRYPOINT')!);if(Deno.env.get('PL_BOUNDARY')==='render-public-body')await mod.renderPublicBody({owner:"demo",resources:[],apiVersion:[1,23,1]},[{t:'Para',c:[{t:'Str',c:'PUBLIC'}]}],'demo/exr-test',{},'resources','client')};
 try{if(Deno.env.get('PL_LINKED')==='yes')await agent.metrics.wrapAsync({id:'test.actual-caller',kind:'phase'},run)();else await run()}
 finally{agent.flush()}
@@ -126,25 +132,37 @@ finally{agent.flush()}
         new TextDecoder().decode(result.stderr),
         /native inspect probe failure/,
       );
-      const rows = (await Deno.readTextFile(log)).trim().split("\n").map(
-        (line) => record(JSON.parse(line)),
-      );
+      const rows = (await Deno.readTextFile(log))
+        .trim()
+        .split("\n")
+        .map((line) => record(JSON.parse(line)));
       assert.equal(rows.length, 1);
-      const events = (await Deno.readTextFile(
-        join(root, "events/actual-entrypoint/ts.jsonl"),
-      )).trim().split("\n").filter(Boolean).map((line) => record(JSON.parse(line)));
-      const command = events.find((event) =>
-        event.event === "begin" &&
-        event.operation_id === "course-prairielearn.application.export.command"
+      const events = (
+        await Deno.readTextFile(join(root, "events/actual-entrypoint/ts.jsonl"))
+      )
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => record(JSON.parse(line)));
+      const command = events.find(
+        (event) =>
+          event.event === "begin" &&
+          event.operation_id ===
+            "course-prairielearn.application.export.command",
       );
-      const caller = events.find((event) =>
-        event.event === "begin" && event.operation_id === "test.actual-caller"
+      const caller = events.find(
+        (event) =>
+          event.event === "begin" &&
+          event.operation_id === "test.actual-caller",
       );
       assert.equal(Boolean(caller), linked);
       if (entrypoint === "render-public-body") {
         assert(command, "существующая command boundary записана");
         assert.equal(command.document_id, undefined);
-        assert.equal(record(command.attributes).extension_id, "course-prairielearn");
+        assert.equal(
+          record(command.attributes).extension_id,
+          "course-prairielearn",
+        );
         assert.equal(
           command.parent_span_id,
           linked ? required(caller, "caller span").span_id : undefined,
@@ -156,8 +174,8 @@ finally{agent.flush()}
           entrypoint === "render-public-body"
             ? command?.span_id
             : linked
-            ? required(caller, "caller span").span_id
-            : null,
+              ? required(caller, "caller span").span_id
+              : null,
           `${entrypoint}: stale/incorrect parent`,
         );
         assert.equal(row.process, "actual-entrypoint");
@@ -174,11 +192,13 @@ finally{agent.flush()}
         );
         assert.equal(row.profile, "student");
         assert.equal(row.cwd, Deno.cwd());
-        const summary = record(JSON.parse(
-          await Deno.readTextFile(
-            join(root, "events/actual-entrypoint/ts.summary.json"),
+        const summary = record(
+          JSON.parse(
+            await Deno.readTextFile(
+              join(root, "events/actual-entrypoint/ts.summary.json"),
+            ),
           ),
-        ));
+        );
         assert.equal(row.ppid, summary.os_pid);
         assert(row.pid !== row.ppid);
       }

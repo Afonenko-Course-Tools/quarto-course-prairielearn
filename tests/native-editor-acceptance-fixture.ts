@@ -4,14 +4,20 @@ import { fileURLToPath } from "node:url";
 const [targetArg, phase, coreArg, qrcArg, downloadArg, registryArg, mapArg] =
   Deno.args;
 if (
-  !targetArg || !["editor", "upload"].includes(phase ?? "") || !coreArg ||
-  !qrcArg || !downloadArg || !registryArg || !mapArg
+  !targetArg ||
+  !["editor", "upload"].includes(phase ?? "") ||
+  !coreArg ||
+  !qrcArg ||
+  !downloadArg ||
+  !registryArg ||
+  !mapArg
 ) {
   throw Error(
     "Требуются NEW_TARGET editor|upload CORE QRC DOWNLOAD RUNTIME_REGISTRY IMPORT_MAP",
   );
 }
-const root = resolve(targetArg), book = join(root, "tasks");
+const root = resolve(targetArg),
+  book = join(root, "tasks");
 try {
   await Deno.lstat(root);
   throw Error("Нужен новый TARGET: " + root);
@@ -33,14 +39,12 @@ async function copy(source: string, target: string): Promise<void> {
     if (stat.mode !== null) await Deno.chmod(target, stat.mode & 0o777);
   }
 }
-for (
-  const [source, name] of [
-    [coreArg, "course-core"],
-    [repo, "course-prairielearn"],
-    [qrcArg, "reference-catalog"],
-    [downloadArg, "project-download"],
-  ]
-) {
+for (const [source, name] of [
+  [coreArg, "course-core"],
+  [repo, "course-prairielearn"],
+  [qrcArg, "reference-catalog"],
+  [downloadArg, "project-download"],
+]) {
   if (!source || !name) throw Error("Неполная dependency");
   await copy(
     join(resolve(source), "_extensions", name),
@@ -146,9 +150,10 @@ const add =
   "package demo;\npublic class Add { public static long sum(int a, int b) { return Helper.sum(a, b); } }\n";
 const helper =
   "package demo;\npublic class Helper { public static long sum(int a, int b) { return (long) a + b; } }\n";
-for (
-  const [name, code] of [["Add.java", add], ["Helper.java", helper]] as const
-) {
+for (const [name, code] of [
+  ["Add.java", add],
+  ["Helper.java", helper],
+] as const) {
   await put(
     "projects/editor/student/src/main/java/demo/" + name,
     name === "Helper.java" ? code.replace("(long) a + b", "0") : code,
@@ -181,8 +186,8 @@ for (const scenario of ["correct", "incomplete", "error"]) {
     scenario === "correct"
       ? helper
       : scenario === "incomplete"
-      ? helper.replace("(long) a + b", "0")
-      : helper.replace("(long) a + b", "missingSymbol"),
+        ? helper.replace("(long) a + b", "0")
+        : helper.replace("(long) a + b", "missingSymbol"),
   );
 }
 await Deno.writeFile(

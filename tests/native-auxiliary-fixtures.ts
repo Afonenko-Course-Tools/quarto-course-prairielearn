@@ -22,9 +22,10 @@ async function fixture(name: string, noSite = false) {
       new URL("./fixtures/git-recipes/" + name + "/" + path, import.meta.url),
     );
   }
-  const paths = name === "github-ssh"
-    ? ["seed_recipe.py", "seed.json"]
-    : ["seed_recipe.py", "student/work/README.md", "student/work/notes.txt"];
+  const paths =
+    name === "github-ssh"
+      ? ["seed_recipe.py", "seed.json"]
+      : ["seed_recipe.py", "student/work/README.md", "student/work/notes.txt"];
   for (const path of paths) {
     const to = join(root, project, path);
     await Deno.mkdir(dirname(to), { recursive: true });
@@ -39,12 +40,14 @@ async function fixture(name: string, noSite = false) {
   }
   const files = [
     { name: "README.md", bytes: new TextEncoder().encode("Полное условие.") },
-    ...await Promise.all(
-      paths.filter((p) => p.startsWith("student/")).map(async (p) => ({
-        name: p.slice(8),
-        bytes: await original(p),
-      })),
-    ),
+    ...(await Promise.all(
+      paths
+        .filter((p) => p.startsWith("student/"))
+        .map(async (p) => ({
+          name: p.slice(8),
+          bytes: await original(p),
+        })),
+    )),
   ];
   const options = {
     root,

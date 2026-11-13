@@ -1,8 +1,16 @@
 import type { NativeAdapterValidationInput } from "course-core/public.ts";
 /** Реально читаемые поля Core input; schema/authenticity остаются у Core boundary.
  * Полный preprojection input структурно совместим без копирования/приведения. */
-export type NativeBusinessInput = Pick<NativeAdapterValidationInput, "declarations"> & {
-  assessment?: Pick<NonNullable<NativeAdapterValidationInput["assessment"]>, "id" | "kind" | "slots"> | undefined;
+export type NativeBusinessInput = Pick<
+  NativeAdapterValidationInput,
+  "declarations"
+> & {
+  assessment?:
+    | Pick<
+        NonNullable<NativeAdapterValidationInput["assessment"]>,
+        "id" | "kind" | "slots"
+      >
+    | undefined;
   origin?: Pick<NativeAdapterValidationInput["origin"], "source"> | undefined;
   course: Partial<NativeAdapterValidationInput["course"]>;
 };
@@ -43,19 +51,21 @@ export const AssignmentPolicySchema = z.union([
 ]);
 export const ScoringPolicySchema = z.strictObject({
   ...questionScore,
-  "slot-overrides": z.record(
-    z.string().regex(/^(exr|alt)-[a-z0-9-]+$/),
-    z.strictObject(questionScore),
-  ).optional(),
+  "slot-overrides": z
+    .record(
+      z.string().regex(/^(exr|alt)-[a-z0-9-]+$/),
+      z.strictObject(questionScore),
+    )
+    .optional(),
   "max-points": amount.nullable().optional(),
   "grade-rate-minutes": amount.optional(),
   "allow-multiple-instances": z.boolean().optional(),
 });
 export const AssessmentPolicySchema = ScoringPolicySchema.extend({
-  uuid: z.string().regex(
-    assessmentUuidPattern,
-    "Ожидается native UUID контрольной работы",
-  ).optional(),
+  uuid: z
+    .string()
+    .regex(assessmentUuidPattern, "Ожидается native UUID контрольной работы")
+    .optional(),
   pass: z.strictObject({ "at-least": z.number().int().positive() }),
   attempts: z.number().int().positive(),
   assignment: AssignmentPolicySchema.optional(),
@@ -69,23 +79,35 @@ export const NativeBusinessSchema = z.strictObject({
   assessment: z.unknown().optional(),
   projectChecks: z.unknown().optional(),
   materialization: z.unknown().optional(),
-  declarations: z.array(
-    z.strictObject({
-      id: z.string().regex(/^exr-[a-z0-9-]+$/),
-      attributes: z.record(z.string(), z.string()),
-      answer: z.unknown().optional(),
-    }),
-  ).max(4096),
+  declarations: z
+    .array(
+      z.strictObject({
+        id: z.string().regex(/^exr-[a-z0-9-]+$/),
+        attributes: z.record(z.string(), z.string()),
+        answer: z.unknown().optional(),
+      }),
+    )
+    .max(4096),
 });
 export type NativeBusiness = z.output<typeof NativeBusinessSchema>;
 /** Нормализация native Pandoc scalars; metadata inheritance уже выполнил Quarto. */
 export function nativePolicy(value: unknown): unknown {
   if (!object(value)) return value;
   const result = structuredClone(value);
-  for (const key of ["attempts", "question-points", "question-max-points", "max-points",
-    "grade-rate-minutes", "advance-score-perc", "auto-points", "manual-points"]) {
-    const numeric = (v: unknown) => typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))
-      ? Number(v) : v;
+  for (const key of [
+    "attempts",
+    "question-points",
+    "question-max-points",
+    "max-points",
+    "grade-rate-minutes",
+    "advance-score-perc",
+    "auto-points",
+    "manual-points",
+  ]) {
+    const numeric = (v: unknown) =>
+      typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))
+        ? Number(v)
+        : v;
     if (Object.hasOwn(result, key)) {
       const field = result[key];
       result[key] = Array.isArray(field) ? field.map(numeric) : numeric(field);
@@ -93,11 +115,15 @@ export function nativePolicy(value: unknown): unknown {
   }
   const pass = result.pass;
   if (object(pass)) {
-    pass["at-least"] = typeof pass["at-least"] === "string" ? Number(pass["at-least"]) : pass["at-least"];
+    pass["at-least"] =
+      typeof pass["at-least"] === "string"
+        ? Number(pass["at-least"])
+        : pass["at-least"];
   }
   const overrides = result["slot-overrides"];
   if (object(overrides)) {
-    for (const id of Object.keys(overrides)) overrides[id] = nativePolicy(overrides[id]);
+    for (const id of Object.keys(overrides))
+      overrides[id] = nativePolicy(overrides[id]);
   }
   return result;
 }
@@ -106,8 +132,10 @@ function mergePolicy(base: Record<string, unknown>, local: unknown): unknown {
   const out: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(local)) {
     const prior = out[key];
-    out[key] = key !== "assignment" && object(value) && object(prior)
-      ? mergePolicy(prior, value) : value;
+    out[key] =
+      key !== "assignment" && object(value) && object(prior)
+        ? mergePolicy(prior, value)
+        : value;
   }
   return out;
 }
@@ -130,15 +158,18 @@ function validateRawDeclarations(
         if (
           key === "prairielearn-grading" &&
           !["external", "manual", "mixed"].includes(value)
-        ) throw Error("PL.GRADING_INVALID: " + declaration.id);
+        )
+          throw Error("PL.GRADING_INVALID: " + declaration.id);
         if (
           key === "prairielearn-submission" &&
           !["editor", "upload", "workspace"].includes(value)
-        ) throw Error("PL.SUBMISSION_INVALID: " + declaration.id);
+        )
+          throw Error("PL.SUBMISSION_INVALID: " + declaration.id);
         if (
           key === "prairielearn-single-variant" &&
           !["true", "false"].includes(value)
-        ) throw Error("PL.DECLARATION_INVALID: single-variant");
+        )
+          throw Error("PL.DECLARATION_INVALID: single-variant");
         if (key === "prairielearn-topic" && !value.trim()) {
           throw Error("PL.DECLARATION_INVALID: topic");
         }
@@ -161,16 +192,20 @@ function readNativeRaw(
     config = raw.config ?? {};
   // Pandoc представляет numeric metadata scalar как Inlines; нормализация принадлежит PL.
   const questionDefaults = config["question-defaults"];
-  const submission = object(questionDefaults) ? questionDefaults.submission : undefined;
-  const workspace = object(submission) ? submission.workspaceOptions : undefined;
+  const submission = object(questionDefaults)
+    ? questionDefaults.submission
+    : undefined;
+  const workspace = object(submission)
+    ? submission.workspaceOptions
+    : undefined;
   const port = object(workspace) ? workspace.port : undefined;
-  if (object(workspace) && typeof port === "string" && /^\d+$/.test(port)) workspace.port = Number(port);
-  closed(config, [], [
-    "delivery",
-    "question-defaults",
-    "assessment-defaults",
-    "seed-targets",
-  ]);
+  if (object(workspace) && typeof port === "string" && /^\d+$/.test(port))
+    workspace.port = Number(port);
+  closed(
+    config,
+    [],
+    ["delivery", "question-defaults", "assessment-defaults", "seed-targets"],
+  );
   if (config["seed-targets"] !== undefined) {
     NativeSeedTargetsSchema.parse(config["seed-targets"]);
   }
@@ -179,13 +214,18 @@ function readNativeRaw(
     const instances = object(delivery) ? delivery.instances : undefined;
     const keys = Object.keys(object(instances) ? instances : {});
     const firstKey = keys[0];
-    if (firstKey === undefined) throw Error("PL.DECLARATION_INVALID: пустые instances");
-    declarations({
-      ...config,
-      "assessment-defaults": config["assessment-defaults"] === undefined
-        ? undefined
-        : nativePolicy(config["assessment-defaults"]),
-    }, firstKey);
+    if (firstKey === undefined)
+      throw Error("PL.DECLARATION_INVALID: пустые instances");
+    declarations(
+      {
+        ...config,
+        "assessment-defaults":
+          config["assessment-defaults"] === undefined
+            ? undefined
+            : nativePolicy(config["assessment-defaults"]),
+      },
+      firstKey,
+    );
   }
   if (config["question-defaults"] !== undefined) {
     parseQuestion(config["question-defaults"]);
@@ -194,11 +234,14 @@ function readNativeRaw(
     nativePolicy(config["assessment-defaults"] ?? {}),
   );
   validateRawDeclarations(raw.declarations);
-  const projectChecks = raw.projectChecks === undefined
-    ? undefined : parseNativeChecks(raw.projectChecks);
-  const materialization = raw.materialization === undefined
-    ? undefined
-    : decodeNativeMaterialization(raw.materialization, context.source);
+  const projectChecks =
+    raw.projectChecks === undefined
+      ? undefined
+      : parseNativeChecks(raw.projectChecks);
+  const materialization =
+    raw.materialization === undefined
+      ? undefined
+      : decodeNativeMaterialization(raw.materialization, context.source);
   return { raw, config, defaults, materialization, projectChecks };
 }
 /** Чистая PL business validation: не создаёт Core capability/release proof. */
@@ -217,7 +260,12 @@ function decodeBusiness<
   parseQuestion: (value: unknown) => Q,
   completeGrading: boolean,
 ) {
-  const { raw, config, defaults, materialization, projectChecks } = readNativeRaw(value, input.origin ? {source: input.origin.source} : {}, parseQuestion);
+  const { raw, config, defaults, materialization, projectChecks } =
+    readNativeRaw(
+      value,
+      input.origin ? { source: input.origin.source } : {},
+      parseQuestion,
+    );
   const questions: Record<
     string,
     Q & {
@@ -229,19 +277,24 @@ function decodeBusiness<
       throw Error("PL.CAPTURE_CHANGED: декларация отсутствует в raw каноне");
     }
     const original = raw.declarations.find((d) => d.id === declaration.id);
-    if (!original) throw Error("PL.CAPTURE_CHANGED: декларация отсутствует в raw каноне");
+    if (!original)
+      throw Error("PL.CAPTURE_CHANGED: декларация отсутствует в raw каноне");
     if (Boolean(original.answer) !== Boolean(declaration.answer)) {
       throw Error("PL.ANSWER_UNQUALIFIED: raw/native answer mismatch");
     }
-    const attrs = declaration.attributes, base = config["question-defaults"];
-    const authored: Record<string, unknown> = structuredClone(object(base) ? base : {});
+    const attrs = declaration.attributes,
+      base = config["question-defaults"];
+    const authored: Record<string, unknown> = structuredClone(
+      object(base) ? base : {},
+    );
     if (attrs["prairielearn-topic"] !== undefined) {
       authored.topic = attrs["prairielearn-topic"];
     }
     if (attrs["prairielearn-grading"] !== undefined) {
-      authored.grading = attrs["prairielearn-grading"] === "external"
-        ? "external"
-        : { method: attrs["prairielearn-grading"] };
+      authored.grading =
+        attrs["prairielearn-grading"] === "external"
+          ? "external"
+          : { method: attrs["prairielearn-grading"] };
     }
     if (attrs["prairielearn-single-variant"] !== undefined) {
       authored["single-variant"] =
@@ -258,8 +311,10 @@ function decodeBusiness<
       authored.submission = submission;
     }
     if (attrs["prairielearn-submission-layout"] !== undefined) {
-      authored.submission = { ...(object(authored.submission) ? authored.submission : {}),
-        layout: attrs["prairielearn-submission-layout"] };
+      authored.submission = {
+        ...(object(authored.submission) ? authored.submission : {}),
+        layout: attrs["prairielearn-submission-layout"],
+      };
     }
     const parsed = parseQuestion(authored);
     questions[declaration.id] = {
@@ -280,14 +335,15 @@ function decodeBusiness<
     }
     if ("mode" in assessment.assignment && input.course.id) {
       assessment.assignment = {
-        "student-label": "pl-" +
-          createHash("sha1").update(
-            input.course.id + "\0" + input.assessment.id,
-          ).digest("hex"),
+        "student-label":
+          "pl-" +
+          createHash("sha1")
+            .update(input.course.id + "\0" + input.assessment.id)
+            .digest("hex"),
       };
     }
-    const required = input.assessment.slots.filter((s) =>
-      s.assignment.requirement === "required"
+    const required = input.assessment.slots.filter(
+      (s) => s.assignment.requirement === "required",
     );
     if (assessment.pass["at-least"] > required.length) {
       throw Error("PL.ASSESSMENT_INVALID: порог выше числа required позиций");
@@ -304,9 +360,10 @@ function decodeBusiness<
       // Partial publication vet проверяет форму/порог; pricing требует полной delivery.
     } else if (
       input.assessment.slots.every((s) =>
-        s.candidates.every((id: string) => methods[id] !== undefined)
+        s.candidates.every((id: string) => methods[id] !== undefined),
       )
-    ) validateGradingComponents(work, methods);
+    )
+      validateGradingComponents(work, methods);
     else if (!options.deferComposition) {
       gradingPolicy(work);
       throw Error(
@@ -369,7 +426,7 @@ export function assertNativeSeedTargets(
       }
       if (
         !["upload", "workspace"].includes(settings.submission.mode) ||
-        settings.submission.mode === "workspace" && target !== "work"
+        (settings.submission.mode === "workspace" && target !== "work")
       ) {
         throw Error(
           "PL.SEED_TARGET_INVALID: поддержаны upload target или прежний Workspace work",

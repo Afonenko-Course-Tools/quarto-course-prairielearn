@@ -1,5 +1,5 @@
-import {createMetrics as __createMetrics} from "../observability/bridge.ts";
-const __metrics=__createMetrics("course-prairielearn");
+import { createMetrics as __createMetrics } from "../observability/bridge.ts";
+const __metrics = __createMetrics("course-prairielearn");
 import { closed } from "./declarations.ts";
 import { validateSlots } from "./slots.ts";
 import type { SlotWork } from "./slots.ts";
@@ -18,14 +18,19 @@ export interface NativeSlotPoints {
 }
 export interface GradingPolicy {
   slots: Record<string, NativeSlotPoints>;
-  assessment: { maxPoints?: number; gradeRateMinutes?: number; multipleInstance?: boolean };
+  assessment: {
+    maxPoints?: number;
+    gradeRateMinutes?: number;
+    multipleInstance?: boolean;
+  };
 }
 // Форма UUID совпадает с закреплённой native infoAssessment schema.
 export const assessmentUuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const scalar = (v: unknown): v is number =>
   typeof v === "number" && Number.isFinite(v) && v >= 0;
-const attempts = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 1;
+const attempts = (v: unknown): v is number =>
+  typeof v === "number" && Number.isSafeInteger(v) && v >= 1;
 function decreasingPoints(v: unknown): v is number[] {
   if (!Array.isArray(v) || !v.length) return false;
   let previous = Infinity;
@@ -51,7 +56,8 @@ function readSlotPoints(
   fail: PolicyFailure,
 ): NativeSlotPoints {
   const id = slot.id;
-  const components = Object.hasOwn(effective, "auto-points") ||
+  const components =
+    Object.hasOwn(effective, "auto-points") ||
     Object.hasOwn(effective, "manual-points");
   if (components) {
     return readComponentPoints(effective, slot, fail);
@@ -60,10 +66,7 @@ function readSlotPoints(
   if (points === undefined) {
     fail(`question-points (${id})`, "missing explicit authored points");
   }
-  if (
-    !scalar(points) &&
-    !(exam && decreasingPoints(points))
-  ) {
+  if (!scalar(points) && !(exam && decreasingPoints(points))) {
     fail(
       `question-points (${id})`,
       exam
@@ -132,9 +135,9 @@ function readComponentPoints(
   }
   const auto = effective["auto-points"] ?? 0,
     manual = effective["manual-points"];
-  const unweighted = slot.assignment.requirement === "optional" && auto === 0 &&
-    manual === 0;
-  if (!scalar(auto) || !scalar(manual) || manual <= 0 && !unweighted) {
+  const unweighted =
+    slot.assignment.requirement === "optional" && auto === 0 && manual === 0;
+  if (!scalar(auto) || !scalar(manual) || (manual <= 0 && !unweighted)) {
     fail(
       `manual-points (${id})`,
       "Нужны неотрицательные auto-points и положительные manual-points; нулевые компоненты допустимы только для добровольной практики",
@@ -155,10 +158,23 @@ function readComponentPoints(
   };
 }
 function readGradingPolicy(work: GradingWork): GradingPolicy {
-  const policy = closed(work.extensions.prairielearn, ["attempts", "pass"], [
-    "assignment", "uuid", "question-points", "question-max-points", "slot-overrides",
-    "max-points", "grade-rate-minutes", "advance-score-perc", "allow-multiple-instances", "auto-points", "manual-points",
-  ]);
+  const policy = closed(
+    work.extensions.prairielearn,
+    ["attempts", "pass"],
+    [
+      "assignment",
+      "uuid",
+      "question-points",
+      "question-max-points",
+      "slot-overrides",
+      "max-points",
+      "grade-rate-minutes",
+      "advance-score-perc",
+      "allow-multiple-instances",
+      "auto-points",
+      "manual-points",
+    ],
+  );
   const workSlots = validateSlots(work.slots, "", work.id);
   const source = `${work.source ?? "course"}#${work.id}`;
   function fail(field: string, reason: string): never {
@@ -168,7 +184,8 @@ function readGradingPolicy(work: GradingWork): GradingPolicy {
   }
   if (
     Object.hasOwn(policy, "uuid") &&
-    (typeof policy.uuid !== "string" || !assessmentUuidPattern.test(policy.uuid))
+    (typeof policy.uuid !== "string" ||
+      !assessmentUuidPattern.test(policy.uuid))
   ) {
     throw Error(
       `PL.ASSESSMENT_INVALID: ${source} uuid: ожидается native UUID контрольной работы`,
@@ -183,12 +200,18 @@ function readGradingPolicy(work: GradingWork): GradingPolicy {
   if (
     policy["grade-rate-minutes"] !== undefined &&
     !scalar(policy["grade-rate-minutes"])
-  ) fail("grade-rate-minutes", "expected finite nonnegative number");
+  )
+    fail("grade-rate-minutes", "expected finite nonnegative number");
   if (
     policy["allow-multiple-instances"] !== undefined &&
     typeof policy["allow-multiple-instances"] !== "boolean"
-  ) fail("allow-multiple-instances", "expected boolean");
-  const overrides = closed(policy["slot-overrides"] === undefined ? {} : policy["slot-overrides"], [], workSlots.map((slot) => slot.id));
+  )
+    fail("allow-multiple-instances", "expected boolean");
+  const overrides = closed(
+    policy["slot-overrides"] === undefined ? {} : policy["slot-overrides"],
+    [],
+    workSlots.map((slot) => slot.id),
+  );
   const exam = ["test", "practical"].includes(work.kind);
   if (!exam && policy["allow-multiple-instances"] === true) {
     fail(
@@ -198,13 +221,17 @@ function readGradingPolicy(work: GradingWork): GradingPolicy {
   }
   const slots: Record<string, NativeSlotPoints> = {};
   for (const slot of workSlots) {
-    const id=slot.id;
-    const override = closed(overrides[id] === undefined ? {} : overrides[id], [], questionFields);
+    const id = slot.id;
+    const override = closed(
+      overrides[id] === undefined ? {} : overrides[id],
+      [],
+      questionFields,
+    );
     const effective: Record<string, unknown> = {
       ...Object.fromEntries(
-        questionFields.filter((f) => Object.hasOwn(policy, f)).map(
-          (f) => [f, policy[f]],
-        ),
+        questionFields
+          .filter((f) => Object.hasOwn(policy, f))
+          .map((f) => [f, policy[f]]),
       ),
       ...override,
     };
@@ -225,20 +252,54 @@ function readGradingPolicy(work: GradingWork): GradingPolicy {
     },
   };
 }
-export const gradingPolicy = __metrics.wrapSync({id:"course-prairielearn.application.grading-policy.gradingPolicy",kind:"phase"}, readGradingPolicy);
+export const gradingPolicy = __metrics.wrapSync(
+  {
+    id: "course-prairielearn.application.grading-policy.gradingPolicy",
+    kind: "phase",
+  },
+  readGradingPolicy,
+);
 
-export function validateGradingComponents(work: GradingWork, methods: Readonly<Record<string, unknown>>): GradingPolicy {
+export function validateGradingComponents(
+  work: GradingWork,
+  methods: Readonly<Record<string, unknown>>,
+): GradingPolicy {
   const policy = gradingPolicy(work);
-  for (const slot of validateSlots(work.slots, "", work.id)) for (const id of slot.candidates) {
-    const method = methods[id], points = policy.slots[slot.id];
-    if (points === undefined) throw Error("PL.GRADING_INVALID: отсутствуют native points для " + slot.id);
-    const auto = points.autoPoints, manual = points.manualPoints;
-    const unweighted = slot.assignment.requirement === "optional" && auto === 0 && manual === 0;
-    const valid = unweighted && (method === "external" || method === "manual" || method === "mixed") ||
-      (method === "manual" ? auto === 0 && manual !== undefined && manual > 0 :
-       method === "mixed" ? auto !== undefined && auto > 0 && manual !== undefined && manual > 0 :
-       method === "external" ? manual === undefined : false);
-    if (!valid) throw Error("PL.GRADING_INVALID: " + id + " — native компоненты оценки не соответствуют grading.method");
-  }
+  for (const slot of validateSlots(work.slots, "", work.id))
+    for (const id of slot.candidates) {
+      const method = methods[id],
+        points = policy.slots[slot.id];
+      if (points === undefined)
+        throw Error(
+          "PL.GRADING_INVALID: отсутствуют native points для " + slot.id,
+        );
+      const auto = points.autoPoints,
+        manual = points.manualPoints;
+      const unweighted =
+        slot.assignment.requirement === "optional" &&
+        auto === 0 &&
+        manual === 0;
+      const valid =
+        (unweighted &&
+          (method === "external" ||
+            method === "manual" ||
+            method === "mixed")) ||
+        (method === "manual"
+          ? auto === 0 && manual !== undefined && manual > 0
+          : method === "mixed"
+            ? auto !== undefined &&
+              auto > 0 &&
+              manual !== undefined &&
+              manual > 0
+            : method === "external"
+              ? manual === undefined
+              : false);
+      if (!valid)
+        throw Error(
+          "PL.GRADING_INVALID: " +
+            id +
+            " — native компоненты оценки не соответствуют grading.method",
+        );
+    }
   return policy;
 }

@@ -14,26 +14,46 @@ Workspace уже создаёт `info.json gradingMethod=Manual`, `singleVariant
 
 ```ts
 type Payload4 =
- | ({kind:"project"} & ProjectPayload3)
- | {kind:"native-answer"; uuid:string;
-    grading:{method:"external"|"mixed"|"manual"};
-    answerType:"numeric"|"single-choice"|"multipart"|"matching"|"manual";
-    responseSlots:PublicResponseSlot[];
-    upstreamGradingMethod:"Internal"|"Manual"}
- | {kind:"workspace"; uuid:string; grading:{method:"manual"};
-    sourceRoot:string;
-    submission:{mode:"workspace";workspaceOptions:ExistingWorkspaceOptions};
-    seed:{schema:"pl-git-workspace-seed-v1";
-      archive:"workspace/.pl-seed/starter.zip";archiveSha256:string;
-      manifest:"workspace/.pl-seed/manifest.json";manifestSha256:string};
-    upstreamGradingMethod:"Manual";singleVariant:true};
+  | ({ kind: "project" } & ProjectPayload3)
+  | {
+      kind: "native-answer";
+      uuid: string;
+      grading: { method: "external" | "mixed" | "manual" };
+      answerType:
+        | "numeric"
+        | "single-choice"
+        | "multipart"
+        | "matching"
+        | "manual";
+      responseSlots: PublicResponseSlot[];
+      upstreamGradingMethod: "Internal" | "Manual";
+    }
+  | {
+      kind: "workspace";
+      uuid: string;
+      grading: { method: "manual" };
+      sourceRoot: string;
+      submission: {
+        mode: "workspace";
+        workspaceOptions: ExistingWorkspaceOptions;
+      };
+      seed: {
+        schema: "pl-git-workspace-seed-v1";
+        archive: "workspace/.pl-seed/starter.zip";
+        archiveSha256: string;
+        manifest: "workspace/.pl-seed/manifest.json";
+        manifestSha256: string;
+      };
+      upstreamGradingMethod: "Manual";
+      singleVariant: true;
+    };
 ```
 
 `ProjectPayload3` — буквальная прежняя closed method-specific форма: Manual имеет uuid/grading/submission/sourceRoot; External/Mixed дополнительно projectCheck/runtime/sources. Никакого отсутствующего/выдуманного sourceRoot/runtime для native-answer. `PublicResponseSlot` — точная Core163 NativeResponseSlot: name/type/anchor, optional labelAnchor/ordinal/options(anchor,ordinal); не numeric key/tolerance/correct index/pairs/manual rubric. Slots берутся из genuine selected delivery.conditions[id].responseSlots; type и grading сверяются с private canonical declaration.answer и C policy того же operation. `ExistingWorkspaceOptions` — точная текущая submission.ts схема image@sha256/home/port/gradedFiles и optional rewriteUrl/enableNetworking; sourceRoot остаётся фактическим owner-relative project, не переносится в target.
 
 Native-answer ручная часть не получает fictitious JUnit/API/Job. Existing server.py lowering не меняет веса/политику: Internal/Manual проверяются по info.json, actual controls — по responseSlots; multipart mixed сохраняет authored assessment auto/manual points. Package integrity связывает server.py/question.html/info.json и безопасные ресурсы через delivery.files; closed answer никогда не помещается в public binding. Критическая privacy проверка — bytes реально отдаваемых clientFiles/README/ZIP против private key, а не только отсутствие слова key в DTO.
 
-Workspace seed manifest обязан соответствовать archive SHA и точному ZIP file inventory; он уже объявляет work/.git/{HEAD,index,config,objects/**}, work/README.md, work/notes.txt. Прежний workspace-seed.ts проверяет обязательные элементы, возвращаемые gradedFiles включают work/**, work/.git/**, work/.*, explanation.m[d], .pl-seed/identity.jso[n]. Нужны отдельные readers bounded ZIP/git: никаких исполнений seed из receipt, arbitrary roots, symlinks, повторных/../absolute/alias entries. Include-git и непустые common-files доказывает genuine Core/C validator и same-S bindings; image/RepoDigest не выдумываются.
+Workspace seed manifest обязан соответствовать archive SHA и точному ZIP file inventory; он уже объявляет work/.git/{HEAD,index,config,objects/**}, work/README.md, work/notes.txt. Прежний workspace-seed.ts проверяет обязательные элементы, возвращаемые gradedFiles включают work/**, work/.git/\*_, work/._, explanation.m[d], .pl-seed/identity.jso[n]. Нужны отдельные readers bounded ZIP/git: никаких исполнений seed из receipt, arbitrary roots, symlinks, повторных/../absolute/alias entries. Include-git и непустые common-files доказывает genuine Core/C validator и same-S bindings; image/RepoDigest не выдумываются.
 
 ## Точные consumer дельты
 

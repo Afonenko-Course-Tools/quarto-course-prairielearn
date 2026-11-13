@@ -13,9 +13,7 @@ type CoreBoundary = Pick<
   "ArtifactFilesSchema" | "ProjectPlanSchema"
 >;
 const file = async (value: File, name: string) => {
-  if (
-    !safePath(name)
-  ) {
+  if (!safePath(name)) {
     throw Error("PL.SELECTION_CHANGED: inventory bytes");
   }
   const bytes = new Uint8Array(value.bytes);
@@ -30,7 +28,8 @@ const under = (target: string, root: string) =>
   target.startsWith(root + "/") ? target.slice(root.length + 1) : undefined;
 function selectedName(target: string, root: string): string {
   const name = under(target, root);
-  if (name === undefined) throw Error("PL.SELECTION_INVALID: target outside selected root");
+  if (name === undefined)
+    throw Error("PL.SELECTION_INVALID: target outside selected root");
   return name;
 }
 function select(
@@ -54,8 +53,12 @@ function select(
     });
     if (!matches.length) {
       throw Error(
-        "PL.SELECTION_MIGRATION_REQUIRED: no A1 target for " + label + " " +
-          root + "/" + pattern,
+        "PL.SELECTION_MIGRATION_REQUIRED: no A1 target for " +
+          label +
+          " " +
+          root +
+          "/" +
+          pattern,
       );
     }
     for (const f of matches) {
@@ -92,16 +95,19 @@ function validateSources(
 ) {
   const extensions = runtimeProfile?.sourceExtensions ?? [".java"];
   if (
-    !Array.isArray(extensions) || !extensions.length ||
-    runtimeProfile?.javaRelease !== undefined &&
-      extensions.some((e: string) => e !== ".java") ||
-    extensions.some((e) =>
-      typeof e !== "string" || !/^\.[a-z][a-z0-9]*$/.test(e)
+    !Array.isArray(extensions) ||
+    !extensions.length ||
+    (runtimeProfile?.javaRelease !== undefined &&
+      extensions.some((e: string) => e !== ".java")) ||
+    extensions.some(
+      (e) => typeof e !== "string" || !/^\.[a-z][a-z0-9]*$/.test(e),
     )
-  ) throw Error("PL.SELECTION_INVALID: runtime extensions");
+  )
+    throw Error("PL.SELECTION_INVALID: runtime extensions");
   const files = sources;
   if (
-    !files.length || files.length > 128 ||
+    !files.length ||
+    files.length > 128 ||
     files.reduce((n, f) => n + f.bytes.length, 0) > 4194304
   ) {
     throw Error("PL.SELECTION_INVALID: source count/total bytes");
@@ -110,10 +116,9 @@ function validateSources(
     if (
       !extensions.some((e: string) => source.name.endsWith(e)) ||
       source.bytes.length > 1048576
-    ) throw Error("PL.SELECTION_INVALID: non-source student target");
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(
-      source.bytes,
-    );
+    )
+      throw Error("PL.SELECTION_INVALID: non-source student target");
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(source.bytes);
     if (text.includes("\0")) throw Error("PL.SELECTION_INVALID: NUL source");
   }
 }
@@ -136,11 +141,14 @@ export async function selectNativeCompilerInputs(options: {
   const studentPlan = options.core.ProjectPlanSchema.parse(options.studentPlan),
     fullPlan = options.core.ProjectPlanSchema.parse(options.fullPlan);
   if (
-    student.audience !== "student" || full.audience !== "full" ||
-    studentPlan.audience !== "student" || fullPlan.audience !== "full" ||
+    student.audience !== "student" ||
+    full.audience !== "full" ||
+    studentPlan.audience !== "student" ||
+    fullPlan.audience !== "full" ||
     student.exerciseId !== full.exerciseId ||
     studentPlan.input !== fullPlan.input
-  ) throw Error("PL.SELECTION_INVALID: inventories/plan identity mismatch");
+  )
+    throw Error("PL.SELECTION_INVALID: inventories/plan identity mismatch");
   const sources = await selectNativeStarterSources(
     student.files,
     check.sourceProfile,
@@ -150,7 +158,7 @@ export async function selectNativeCompilerInputs(options: {
     return f.reason.startsWith("testset:")
       ? fullPlan.testsets.includes(f.reason.slice(8))
       : f.reason.startsWith("component:") &&
-        fullPlan.components.includes(f.reason.slice(10));
+          fullPlan.components.includes(f.reason.slice(10));
   }
   const trustedRecords = new Map<string, File>();
   for (const pattern of check.tests) {
@@ -173,9 +181,9 @@ export async function selectNativeCompilerInputs(options: {
     throw Error("PL.SELECTION_INVALID: trusted tests missing");
   }
   const tests = await Promise.all(
-    [...trustedRecords.values()].sort((a, b) =>
-      a.target.localeCompare(b.target)
-    ).map((f) => file(f, f.target)),
+    [...trustedRecords.values()]
+      .sort((a, b) => a.target.localeCompare(b.target))
+      .map((f) => file(f, f.target)),
   );
   let api: undefined | { files: string[]; entry: string };
   if (check["api-precheck"]) {

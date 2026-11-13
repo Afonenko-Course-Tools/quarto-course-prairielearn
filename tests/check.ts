@@ -10,15 +10,18 @@ const files = [];
 for await (const e of Deno.readDir(new URL("./", import.meta.url))) {
   if (e.name.endsWith(".test.ts")) files.push("tests/" + e.name);
 }
-const commands = [["run", "--no-config", "-A", "tools/check-contracts.ts"], [
-  "test",
-  "--no-config",
-  "--allow-read",
-  "--allow-write",
-  "--allow-run",
-  "--allow-env",
-  ...files.sort(),
-]];
+const commands = [
+  ["run", "--no-config", "-A", "tools/check-contracts.ts"],
+  [
+    "test",
+    "--no-config",
+    "--allow-read",
+    "--allow-write",
+    "--allow-run",
+    "--allow-env",
+    ...files.sort(),
+  ],
+];
 const temporary = await Deno.makeTempDir({ prefix: "pl-check-imports-" });
 try {
   const map = resolve(temporary, "imports.json");

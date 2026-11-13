@@ -20,7 +20,8 @@ export async function renderNative(
     stdout: "piped",
     stderr: "piped",
   }).output();
-  let text = new TextDecoder().decode(result.stdout) +
+  let text =
+    new TextDecoder().decode(result.stdout) +
     new TextDecoder().decode(result.stderr);
   let ok = result.success;
   if (ok && input === ".") {
@@ -38,52 +39,65 @@ export async function renderNative(
         stderr: "piped",
       },
     ).output();
-    text += new TextDecoder().decode(validated.stdout) +
+    text +=
+      new TextDecoder().decode(validated.stdout) +
       new TextDecoder().decode(validated.stderr);
     ok = validated.success;
   }
   if (ok) {
-    const pointer = record(JSON.parse(
-      await Deno.readTextFile(
-        join(source, "_generated/course-spec/active-native-run.json"),
+    const pointer = record(
+      JSON.parse(
+        await Deno.readTextFile(
+          join(source, "_generated/course-spec/active-native-run.json"),
+        ),
       ),
-    ));
-    const run = record(JSON.parse(
-      await Deno.readTextFile(
-        join(source, "_generated/course-spec/native-run.json"),
+    );
+    const run = record(
+      JSON.parse(
+        await Deno.readTextFile(
+          join(source, "_generated/course-spec/native-run.json"),
+        ),
       ),
-    ));
+    );
     if (
-      run.schema !== "course-native-run-v1" || !array(run.profiles).includes(profile)
-    ) throw new Error("Native run context missing");
+      run.schema !== "course-native-run-v1" ||
+      !array(run.profiles).includes(profile)
+    )
+      throw new Error("Native run context missing");
     for (const entry of array(run.documents).map(record)) {
       if (
         record(entry.course).view !== profile ||
         !array(record(entry.document).profiles).includes(profile)
-      ) throw new Error("Mixed audience native document");
+      )
+        throw new Error("Mixed audience native document");
     }
-    for await (
-      const entry of Deno.readDir(join(string(pointer.directory), "adapters"))
-    ) {
+    for await (const entry of Deno.readDir(
+      join(string(pointer.directory), "adapters"),
+    )) {
       if (!entry.isDirectory) continue;
-      for await (
-        const file of Deno.readDir(
-          join(string(pointer.directory), "adapters", entry.name),
-        )
-      ) {
-        if (
-          !file.name.endsWith(".json") || file.name === "contract.json"
-        ) continue;
-        const fragment = record(JSON.parse(
-          await Deno.readTextFile(
-            join(string(pointer.directory), "adapters", entry.name, file.name),
+      for await (const file of Deno.readDir(
+        join(string(pointer.directory), "adapters", entry.name),
+      )) {
+        if (!file.name.endsWith(".json") || file.name === "contract.json")
+          continue;
+        const fragment = record(
+          JSON.parse(
+            await Deno.readTextFile(
+              join(
+                string(pointer.directory),
+                "adapters",
+                entry.name,
+                file.name,
+              ),
+            ),
           ),
-        ));
-        const document = array(run.documents).map(record).find(value =>
-          value.source === fragment.source
         );
+        const document = array(run.documents)
+          .map(record)
+          .find((value) => value.source === fragment.source);
         if (
-          !document || record(fragment.course).view !== profile ||
+          !document ||
+          record(fragment.course).view !== profile ||
           JSON.stringify(Object.entries(record(fragment.document)).sort()) !==
             JSON.stringify(Object.entries(record(document.document)).sort())
         ) {
@@ -112,12 +126,17 @@ export async function selectedDocument(
 ) {
   const result = await renderNative(source, profile, input);
   if (!result.ok) throw new Error(result.text);
-  const run = record(JSON.parse(
-    await Deno.readTextFile(
-      join(source, "_generated/course-spec/native-run.json"),
+  const run = record(
+    JSON.parse(
+      await Deno.readTextFile(
+        join(source, "_generated/course-spec/native-run.json"),
+      ),
     ),
-  ));
-  if (array(run.documents).length !== 1 || record(array(run.documents)[0]).source !== input) {
+  );
+  if (
+    array(run.documents).length !== 1 ||
+    record(array(run.documents)[0]).source !== input
+  ) {
     throw new Error("Selected native command consumed retained documents");
   }
   const invalid = await new Deno.Command(Deno.env.get("QUARTO") || "quarto", {
@@ -126,12 +145,13 @@ export async function selectedDocument(
     stdout: "piped",
     stderr: "piped",
   }).output();
-  const text = new TextDecoder().decode(invalid.stdout) +
+  const text =
+    new TextDecoder().decode(invalid.stdout) +
     new TextDecoder().decode(invalid.stderr);
   if (
     invalid.success ||
-    !text.includes("CORE.UNKNOWN_MEMBER") &&
-      !text.includes("RELEASE.FULL_NATIVE_RUN_REQUIRED")
+    (!text.includes("CORE.UNKNOWN_MEMBER") &&
+      !text.includes("RELEASE.FULL_NATIVE_RUN_REQUIRED"))
   ) {
     throw new Error(
       "Incomplete current inventory passed full validation: " + text,
@@ -153,12 +173,13 @@ export async function verifyInstalled(
         throw new Error("Installed adapter contains symlink: " + entry.name);
       }
       const path = join(prefix, entry.name);
-      if (entry.isDirectory) result.push(...await files(root, path));
+      if (entry.isDirectory) result.push(...(await files(root, path)));
       else if (entry.isFile) result.push(path);
     }
     return result.sort();
   }
-  const expected = await files(payload), actual = await files(installed);
+  const expected = await files(payload),
+    actual = await files(installed);
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new Error("Installed adapter payload file set differs");
   }
@@ -168,6 +189,7 @@ export async function verifyInstalled(
     if (
       left.length !== right.length ||
       left.some((byte, index) => byte !== right[index])
-    ) throw new Error("Installed adapter byte mismatch: " + file);
+    )
+      throw new Error("Installed adapter byte mismatch: " + file);
   }
 }

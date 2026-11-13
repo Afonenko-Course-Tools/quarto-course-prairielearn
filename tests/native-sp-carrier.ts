@@ -15,14 +15,12 @@ async function git(args: string[]) {
 if ((await git(["rev-parse", ref + "^{commit}"])).trim() !== ref) {
   throw Error("Точный SP commit недоступен");
 }
-const paths = (await git([
-  "grep",
-  "-l",
-  'target="prairielearn"',
-  ref,
-  "--",
-  "*.qmd",
-])).trim().split("\n").map((x) => x.slice(ref.length + 1));
+const paths = (
+  await git(["grep", "-l", 'target="prairielearn"', ref, "--", "*.qmd"])
+)
+  .trim()
+  .split("\n")
+  .map((x) => x.slice(ref.length + 1));
 const declarations = [];
 for (const path of paths) {
   for (const line of (await git(["show", ref + ":" + path])).split("\n")) {
@@ -46,13 +44,14 @@ for (const path of paths) {
 }
 if (
   declarations.length !== 7 ||
-  declarations.filter((d) =>
-      d.attributes["prairielearn-submission"] === "upload"
-    ).length !== 6 ||
-  declarations.filter((d) =>
-      d.attributes["prairielearn-submission"] === "workspace"
-    ).length !== 1
-) throw Error("Actual7 mode values changed");
+  declarations.filter(
+    (d) => d.attributes["prairielearn-submission"] === "upload",
+  ).length !== 6 ||
+  declarations.filter(
+    (d) => d.attributes["prairielearn-submission"] === "workspace",
+  ).length !== 1
+)
+  throw Error("Actual7 mode values changed");
 const config = {
   "question-defaults": {
     topic: "System",
@@ -74,15 +73,19 @@ const config = {
     },
   },
 };
-const result = decodeNativeBusiness({ config, declarations }, {
-  course: { adapters: ["prairielearn"] },
-  declarations,
-});
+const result = decodeNativeBusiness(
+  { config, declarations },
+  {
+    course: { adapters: ["prairielearn"] },
+    declarations,
+  },
+);
 for (const d of declarations) {
   if (
     required(result.questions[d.id]).submission.mode !==
-      d.attributes["prairielearn-submission"]
-  ) throw Error("Inherited carrier changed authored mode");
+    d.attributes["prairielearn-submission"]
+  )
+    throw Error("Inherited carrier changed authored mode");
 }
 console.log(
   JSON.stringify(

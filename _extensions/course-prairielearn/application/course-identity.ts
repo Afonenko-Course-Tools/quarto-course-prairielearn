@@ -13,7 +13,8 @@ async function identityImplementation(
     0,
     16,
   );
-  const version = h.at(6), variant = h.at(8);
+  const version = h.at(6),
+    variant = h.at(8);
   if (version === undefined || variant === undefined) {
     throw Error("PL UUID digest too short");
   }
@@ -28,7 +29,10 @@ async function identityImplementation(
     hex.slice(20),
   ].join("-");
 }
-export const identity = __metrics.wrapAsync({
-  id: "course-prairielearn.application.export-course.identity",
-  kind: "phase",
-}, identityImplementation);
+export const identity = __metrics.wrapAsync(
+  {
+    id: "course-prairielearn.application.export-course.identity",
+    kind: "phase",
+  },
+  identityImplementation,
+);

@@ -6,7 +6,7 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    - cron: '23 5 * * 1'
+    - cron: "23 5 * * 1"
 
 permissions:
   contents: read
@@ -167,10 +167,10 @@ jobs:
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: "25"
       - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
         with:
-          gradle-version: '9.1.0'
+          gradle-version: "9.1.0"
       - name: Настоящий Gradle эталон и отказ незавершённого starter
         run: |
           export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
@@ -190,7 +190,7 @@ jobs:
       PERFORMANCE: ${{ github.workspace }}/.ci-deps/performance
       COURSE_PERFORMANCE_SOURCE: ${{ github.workspace }}/.ci-deps/performance
       LUA_LANGUAGE_SERVER: ${{ github.workspace }}/.ci/luals/bin/lua-language-server
-      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -244,12 +244,12 @@ jobs:
           deno-version: v2.7.14
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '24'
+          node-version: "24"
           package-manager-cache: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         id: python
         with:
-          python-version: '3.12'
+          python-version: "3.12"
       - name: Карта типов фактических публичных providers
         run: quarto run tools/native-core-import-map.ts .ci-deps/core .ci-deps/pl-native-imports.json .ci-deps/qrc .ci-deps/download
       - name: Полный строгий TS graph и запрет explicit any

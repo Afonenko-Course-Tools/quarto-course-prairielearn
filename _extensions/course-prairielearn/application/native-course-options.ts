@@ -12,9 +12,11 @@ const record = (value: unknown): value is Record<string, unknown> =>
 /** Local native overlay; official frozen JSON schemas and generated validators stay intact. */
 export function upstreamCourseValidationInput(value: unknown): unknown {
   if (
-    !record(value) || !record(value.options) ||
+    !record(value) ||
+    !record(value.options) ||
     !Object.hasOwn(value.options, "integerManualPoints")
-  ) return value;
+  )
+    return value;
   const { integerManualPoints, ...options } = value.options;
   z.boolean().parse(integerManualPoints);
   return { ...value, options };
@@ -33,12 +35,13 @@ export function assertIntegerCourseMaxima(
   for (const [id, points] of Object.entries(policy.slots)) {
     const manual = points.manualPoints ?? 0;
     const authored = points.points;
-    const maximum = points.maxPoints ??
+    const maximum =
+      points.maxPoints ??
       (authored === undefined
         ? (points.autoPoints ?? 0) + manual
         : Array.isArray(authored)
-        ? authored[0]
-        : authored);
+          ? authored[0]
+          : authored);
     if (!integer(manual)) fail(`manual-points (${id})`);
     if (maximum === undefined || !integer(maximum)) fail(`max-points (${id})`);
     total += maximum;

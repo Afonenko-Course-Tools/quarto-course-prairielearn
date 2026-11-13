@@ -1,59 +1,67 @@
 import type { AnswerFacts, NativeResponseSlot } from "course-core/public.ts";
 import { nativeAnswerBinding } from "../_extensions/course-prairielearn/application/native-delivery.ts";
 const slot = {
-  name: "answer",
-  type: "numeric",
-  anchor: "public-response",
-} satisfies NativeResponseSlot,
+    name: "answer",
+    type: "numeric",
+    anchor: "public-response",
+  } satisfies NativeResponseSlot,
   answer = {
     type: "numeric",
     key: { value: 734129, tolerance: { absolute: 0 } },
   } satisfies AnswerFacts;
-Deno.test("native binding не переносит private key и закрывает несовместимые slots/method", () => {
-  const good = nativeAnswerBinding(
-    "00000000-0000-4000-8000-000000000000",
-    "external",
-    answer,
-    [slot],
-  );
-  if (
-    JSON.stringify(good).includes("734129") ||
-    good.upstreamGradingMethod !== "Internal"
-  ) throw Error("key leaked");
-  for (
-    const [method, slots] of [
+Deno.test(
+  "native binding не переносит private key и закрывает несовместимые slots/method",
+  () => {
+    const good = nativeAnswerBinding(
+      "00000000-0000-4000-8000-000000000000",
+      "external",
+      answer,
+      [slot],
+    );
+    if (
+      JSON.stringify(good).includes("734129") ||
+      good.upstreamGradingMethod !== "Internal"
+    )
+      throw Error("key leaked");
+    for (const [method, slots] of [
       ["manual", [slot]],
       ["external", []],
       ["external", [{ ...slot, key: 42 }]],
       ["external", [{ ...slot, name: "foreign" }]],
       ["external", [slot, slot]],
-    ] satisfies [string, unknown][]
-  ) {
-    let refused = false;
-    try {
-      nativeAnswerBinding("uuid", method, answer, slots);
-    } catch {
-      refused = true;
+    ] satisfies [string, unknown][]) {
+      let refused = false;
+      try {
+        nativeAnswerBinding("uuid", method, answer, slots);
+      } catch {
+        refused = true;
+      }
+      if (!refused) throw Error("mutant accepted");
     }
-    if (!refused) throw Error("mutant accepted");
-  }
-});
-Deno.test("capture consumer не содержит callback escape/executable/environment", async () => {
-  const s = await Deno.readTextFile(
-    new URL(
-      "../_extensions/course-prairielearn/application/native-entry.ts",
-      import.meta.url,
-    ),
-  );
-  const seam = s.slice(
-    s.indexOf("await lease.captureInputs("),
-    s.indexOf(
-      "await lease.assert(descriptor)",
+  },
+);
+Deno.test(
+  "capture consumer не содержит callback escape/executable/environment",
+  async () => {
+    const s = await Deno.readTextFile(
+      new URL(
+        "../_extensions/course-prairielearn/application/native-entry.ts",
+        import.meta.url,
+      ),
+    );
+    const seam = s.slice(
       s.indexOf("await lease.captureInputs("),
-    ),
-  );
-  if (
-    seam.includes("Deno.Command") || seam.includes("env:") ||
-    seam.includes("cwd:") || !seam.includes("timeoutMs:")
-  ) throw Error("unchecked child callback returned");
-});
+      s.indexOf(
+        "await lease.assert(descriptor)",
+        s.indexOf("await lease.captureInputs("),
+      ),
+    );
+    if (
+      seam.includes("Deno.Command") ||
+      seam.includes("env:") ||
+      seam.includes("cwd:") ||
+      !seam.includes("timeoutMs:")
+    )
+      throw Error("unchecked child callback returned");
+  },
+);

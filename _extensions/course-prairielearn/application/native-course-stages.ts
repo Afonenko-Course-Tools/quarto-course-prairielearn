@@ -50,9 +50,8 @@ export function authoredNativeSettings(
 ) {
   const { singleVariant, grading, submission, ...rest } = value;
   const aceMode = submission.mode === "editor" ? submission.aceMode : undefined;
-  const sub = submission.mode === "editor"
-    ? { mode: submission.mode }
-    : submission;
+  const sub =
+    submission.mode === "editor" ? { mode: submission.mode } : submission;
   return {
     ...rest,
     submission: { ...sub, ...(aceMode ? { "ace-mode": aceMode } : {}) },
@@ -72,14 +71,20 @@ export function coursePolicies(
     exercises: [],
     projects: projectRows.map((p) => p.fact),
   };
-  const sourcePolicies = new Map(expectedSources.map((source) => [source, {
-    input: adapter.validatedInput(source),
-    business: adapter.business(source),
-  }]));
+  const sourcePolicies = new Map(
+    expectedSources.map((source) => [
+      source,
+      {
+        input: adapter.validatedInput(source),
+        business: adapter.business(source),
+      },
+    ]),
+  );
   for (const source of expectedSources) {
     const policy = sourcePolicies.get(source);
     if (!policy) throw Error("PL.CAPTURE_MISSING: source policy");
-    const value = policy.input, business = policy.business;
+    const value = policy.input,
+      business = policy.business;
     if (value.assessment) {
       if (!business.assessment) {
         throw Error("PL.ASSIGNMENT_CHANGED: missing assessment policy");
@@ -99,9 +104,7 @@ export function coursePolicies(
         id: declaration.id,
         target: "prairielearn",
         extensions: {
-          prairielearn: authoredNativeSettings(
-            questionSettings,
-          ),
+          prairielearn: authoredNativeSettings(questionSettings),
         },
       });
     }
@@ -137,8 +140,8 @@ export async function prepareCourseMenus(input: {
   // Assignment membership проверяет Core по раннему observed context intent.
   if (options.instance) {
     const selectedWorks = selection.assessments.map((a) => {
-      const work = content.assessments.find((w) =>
-        w.id === a.id && w.source === a.source
+      const work = content.assessments.find(
+        (w) => w.id === a.id && w.source === a.source,
       );
       if (!work) {
         throw Error(

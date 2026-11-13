@@ -78,7 +78,7 @@ XDG_CACHE_HOME=/tmp/pl-editor-cache quarto run tests/native-editor-acceptance-fi
    ответов, включая возвращённые native файлы.
 5. Скачать настоящий `starter.zip`, распаковать в новый каталог локальной IDE,
    заменить исходники из `answers/correct`, собрать `javac -d classes
-   src/main/java/demo/*.java`. Проверить вызовы `demo.Add.sum(2,3)==5` и
+src/main/java/demo/*.java`. Проверить вызовы `demo.Add.sum(2,3)==5` и
    `demo.Add.sum(Integer.MAX_VALUE,1)==2147483648L`. Исходники в ZIP имеют пути
    `src/main/java/demo/Add.java` и `src/main/java/demo/Helper.java`;
    сдаваемый solution ZIP содержит logical paths `demo/Add.java` и
