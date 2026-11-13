@@ -469,8 +469,7 @@ try {
     console.log(
       run("yamllint", ["--strict", "--config-file", ".yamllint.yml", ...yaml]),
     );
-  if (workflows.length)
-    console.log(run("actionlint", ["-pyflakes=", ...workflows]));
+  if (workflows.length) console.log(run("actionlint", workflows));
   console.log(
     JSON.stringify({
       ...receipt,
