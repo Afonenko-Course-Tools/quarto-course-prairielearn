@@ -24,6 +24,7 @@ import type { createNativeAdapter } from "./native-adapter.ts";
 import type { question } from "./declarations.ts";
 import type { RuntimeProfile } from "./runtime-descriptor.ts";
 import type * as ReferencePublic from "reference-catalog/public.ts";
+import { withStudentSubmissionNames } from "./student-artifact.ts";
 import type * as DownloadPublic from "project-download/public.ts";
 type ReferenceAPI = Pick<typeof ReferencePublic, "loadBodyLinks" | "createBodyLinks" | "bindConditionLinks">;
 type DownloadAPI = Pick<typeof DownloadPublic, "zip" | "packageArtifact">;
@@ -306,8 +307,10 @@ export async function materializeNativeQuestion(
     return {
       ...checked,
       student: final,
-      files: workspace.files,
-      archive: workspace.archive,
+      ...withStudentSubmissionNames(
+        { files: workspace.files, archive: workspace.archive },
+        checked?.selection.sources ?? [],
+      ),
     };
   }
   const files = final.files.map((f) => ({
@@ -319,5 +322,9 @@ export async function materializeNativeQuestion(
   await (input.checkpoint
     ? input.checkpoint()
     : input.operation.assertCurrent());
-  return { ...checked, student: final, files, archive };
+  return {
+    ...checked,
+    student: final,
+    ...withStudentSubmissionNames({ files, archive }, checked?.selection.sources ?? []),
+  };
 }

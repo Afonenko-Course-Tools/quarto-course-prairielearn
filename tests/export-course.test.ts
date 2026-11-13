@@ -800,6 +800,42 @@ async function inventoryCourseFixture(
   }
 }
 
+Deno.test("course writer uses checked Core target mappings to remove four renamed Java downloads", async () => {
+  await inventoryCourseFixture(async (input) => {
+    const project = required(input.checks.projects[0]);
+    const sources = ["A.java", "B.java", "C.java", "D.java"].map((name) => ({
+      name,
+      bytes: new TextEncoder().encode("class " + name.slice(0, -5) + " {}\n"),
+    }));
+    project.sources = sources.map((file) => selectedCheckFile({
+      target: "student/" + file.name,
+      bytes: file.bytes,
+    }, file.name));
+    input.nativeInputs = {
+      "exr-a": {
+        sources,
+        tests: [{ name: "ATest.java", bytes: new TextEncoder().encode("PRIVATE_TEST") }],
+        descriptor: runtimeDescriptor(project.check, { javaRelease: 25 }, sources.map((file) => file.name), ["ATest.java"]),
+      },
+    };
+    input.config["question-defaults"] = { topic: "Java", submission: { mode: "upload", layout: "files" } };
+    input.studentArtifact = async () => ({
+      files: sources.map((file) => ({ name: "student/" + file.name, bytes: file.bytes })),
+      archive: new Uint8Array([80, 75, 3, 4]),
+    });
+    await exportCourse(input);
+    const base = input.output + "/questions/demo/exr-a";
+    const html = await Deno.readTextFile(base + "/question.html");
+    assert(html.includes('file-names="A.java,B.java,C.java,D.java"') && !html.includes("<pl-file-download"), "renamed starter sources remain duplicated");
+    for (const source of sources) {
+      const bytes = await Deno.readFile(base + "/clientFilesQuestion/starter/student/" + source.name);
+      assert(bytes.length === source.bytes.length && bytes.every((byte, index) => byte === source.bytes[index]), "mapped starter bytes changed");
+      const duplicate = await Deno.stat(base + "/clientFilesQuestion/" + source.name).catch(() => undefined);
+      assert(duplicate === undefined, "renamed source duplicated at root");
+    }
+  });
+});
+
 for (
   const [kind, defense] of [
     ["lab", false],
