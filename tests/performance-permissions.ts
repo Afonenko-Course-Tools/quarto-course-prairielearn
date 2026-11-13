@@ -1,9 +1,11 @@
 import { strict as assert } from "node:assert";
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 const extension = Deno.args[0]
   ? resolve(Deno.args[0])
-  : new URL("../_extensions/course-prairielearn", import.meta.url).pathname;
+  : fileURLToPath(
+      new URL("../_extensions/course-prairielearn", import.meta.url),
+    );
 const root = await Deno.makeTempDir();
 try {
   await Deno.mkdir(join(root, "tasks"));

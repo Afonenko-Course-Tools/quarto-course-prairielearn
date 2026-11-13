@@ -258,18 +258,6 @@ jobs:
           deno run --no-config -A tools/check-types.ts --lint
       - name: Установить закреплённые зависимости CJS-проверки
         run: npm ci --ignore-scripts
-      - name: Блокирующий typed ESLint и границы модулей
-        run: |
-          npm run check-quality -- .ci-deps/pl-native-imports.json
-          npm run check-quality:controls -- .ci-deps/pl-native-imports.json
-      - name: Строгая проверка собственного CJS
-        run: npm run typecheck:tools -- --pretty false
-      - name: Строгая проверка четырёх собственных Python-файлов
-        run: npm exec --yes --package=pyright@1.1.414 -- pyright --project pyrightconfig.json --pythonpath "${{ steps.python.outputs.python-path }}" --outputjson
-      - name: Единственная установка canonical LuaLS
-        run: bash "$PERFORMANCE/tools/setup-lua-ci.sh" "$GITHUB_WORKSPACE/.ci/luals"
-      - name: Строгая проверка двух собственных Lua-файлов
-        run: timeout --kill-after=3s 60s quarto run "$PERFORMANCE/tools/check-lua.ts" --root "$GITHUB_WORKSPACE" --server "$LUA_LANGUAGE_SERVER" --scope _extensions/course-prairielearn/observability/bridge.lua --scope _extensions/course-prairielearn/filter.lua
       - name: Установить закреплённый ShellCheck
         run: |
           tool_dir="$RUNNER_TEMP/shellcheck-0.11.0"
@@ -281,12 +269,31 @@ jobs:
           tar -xJf "$tool_dir/archive.tar.xz" --directory "$tool_dir" --strip-components=1
           "$tool_dir/shellcheck" --version
           printf '%s\n' "$tool_dir" >> "$GITHUB_PATH"
-      - name: Синтаксис и строгая проверка shell по каждому диалекту
+      - name: Установить штатные форматтеры и анализаторы
         run: |
-          bash -n tools/check-mv-capability.sh
-          bash -n tools/setup-mv-ci.sh
-          shellcheck tools/check-mv-capability.sh tools/setup-mv-ci.sh
-          bash -n tools/check-java.sh
-          sh -n examples/java-gradle/bank/projects/clamp/tests/grade.sh
-          shellcheck --norc --enable=all --severity=style --shell=bash tools/check-java.sh
-          shellcheck --norc --enable=all --severity=style --shell=sh examples/java-gradle/bank/projects/clamp/tests/grade.sh
+          npm install --global prettier@3.8.1 pyright@1.1.414
+          python -m pip install ruff==0.17.5 yamllint==1.38.0
+          cargo install stylua --version 2.6.0 --locked
+          go install mvdan.cc/sh/v3/cmd/shfmt@v3.14.1
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          printf '%s\n' "$HOME/go/bin" "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          sudo apt-get update
+          sudo apt-get install --yes luarocks
+          sudo luarocks install luacheck 1.2.0
+      - name: Единственная установка canonical LuaLS
+        run: bash "$PERFORMANCE/tools/setup-lua-ci.sh" "$GITHUB_WORKSPACE/.ci/luals"
+      - name: Получить неизменяемый исторический SP snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: BSU-RFCT-Afonenko-Courses/System-Practice
+          ref: 6b4ffbe35a018678a0bf6bb3e7f99bcf794bf204
+          path: .ci-deps/sp-pinned
+          persist-credentials: false
+      - name: Проверить точные сегменты и байты исторических Git helpers
+        run: python tests/trusted-git-helper.py .ci-deps/sp-pinned
+      - name: Блокирующие типы, структура, форматы и анализаторы
+        run: |
+          npm run check-quality -- .ci-deps/pl-native-imports.json
+          npm run check-quality:controls -- .ci-deps/pl-native-imports.json
+      - name: Строгая проверка собственного CJS
+        run: npm run typecheck:tools -- --pretty false

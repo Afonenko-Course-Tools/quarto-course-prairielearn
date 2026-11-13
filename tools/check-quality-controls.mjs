@@ -1,12 +1,23 @@
 // Проверяет правила штатной командой на новых production-файлах; исходники всегда удаляются.
 import { execFileSync } from "node:child_process";
-import { existsSync, writeFileSync, unlinkSync } from "node:fs";
+import {
+  existsSync,
+  writeFileSync,
+  unlinkSync,
+  readFileSync,
+  mkdtempSync,
+  rmSync,
+  chmodSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { scope } from "../eslint.config.mjs";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+/** @type {string[]} */
 const files = [];
-function run() {
+/** @param {Record<string, string | undefined>} environment */
+function run(environment = {}) {
   try {
     return {
       status: 0,
@@ -15,6 +26,7 @@ function run() {
         ["tools/check-quality.mjs", ...process.argv.slice(2)],
         {
           cwd: root,
+          env: { ...process.env, ...environment },
           encoding: "utf8",
           stdio: "pipe",
           maxBuffer: 32 * 1024 * 1024,
@@ -23,14 +35,36 @@ function run() {
     };
   } catch (error) {
     return {
-      status: error.status ?? 1,
-      output: String(error.stdout ?? "") + String(error.stderr ?? ""),
+      status:
+        error instanceof Error &&
+        "status" in error &&
+        typeof error.status === "number"
+          ? error.status
+          : 1,
+      output:
+        error instanceof Error
+          ? ("stdout" in error ? String(error.stdout) : "") +
+            ("stderr" in error ? String(error.stderr) : "") +
+            error.message
+          : String(error),
     };
   }
 }
-function put(path, source) {
+/** @param {string} path @param {string} source */
+function put(path, source, format = true) {
   const file = join(root, path);
   if (existsSync(file)) throw Error("Контрольный путь уже занят: " + file);
+  if (format && /\.(?:ts|js|mjs|cjs|json|ya?ml|md)$/.test(file)) {
+    try {
+      source = execFileSync("prettier", ["--stdin-filepath", file], {
+        input: source,
+        encoding: "utf8",
+        stdio: "pipe",
+      });
+    } catch {
+      /* malformed AST остаётся входом настоящего production gate. */
+    }
+  }
   writeFileSync(file, source);
   files.push(file);
 }
@@ -135,6 +169,120 @@ try {
   console.log(
     JSON.stringify({ control: "providers-use-public-api", status: "rejected" }),
   );
+
+  /** @type {Array<[string, string, string, RegExp]>} */
+  const languageCases = [
+    [
+      "mjs-typed",
+      scope[0] + "__quality_negative.mjs",
+      "/** @type {string} */\nexport const unsafe = JSON.parse('{}');",
+      /no-unsafe-assignment/,
+    ],
+    [
+      "new-helper-type",
+      "tools/__quality_negative.mjs",
+      "/** @returns {string} */\nexport function wrong() { return 3; }\n",
+      /TS2322/,
+    ],
+    [
+      "new-python-bug",
+      "tools/__quality_negative.py",
+      "def mutable(values: list[str] = []) -> list[str]:\n    return values\n",
+      /B006/,
+    ],
+    [
+      "new-python-type",
+      "tools/__quality_negative.py",
+      "def wrong() -> str:\n    return 3\n",
+      /reportReturnType/,
+    ],
+    [
+      "new-lua",
+      scope[0] + "__quality_negative.lua",
+      "return missing_quality_global\n",
+      /W113|undefined-global/,
+    ],
+    [
+      "new-shell",
+      "tools/__quality_negative.sh",
+      "#!/bin/sh\nprintf '%s\\n' $quality_missing\n",
+      /SC2086|SC2154/,
+    ],
+    ["new-yaml", ".github/__quality_negative.yaml", "enabled: yes\n", /truthy/],
+    [
+      "new-workflow",
+      ".github/workflows/__quality_negative.yml",
+      'name: Control\non: push\njobs:\n  probe:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo "${{ nonexistent.value }}"\n',
+      /undefined variable \"nonexistent\"/,
+    ],
+  ];
+  for (const [name, path, source, diagnostic] of languageCases) {
+    put(path, source);
+    const result = run();
+    clean();
+    if (result.status === 0 || !diagnostic.test(result.output))
+      throw Error("Контроль не обнаружен: " + name + "\n" + result.output);
+    console.log(JSON.stringify({ control: name, status: "rejected" }));
+  }
+  put(
+    scope[0] + "__quality_negative.ts",
+    "export const qualityFormat={value:1}",
+    false,
+  );
+  const unformatted = run();
+  clean();
+  if (
+    unformatted.status === 0 ||
+    !/Code style issues|__quality_negative\.ts/.test(unformatted.output)
+  )
+    throw Error(
+      "Новый неформатированный файл не обнаружен:\n" + unformatted.output,
+    );
+  console.log(
+    JSON.stringify({ control: "new-file-format", status: "rejected" }),
+  );
+
+  put(scope[0] + "__quality_negative.mjs", "export const qualityConfig = 1;\n");
+  const configPath = join(root, "typecheck/javascript.json");
+  const originalConfig = readFileSync(configPath, "utf8");
+  try {
+    const config = JSON.parse(originalConfig);
+    config.compilerOptions.checkJs = false;
+    writeFileSync(configPath, JSON.stringify(config));
+    const result = run();
+    if (
+      result.status === 0 ||
+      !result.output.includes("JavaScript quality gate требует")
+    )
+      throw Error("Ослабление JS config не обнаружено:\n" + result.output);
+    console.log(
+      JSON.stringify({ control: "javascript-config", status: "rejected" }),
+    );
+  } finally {
+    writeFileSync(configPath, originalConfig);
+    clean();
+  }
+
+  const failedTool = mkdtempSync(join(tmpdir(), "exporter-quality-tool-"));
+  try {
+    const executable = join(failedTool, "prettier");
+    writeFileSync(
+      executable,
+      "#!/bin/sh\nprintf '%s\\n' QUALITY_EXPECTED_TOOL_FAILURE >&2\nexit 73\n",
+    );
+    chmodSync(executable, 0o755);
+    const result = run({ PATH: failedTool + ":" + process.env.PATH });
+    if (
+      result.status === 0 ||
+      !result.output.includes("QUALITY_EXPECTED_TOOL_FAILURE")
+    )
+      throw Error("Отказ анализатора не блокирует gate:\n" + result.output);
+    console.log(
+      JSON.stringify({ control: "tool-failure", status: "rejected" }),
+    );
+  } finally {
+    rmSync(failedTool, { recursive: true, force: true });
+  }
 } finally {
   clean();
 }

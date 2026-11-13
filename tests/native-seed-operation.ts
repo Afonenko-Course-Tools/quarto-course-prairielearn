@@ -9,9 +9,9 @@ import type * as CorePublic from "course-core/public.ts";
 // Настоящий ordinary Core/A1 → два seed artifacts одной операции. Не assignment/P.
 import { strict as assert } from "node:assert";
 import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 const source = resolve(required(Deno.args[0])),
-  repo = resolve(new URL("../", import.meta.url).pathname),
+  repo = resolve(fileURLToPath(new URL("../", import.meta.url))),
   root = await Deno.makeTempDir({ prefix: "c9-seed-op-" });
 const core = join(root, "_extensions/course-core"),
   pl = join(root, "_extensions/course-prairielearn");

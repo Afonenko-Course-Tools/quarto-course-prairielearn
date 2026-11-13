@@ -1,0 +1,8 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+# Исторические byte-exact входы проверяются provenance и строгим Pyright.
+extend-exclude = ["tests/fixtures/git-recipes", "_extensions/course-prairielearn/application/trusted-git", "**/vendor", ".ci-deps", ".ci"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "ANN", "PGH003", "PGH004", "RUF100"]

@@ -9,9 +9,9 @@ import {
 // Genuine ordinary Core producer → C consumer; не assignment/P/actual C CLI.
 import { strict as assert } from "node:assert";
 import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 const coreSource = resolve(required(Deno.args[0])),
-  repo = resolve(new URL("../", import.meta.url).pathname);
+  repo = resolve(fileURLToPath(new URL("../", import.meta.url)));
 const root = await Deno.makeTempDir({ prefix: "pl-c9-native-" }),
   checks: string[] = [];
 const core = join(root, "_extensions/course-core"),

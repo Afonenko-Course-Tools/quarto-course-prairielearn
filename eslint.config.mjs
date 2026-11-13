@@ -1,11 +1,11 @@
 import tseslint from "typescript-eslint";
 export const scope = ["_extensions/course-prairielearn/"];
 export const structuralScope = scope.map(
-  (prefix) => prefix + "**/*.{ts,js,cjs}",
+  (prefix) => prefix + "**/*.{ts,js,mjs,cjs}",
 );
 export default [
   {
-    files: scope.map((prefix) => prefix + "**/*.{ts,js,cjs}"),
+    files: scope.map((prefix) => prefix + "**/*.{ts,js,mjs,cjs}"),
     ignores: [
       "**/vendor/**",
       "**/node_modules/**",

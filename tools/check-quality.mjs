@@ -14,8 +14,52 @@ import tseslint from "typescript-eslint";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { ESLint } from "eslint";
 import { scope } from "../eslint.config.mjs";
+/** @typedef {{specifier: string}} GraphTarget */
+/** @typedef {{specifier: string, type?: GraphTarget, code?: GraphTarget}} GraphDependency */
+/** @typedef {{specifier: string, local?: string, mediaType?: string, error?: unknown, dependencies?: GraphDependency[]}} GraphModule */
+/** @typedef {{modules: GraphModule[], redirects: Record<string, string>}} DenoGraph */
+/** @param {unknown} value @returns {value is Record<string, unknown>} */
+function record(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+/** @param {unknown} value @returns {value is GraphTarget} */
+function graphTarget(value) {
+  return record(value) && typeof value.specifier === "string";
+}
+/** @param {unknown} value @returns {value is GraphDependency} */
+function graphDependency(value) {
+  return (
+    record(value) &&
+    typeof value.specifier === "string" &&
+    (value.type === undefined || graphTarget(value.type)) &&
+    (value.code === undefined || graphTarget(value.code))
+  );
+}
+/** @param {unknown} value @returns {value is GraphModule} */
+function graphModule(value) {
+  return (
+    record(value) &&
+    typeof value.specifier === "string" &&
+    (value.local === undefined || typeof value.local === "string") &&
+    (value.mediaType === undefined || typeof value.mediaType === "string") &&
+    (value.dependencies === undefined ||
+      (Array.isArray(value.dependencies) &&
+        value.dependencies.every(graphDependency)))
+  );
+}
+/** @param {unknown} value @returns {value is DenoGraph} */
+function denoGraph(value) {
+  return (
+    record(value) &&
+    Array.isArray(value.modules) &&
+    value.modules.every(graphModule) &&
+    record(value.redirects) &&
+    Object.values(value.redirects).every((target) => typeof target === "string")
+  );
+}
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 process.chdir(root);
+/** @param {string} bin @param {string[]} args */
 const run = (bin, args) =>
   execFileSync(bin, args, { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
 const temporary = mkdtempSync(join(tmpdir(), "course-quality-"));
@@ -27,11 +71,24 @@ try {
     "--exclude-standard",
     "-z",
   ]).split("\0");
-  const sourceFiles = [...new Set(tracked)]
+  const ownFiles = [...new Set(tracked)]
+    .filter(
+      (file) =>
+        file &&
+        existsSync(file) &&
+        !/(^|\/)(vendor|node_modules|generated|_generated|\.git|\.quarto|_site|_output|_book)(\/|$)/.test(
+          file,
+        ) &&
+        !file.startsWith(".ci-deps/") &&
+        !file.startsWith(".ci/") &&
+        !/^examples\/.*\/_extensions\//.test(file),
+    )
+    .sort();
+  const sourceFiles = ownFiles
     .filter(
       (file) =>
         scope.some((prefix) => file.startsWith(prefix)) &&
-        /\.(?:ts|js|cjs)$/.test(file) &&
+        /\.(?:ts|js|mjs|cjs)$/.test(file) &&
         !/(^|\/)(vendor|node_modules|generated|_generated)(\/|$)/.test(file) &&
         existsSync(file),
     )
@@ -67,6 +124,7 @@ try {
       .trim()
       .split("\n")
       .at(-1);
+    if (!share) throw Error("Quarto не вернул share path");
     const quarto = JSON.parse(
       readFileSync(join(share, "deno_std/run_import_map.json"), "utf8"),
     );
@@ -109,7 +167,9 @@ try {
         imports[pathToFileURL(join(namespace, name) + "/").href] = target;
       }
   }
-  let importMap = process.argv[2];
+  let importMap = process.argv
+    .slice(2)
+    .find((argument) => !argument.startsWith("--"));
   if (importMap)
     Object.assign(
       imports,
@@ -124,9 +184,11 @@ try {
       .map((file) => `import ${JSON.stringify(pathToFileURL(file).href)};`)
       .join("\n"),
   );
+  /** @type {unknown} */
   const graph = JSON.parse(
     run("deno", ["info", "--no-lock", "--config", configPath, "--json", entry]),
   );
+  if (!denoGraph(graph)) throw Error("Deno info вернул неверный graph");
   const errors = graph.modules.filter((module) => module.error);
   if (errors.length) throw Error(JSON.stringify(errors));
   const byUrl = new Map(
@@ -166,8 +228,8 @@ try {
         .get(containing)
         ?.dependencies?.find((item) => item.specifier === name);
       let url = dep?.type?.specifier ?? dep?.code?.specifier;
-      while (graph.redirects[url]) url = graph.redirects[url];
-      const module = byUrl.get(url);
+      while (url && graph.redirects[url]) url = graph.redirects[url];
+      const module = byUrl.get(url ?? "");
       return module?.local
         ? {
             resolvedFileName: module.local,
@@ -189,6 +251,13 @@ try {
         : "browser.json",
     );
     const settings = JSON.parse(readFileSync(browserConfig, "utf8"));
+    if (
+      settings.compilerOptions?.strict !== true ||
+      settings.compilerOptions?.checkJs !== true
+    )
+      throw Error(
+        "JavaScript quality gate требует strict: true и checkJs: true",
+      );
     const jsOptions = {
       ...ts.convertCompilerOptionsFromJson(
         settings.compilerOptions,
@@ -234,12 +303,52 @@ try {
     results.some((result) => result.warningCount)
   )
     throw Error("Неполный quality scope либо предупреждения линтера");
+  const configured = await Promise.all(
+    checkedFiles.map((file) => eslint.calculateConfigForFile(file)),
+  );
+  const requiredRules = [
+    "no-explicit-any",
+    "ban-ts-comment",
+    "no-unsafe-type-assertion",
+    "no-unsafe-assignment",
+    "no-unsafe-argument",
+    "no-unsafe-call",
+    "no-unsafe-member-access",
+    "no-unsafe-return",
+    "switch-exhaustiveness-check",
+  ];
+  for (const [index, config] of configured.entries()) {
+    const expectedParams = checkedFiles[index].endsWith(
+      "/application/public-body-render.ts",
+    )
+      ? 7
+      : 5;
+    if (
+      config?.linterOptions.noInlineConfig !== true ||
+      requiredRules.some(
+        (rule) => config.rules["@typescript-eslint/" + rule]?.[0] !== 2,
+      ) ||
+      config.rules.complexity?.[0] !== 2 ||
+      config.rules.complexity?.[1] !== 30 ||
+      config.rules["max-depth"]?.[0] !== 2 ||
+      config.rules["max-depth"]?.[1] !== 5 ||
+      config.rules["max-params"]?.[0] !== 2 ||
+      config.rules["max-params"]?.[1] !== expectedParams
+    ) {
+      throw Error("Неполная ESLint config: " + checkedFiles[index]);
+    }
+  }
+  const parser = tseslint.parser;
+  if (
+    !("meta" in parser) ||
+    !record(parser.meta) ||
+    typeof parser.meta.version !== "string"
+  )
+    throw Error("Parser не вернул версию");
+  const parserVersion = parser.meta.version;
   let receipt;
   if (results.some((result) => result.errorCount)) process.exitCode = 1;
   else {
-    const configured = await Promise.all(
-      checkedFiles.map((file) => eslint.calculateConfigForFile(file)),
-    );
     receipt = {
       checked: files.length,
       javascriptChecked: javascriptFiles.length,
@@ -249,7 +358,7 @@ try {
       strict: true,
       typescript: ts.version,
       eslint: ESLint.version,
-      typescriptESLint: tseslint.parser.meta.version,
+      typescriptESLint: parserVersion,
       graphModules: graph.modules.length,
     };
   }
@@ -262,10 +371,123 @@ try {
       ...scope.map((prefix) => prefix.replace(/\/$/, "")),
     ]),
   );
-  if (!process.exitCode) console.log(JSON.stringify(receipt));
+  if (process.exitCode) throw Error("Typed ESLint не прошёл");
+  console.log(
+    run(join(root, "node_modules/.bin/tsc"), [
+      "--project",
+      "tsconfig.tools.json",
+      "--pretty",
+      "false",
+    ]),
+  );
+  // Один владелец формата: Prettier, Ruff, StyLua и shfmt по своему языку.
+  // Закреплённые исходные байты SP и upstream schemas проверяются существующим provenance gate.
+  /** @param {string} file */
+  const pinned = (file) =>
+    file.startsWith("tests/fixtures/git-recipes/") ||
+    file.startsWith(
+      "_extensions/course-prairielearn/application/trusted-git/",
+    ) ||
+    file.startsWith("_extensions/course-prairielearn/spec/upstream/") ||
+    /\/native-validators\.(?:js|d\.ts)$/.test(file);
+  const formatted = ownFiles.filter(
+    (file) =>
+      !pinned(file) && !/\/observability\/bridge\.(?:ts|lua)$/.test(file),
+  );
+  const prettier = formatted.filter((file) =>
+    /\.(?:ts|js|mjs|cjs|json|ya?ml|md)$/.test(file),
+  );
+  const python = ownFiles.filter(
+    (file) => file.endsWith(".py") && !pinned(file),
+  );
+  const lua = ownFiles.filter((file) => file.endsWith(".lua"));
+  const shell = formatted.filter((file) => file.endsWith(".sh"));
+  const yaml = ownFiles.filter(
+    (file) => /\.ya?ml$/.test(file) && !pinned(file),
+  );
+  const workflows = yaml.filter((file) =>
+    file.startsWith(".github/workflows/"),
+  );
+  for (const file of ownFiles.filter((file) => /\.(?:mjs|cjs)$/.test(file)))
+    run(process.execPath, ["--check", file]);
+  console.log(run("prettier", ["--check", ...prettier]));
+  if (python.length) {
+    console.log(run("ruff", ["format", "--check", ...python]));
+    console.log(run("ruff", ["check", ...python]));
+  }
+  const pythonTypes = ownFiles.filter(
+    (file) =>
+      file.endsWith(".py") && !file.startsWith("tests/fixtures/git-recipes/"),
+  );
+  console.log(
+    run("pyright", [
+      "--project",
+      "pyrightconfig.json",
+      "--warnings",
+      ...pythonTypes,
+    ]),
+  );
+  if (lua.length) {
+    console.log(run("stylua", ["--check", ...lua]));
+    console.log(run("luacheck", ["--codes", "--no-color", ...lua]));
+    const performance =
+      process.env.COURSE_PERFORMANCE_SOURCE ?? process.env.PERFORMANCE;
+    if (!performance)
+      throw Error(
+        "Для LuaLS задайте COURSE_PERFORMANCE_SOURCE или PERFORMANCE",
+      );
+    console.log(
+      run("quarto", [
+        "run",
+        join(performance, "tools/check-lua.ts"),
+        "--root",
+        root,
+        "--server",
+        resolve(
+          process.env.LUA_LANGUAGE_SERVER ??
+            run("which", ["lua-language-server"]).trim(),
+        ),
+        "--scope",
+        "_extensions/course-prairielearn",
+        "--exclude",
+        "_extensions/course-prairielearn/vendor",
+      ]),
+    );
+  }
+  if (shell.length) {
+    console.log(run("shfmt", ["-d", "-i", "2", "-ci", ...shell]));
+    console.log(
+      run("shellcheck", [
+        "--norc",
+        "--enable=all",
+        "--severity=style",
+        ...shell,
+      ]),
+    );
+  }
+  if (yaml.length)
+    console.log(
+      run("yamllint", ["--strict", "--config-file", ".yamllint.yml", ...yaml]),
+    );
+  if (workflows.length)
+    console.log(run("actionlint", ["-pyflakes=", ...workflows]));
+  console.log(
+    JSON.stringify({
+      ...receipt,
+      formatted: prettier.length,
+      python: python.length,
+      lua: lua.length,
+      shell: shell.length,
+      yaml: yaml.length,
+      workflows: workflows.length,
+    }),
+  );
 } catch (error) {
-  if (error.stdout) console.error(String(error.stdout));
-  console.error(error.message);
+  if (error instanceof Error) {
+    if ("stdout" in error) console.error(String(error.stdout));
+    if ("stderr" in error) console.error(String(error.stderr));
+  }
+  console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 } finally {
   rmSync(temporary, { recursive: true, force: true });

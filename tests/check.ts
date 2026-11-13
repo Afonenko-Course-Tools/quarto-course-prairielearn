@@ -1,11 +1,12 @@
 // Каноническая проверка C: typed owner contracts и genuine ordinary producer.
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { writeNativeCoreImportMap } from "../tools/native-core-import-map.ts";
 const core = Deno.args[0];
 const qrc = Deno.args[1];
 const download = Deno.args[2];
 if (!core) throw Error("Укажите immutable Core companion");
-const repo = dirname(dirname(new URL(import.meta.url).pathname));
+const repo = dirname(dirname(fileURLToPath(import.meta.url)));
 const files = [];
 for await (const e of Deno.readDir(new URL("./", import.meta.url))) {
   if (e.name.endsWith(".test.ts")) files.push("tests/" + e.name);
