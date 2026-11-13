@@ -405,6 +405,9 @@ try {
   const yaml = ownFiles.filter(
     (file) => /\.ya?ml$/.test(file) && !pinned(file),
   );
+  const toml = ownFiles.filter(
+    (file) => file.endsWith(".toml") && !pinned(file),
+  );
   const workflows = yaml.filter((file) =>
     file.startsWith(".github/workflows/"),
   );
@@ -465,6 +468,12 @@ try {
       ]),
     );
   }
+  if (toml.length) {
+    console.log(
+      run("taplo", ["lint", "--no-auto-config", "--no-schema", ...toml]),
+    );
+    console.log(run("taplo", ["fmt", "--no-auto-config", "--check", ...toml]));
+  }
   if (yaml.length)
     console.log(
       run("yamllint", ["--strict", "--config-file", ".yamllint.yml", ...yaml]),
@@ -479,6 +488,7 @@ try {
       shell: shell.length,
       yaml: yaml.length,
       workflows: workflows.length,
+      toml: toml.length,
     }),
   );
 } catch (error) {

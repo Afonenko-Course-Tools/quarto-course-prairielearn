@@ -1,4 +1,4 @@
-// Run with Node and installed ajv@8.17.1/esbuild@0.25.10. Schemas are pinned in provenance.json.
+// Run with Node and installed ajv@8.20.0/esbuild@0.25.10. Schemas are pinned in provenance.json.
 const fs = require("node:fs");
 const path = require("node:path");
 const { Ajv } = require("ajv");

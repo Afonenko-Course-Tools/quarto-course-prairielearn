@@ -66,7 +66,7 @@ Dependency-cruiser проверяет разрешаемый статическ�
 Та же `npm run check-quality` после typed ESLint и dependency-cruiser блокирует
 любой сбой инструментов и проверяет tracked/untracked собственные файлы:
 Prettier 3.8.1 — TS/JS/MJS/CJS, JSON, YAML и Markdown; Ruff 0.17.5 — Python;
-StyLua 2.6.0 — Lua; shfmt 3.14.1 — shell. У каждого языка один форматтер.
+StyLua 2.6.0 — Lua; shfmt 3.14.1 — shell; Taplo — TOML. У каждого языка один форматтер.
 Форматирование вызывается отдельно стандартным `--write`/`-w`; gate ничего
 не перезаписывает. CJS/MJS также проходят `node --check`. Все собственные tools/tests и корневые
 CJS/MJS config-файлы входят в строгий `checkJs` через `tsconfig.tools.json`;
@@ -106,3 +106,21 @@ shell с unquoted variable, YAML с truthy и workflow с неизвестным
 файлы и изменённый JS config восстанавливаются в `finally`; заглушка отказавшего
 инструмента живёт в отдельном `/tmp` каталоге. Положительный gate всегда
 выполняется перед controls.
+
+Все собственные `.toml`, включая `.stylua.toml` и `pyproject.toml`, автоматически
+обнаруживаются и проходят `taplo lint --no-auto-config --no-schema` и
+`taplo fmt --no-auto-config --check`. Проверяется синтаксис и стандартный формат;
+внешние schema catalogs не требуются. CI устанавливает стандартный
+`@taplo/cli@0.7.0`. Два отдельных controls создают новый TOML с неверным
+синтаксисом и с корректными, но неформатированными данными.
+
+ESLint 10 использует совместимый parser peer; scoped overrides `minimatch`
+относятся только к ESLint и `@typescript-eslint/typescript-estree`. Штатные
+`npm ci`, `npm ls` и `npm audit` проверяют разрешённый lock без `--force`
+или `--legacy-peer-deps`.
+
+Прямой Ajv закреплён на `8.20.0` с исправлением GHSA-2g4f-4pwh-qvx6.
+Canonical generator и provenance указывают ту же версию; повторная генерация
+сохраняет точные прежние JS/declaration bytes. Закреплённые официальные схемы,
+API и смысл оценивания сохраняются. Проверены реальные exported payloads всех
+четырёх validators, обязательные поля и отрицательные границы типов.

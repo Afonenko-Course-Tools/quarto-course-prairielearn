@@ -8,6 +8,8 @@ updated: 2026-10-31
 # Задания курса в PrairieLearn
 
 [Индекс спецификаций](spec/index.md) описывает контракт текущего Git ref.
+[Среда разработки Arch Linux](https://github.com/Afonenko-Course-Tools/quarto-course/blob/main/docs/development-arch.md)
+описывает установку системных инструментов и зависимости проекта.
 Версия определяется descriptor этого ref; код и документация устанавливаемого
 выпуска читаются из одного тега. Изменения main после выпущенного тега —
 **unreleased**. Минимум — Quarto 1.11.5.

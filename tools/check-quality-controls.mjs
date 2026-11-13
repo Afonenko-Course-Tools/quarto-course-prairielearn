@@ -208,6 +208,18 @@ try {
       "#!/bin/sh\nprintf '%s\\n' $quality_missing\n",
       /SC2086|SC2154/,
     ],
+    [
+      "new-toml-syntax",
+      "tools/__quality_negative.toml",
+      "[invalid\n",
+      /invalid.*header|expected.*\]|unexpected|syntax/i,
+    ],
+    [
+      "new-toml-format",
+      "tools/__quality_negative.toml",
+      "quality=1\n",
+      /not properly formatted/,
+    ],
     ["new-yaml", ".github/__quality_negative.yaml", "enabled: yes\n", /truthy/],
     [
       "new-workflow",

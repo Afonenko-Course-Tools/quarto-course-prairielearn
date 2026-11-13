@@ -1,5 +1,10 @@
 {
   "repository": "https://github.com/PrairieLearn/PrairieLearn",
   "commit": "92584fe426ececb84bc2d09de9975c7056c0c5f6",
-  "path": "apps/prairielearn/src/schemas/schemas"
+  "path": "apps/prairielearn/src/schemas/schemas",
+  "generator": {
+    "entry": "tools/build-native-validators.cjs",
+    "ajv": "8.20.0",
+    "esbuild": "0.25.10"
+  }
 }
