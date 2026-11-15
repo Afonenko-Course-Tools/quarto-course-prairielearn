@@ -30,14 +30,7 @@ import { createMetrics as __createMetrics } from "../observability/bridge.ts";
 const __metrics = __createMetrics("course-prairielearn");
 async function buildCourse(input: CourseExportInput) {
   const plan = await planCourseExport(input);
-  const {
-    d,
-    out,
-    privateOut,
-    works,
-    courseUuid,
-    assessmentUuids,
-  } = plan;
+  const { d, out, privateOut, works, courseUuid, assessmentUuids } = plan;
   const owned = await OwnedExportOutput.create(
     out,
     input.nativeAuxiliary?.environment,
@@ -49,7 +42,11 @@ async function buildCourse(input: CourseExportInput) {
   try {
     const scratch = await owned.scratchDirectory();
     if (d.course.options?.integerManualPoints === true) {
-      for (const work of works) assertIntegerCourseMaxima(gradingPolicy(work), `${work.source ?? "course"}#${work.id}`);
+      for (const work of works)
+        assertIntegerCourseMaxima(
+          gradingPolicy(work),
+          `${work.source ?? "course"}#${work.id}`,
+        );
     }
     await writer.write("infoCourse.json", {
       uuid: courseUuid,
@@ -57,7 +54,7 @@ async function buildCourse(input: CourseExportInput) {
       title: d.course.title,
       timezone: d.course.timezone,
       topics: d.course.topics,
-      ...(d.course.options === undefined ? {} : {options: d.course.options}),
+      ...(d.course.options === undefined ? {} : { options: d.course.options }),
     });
     await writer.write(
       "courseInstances/" + input.instance + "/infoCourseInstance.json",
@@ -67,12 +64,14 @@ async function buildCourse(input: CourseExportInput) {
         studentLabels: await Promise.all(
           [
             ...new Set(
-              works.filter((w) => w.relatedExercise).map((w) =>
-                ((assignment) =>
-                  assignment && "student-label" in assignment
-                    ? assignment["student-label"]
-                    : undefined)(w.extensions.prairielearn.assignment)
-              ),
+              works
+                .filter((w) => w.relatedExercise)
+                .map((w) =>
+                  ((assignment) =>
+                    assignment && "student-label" in assignment
+                      ? assignment["student-label"]
+                      : undefined)(w.extensions.prairielearn.assignment),
+                ),
             ),
           ].map(async (name) => {
             if (typeof name !== "string" || !name) {
@@ -100,25 +99,38 @@ async function buildCourse(input: CourseExportInput) {
     const reuse = new QuestionArtifactReuse();
     for (const [index, work] of works.entries()) {
       const p = await input.body(work.id);
-      const { binding, projects, studentArtifacts, questions: deliveries } =
-        await courseQuestionInput(plan, p, scratch);
+      const {
+        binding,
+        projects,
+        studentArtifacts,
+        questions: deliveries,
+      } = await courseQuestionInput(plan, p, scratch);
       Object.assign(questions, deliveries);
       const overview = await overviews.render(work, p);
       const partial = join(scratch, "work-" + index);
-      const selected = await planSelectedExport(p, {
-        projectRoot: scratch,
-        nativeBody: input.nativeBody,
-        nativeAuxiliary: input.nativeAuxiliary,
-        projects,
-        studentArtifacts,
-        nativeAnswers: input.nativeAnswers,
-      }, binding);
-      const identities = Object.fromEntries(p.questions.map((q) => [q.key, {
-        delivery: deliveries[q.key],
-        project: input.checks.projects.find((f) => f.exerciseId === q.id),
-        selection: input.nativeInputs[q.id],
-        responseSlots: input.nativeResponseSlots?.[q.id],
-      }]));
+      const selected = await planSelectedExport(
+        p,
+        {
+          projectRoot: scratch,
+          nativeBody: input.nativeBody,
+          nativeAuxiliary: input.nativeAuxiliary,
+          projects,
+          studentArtifacts,
+          nativeAnswers: input.nativeAnswers,
+        },
+        binding,
+      );
+      const identities = Object.fromEntries(
+        p.questions.map((q) => [
+          q.key,
+          {
+            delivery: deliveries[q.key],
+            project: input.checks.projects.find((f) => f.exerciseId === q.id),
+            selection: input.nativeInputs[q.id],
+            responseSlots: input.nativeResponseSlots?.[q.id],
+          },
+        ]),
+      );
       const artifacts = await questionArtifacts(selected, {
         reuse,
         identities,
@@ -135,7 +147,10 @@ async function buildCourse(input: CourseExportInput) {
         ? "Exam"
         : "Homework";
       await writer.write(
-        "courseInstances/" + input.instance + "/assessments/" + work.id +
+        "courseInstances/" +
+          input.instance +
+          "/assessments/" +
+          work.id +
           "/infoAssessment.json",
         {
           uuid: assessmentUuids.get(work.id),
@@ -146,43 +161,49 @@ async function buildCourse(input: CourseExportInput) {
           ...grading.assessment,
           text: overview.html,
           accessControl: (work.relatedExercise
-            ? [{
-              beforeRelease: { listed: false },
-              dateControl: {
-                release: { date: "9999-12-31T00:00:00" },
-                due: { date: null },
-              },
-            }, {
-              uuid: await identity(
-                "access/" + input.instance + "/" + work.id,
-                courseUuid,
-              ),
-              labels: [
-                policy.assignment && "student-label" in policy.assignment
-                  ? policy.assignment["student-label"]
-                  : undefined,
-              ],
-              dateControl: {
-                release: { date: "1970-01-01T00:00:00" },
-                due: { date: null },
-              },
-            }]
-            : [{
-              dateControl: {
-                release: { date: "1970-01-01T00:00:00" },
-                due: { date: null },
-              },
-            }]).map((rule) =>
-              work.kind === "lab"
-                ? {
+            ? [
+                {
+                  beforeRelease: { listed: false },
+                  dateControl: {
+                    release: { date: "9999-12-31T00:00:00" },
+                    due: { date: null },
+                  },
+                },
+                {
+                  uuid: await identity(
+                    "access/" + input.instance + "/" + work.id,
+                    courseUuid,
+                  ),
+                  labels: [
+                    policy.assignment && "student-label" in policy.assignment
+                      ? policy.assignment["student-label"]
+                      : undefined,
+                  ],
+                  dateControl: {
+                    release: { date: "1970-01-01T00:00:00" },
+                    due: { date: null },
+                  },
+                },
+              ]
+            : [
+                {
+                  dateControl: {
+                    release: { date: "1970-01-01T00:00:00" },
+                    due: { date: null },
+                  },
+                },
+              ]
+          ).map((rule) =>
+            work.kind === "lab"
+              ? {
                   ...rule,
                   afterComplete: {
                     questions: { hidden: false },
                     score: { hidden: false },
                   },
                 }
-                : rule
-            ),
+              : rule,
+          ),
           zones: nativeSlotZones(input.courseId, work, grading),
         },
       );
@@ -197,7 +218,8 @@ async function buildCourse(input: CourseExportInput) {
           if (
             !files.includes(prefix + "starter.zip") ||
             !files.includes(prefix + "manifest.json")
-          ) throw Error("PL.WORKSPACE_SEED_REQUIRED");
+          )
+            throw Error("PL.WORKSPACE_SEED_REQUIRED");
           questions[key] = {
             ...value,
             kind: "workspace",
@@ -222,8 +244,8 @@ async function buildCourse(input: CourseExportInput) {
         id: w.id,
         slots: qualifiedSlots(input.courseId, w),
         policy: Object.fromEntries(
-          Object.entries(w.extensions.prairielearn).filter(([key]) =>
-            w.relatedExercise || key !== "assignment"
+          Object.entries(w.extensions.prairielearn).filter(
+            ([key]) => w.relatedExercise || key !== "assignment",
           ),
         ),
         completion: completionPolicy(input.courseId, w),
@@ -258,10 +280,13 @@ async function buildCourse(input: CourseExportInput) {
     throw error;
   }
 }
-const observedCourseExport = __metrics.wrapAsync({
-  id: "course-prairielearn.application.export-course.exportCourse",
-  kind: "phase",
-}, buildCourse);
+const observedCourseExport = __metrics.wrapAsync(
+  {
+    id: "course-prairielearn.application.export-course.exportCourse",
+    kind: "phase",
+  },
+  buildCourse,
+);
 type CourseExportResult = Awaited<ReturnType<typeof buildCourse>>;
 type PreparedCourseExport = Extract<CourseExportResult, { publish: unknown }>;
 type PublishedCourseExport = Exclude<CourseExportResult, { publish: unknown }>;

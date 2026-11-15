@@ -1,15 +1,28 @@
-import {createMetrics as __createMetrics} from "../observability/bridge.ts";
-const __metrics=__createMetrics("course-prairielearn");
+import { createMetrics as __createMetrics } from "../observability/bridge.ts";
+const __metrics = __createMetrics("course-prairielearn");
 import { closed } from "./declarations.ts";
 import type { NativeProjectCheck } from "./native-checks.ts";
-function normalizeDiscoveryImplementation(value: NativeProjectCheck["discovery"] = {}) {
+function normalizeDiscoveryImplementation(
+  value: NativeProjectCheck["discovery"] = {},
+) {
   closed(value, [], ["min-executed", "allow-skipped"]);
-  const merged = { "min-executed": value["min-executed"] ?? 1, "allow-skipped": value["allow-skipped"] ?? false };
+  const merged = {
+    "min-executed": value["min-executed"] ?? 1,
+    "allow-skipped": value["allow-skipped"] ?? false,
+  };
   if (
-    !Number.isInteger(merged["min-executed"]) || merged["min-executed"] < 1 ||
+    !Number.isInteger(merged["min-executed"]) ||
+    merged["min-executed"] < 1 ||
     typeof merged["allow-skipped"] !== "boolean"
-  ) throw new Error("PL discovery invalid");
+  )
+    throw new Error("PL discovery invalid");
   return merged;
 }
 
-export const normalizeDiscovery = __metrics.wrapSync({id:"course-prairielearn.application.grading-descriptor.normalizeDiscovery",kind:"phase"},normalizeDiscoveryImplementation);
+export const normalizeDiscovery = __metrics.wrapSync(
+  {
+    id: "course-prairielearn.application.grading-descriptor.normalizeDiscovery",
+    kind: "phase",
+  },
+  normalizeDiscoveryImplementation,
+);

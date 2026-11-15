@@ -10,11 +10,15 @@ import type { PublicCore } from "../_extensions/course-prairielearn/application/
 import type { nativeBusinessInput } from "../_extensions/course-prairielearn/application/native-input.ts";
 import type { nativePreparedRequest } from "../_extensions/course-prairielearn/application/native-adapter.ts";
 
-type IsAny<T> = 0 extends (1 & T) ? true : false;
-type Exact<A, B> = IsAny<A> extends true ? false
-  : IsAny<B> extends true ? false
-  : [A, B] extends [B, A] ? true
-  : false;
+type IsAny<T> = 0 extends 1 & T ? true : false;
+type Exact<A, B> =
+  IsAny<A> extends true
+    ? false
+    : IsAny<B> extends true
+      ? false
+      : [A, B] extends [B, A]
+        ? true
+        : false;
 type Require<T extends true> = T;
 
 // Producer совместим с consumer без assertions и отдельной копии API.
@@ -29,10 +33,7 @@ type _Input = Require<
   >
 >;
 type _Inventory = Require<
-  Exact<
-    ReturnType<PublicCore["ArtifactFilesSchema"]["parse"]>,
-    ArtifactFiles
-  >
+  Exact<ReturnType<PublicCore["ArtifactFilesSchema"]["parse"]>, ArtifactFiles>
 >;
 type _Identity = Require<
   Exact<

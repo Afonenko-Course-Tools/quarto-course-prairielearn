@@ -3,22 +3,8 @@ const __metrics = __createMetrics("course-prairielearn");
 async function uuidImplementation(key: string): Promise<string> {
   // UUIDv5 DNS namespace; identity is course/exercise, never a source path.
   const ns = new Uint8Array([
-    0x6b,
-    0xa7,
-    0xb8,
-    0x10,
-    0x9d,
-    0xad,
-    0x11,
-    0xd1,
-    0x80,
-    0xb4,
-    0x00,
-    0xc0,
-    0x4f,
-    0xd4,
-    0x30,
-    0xc8,
+    0x6b, 0xa7, 0xb8, 0x10, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0,
+    0x4f, 0xd4, 0x30, 0xc8,
   ]);
   const name = new TextEncoder().encode("quarto-course-prairielearn:" + key),
     bytes = new Uint8Array(ns.length + name.length);
@@ -28,7 +14,8 @@ async function uuidImplementation(key: string): Promise<string> {
     0,
     16,
   );
-  const version = h.at(6), variant = h.at(8);
+  const version = h.at(6),
+    variant = h.at(8);
   if (version === undefined || variant === undefined) {
     throw Error("PL UUID digest too short");
   }
@@ -43,7 +30,10 @@ async function uuidImplementation(key: string): Promise<string> {
     hex.slice(20),
   ].join("-");
 }
-export const uuid = __metrics.wrapAsync({
-  id: "course-prairielearn.application.export.uuid",
-  kind: "phase",
-}, uuidImplementation);
+export const uuid = __metrics.wrapAsync(
+  {
+    id: "course-prairielearn.application.export.uuid",
+    kind: "phase",
+  },
+  uuidImplementation,
+);

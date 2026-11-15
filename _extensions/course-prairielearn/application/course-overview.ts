@@ -13,7 +13,8 @@ export class CourseOverviews {
     private readonly output: OwnedExportOutput,
   ) {}
   async render(work: CourseExportPlan["works"][number], p: PublicBodyPackage) {
-    const { input, unitMenus } = this.plan, stage = this.output.stage;
+    const { input, unitMenus } = this.plan,
+      stage = this.output.stage;
     const contexts = [{ work, body: p, menu: false }];
     for (const menu of unitMenus.get(work.id) ?? []) {
       let body = this.menuBodies.get(menu.id);
@@ -36,10 +37,11 @@ export class CourseOverviews {
         context.body.owner !== input.courseId ||
         context.body.schema !== "course-body-package-v2" ||
         !Array.isArray(context.body.resources) ||
-        context.menu && (publicWork.source !== context.work.source ||
-            !Array.isArray(publicWork.introduction)) ||
-        publicWork.introduction !== undefined &&
-          !Array.isArray(publicWork.introduction)
+        (context.menu &&
+          (publicWork.source !== context.work.source ||
+            !Array.isArray(publicWork.introduction))) ||
+        (publicWork.introduction !== undefined &&
+          !Array.isArray(publicWork.introduction))
       ) {
         throw new Error(
           "PL публичное введение не соответствует работе: " + context.work.id,
@@ -77,9 +79,7 @@ export class CourseOverviews {
         const target = join(stage, file.name);
         await Deno.mkdir(dirname(target), { recursive: true });
         try {
-          if (
-            !isDeepStrictEqual(await Deno.readFile(target), file.data)
-          ) {
+          if (!isDeepStrictEqual(await Deno.readFile(target), file.data)) {
             throw new Error(
               "PL конфликт публичного ресурса обзора: " + file.name,
             );

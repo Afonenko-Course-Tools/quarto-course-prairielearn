@@ -70,11 +70,13 @@ const check = {
     artifact: "example.jar",
   },
   "api-precheck": { files: ["src/api/java/**/*.java"], entry: "Api" },
-  references: [{
-    name: "alternate",
-    root: "author/alternate/src/main/java",
-    optional: false,
-  }],
+  references: [
+    {
+      name: "alternate",
+      root: "author/alternate/src/main/java",
+      optional: false,
+    },
+  ],
 };
 const options = {
   core: Core,
@@ -91,40 +93,54 @@ const options = {
 };
 const selected = await selectNativeCompilerInputs(options);
 if (
-  required(selected.references[0]).files.map((x) => x.name).join(",") !==
-    "Example.java,Study.java"
-) throw Error("reference helper not preserved");
+  required(selected.references[0])
+    .files.map((x) => x.name)
+    .join(",") !== "Example.java,Study.java"
+)
+  throw Error("reference helper not preserved");
 if (
   selected.descriptor.apiPrecheck?.files.join(",") !==
     "src/api/java/Api.java" ||
   selected.descriptor.testFiles.length !== 2
-) throw Error("API/subject selection changed");
-for (
-  const [name, mutate] of [
-    [
-      "api-all-tests",
-      (o: typeof options) => o.check["api-precheck"].files = ["src/**/*.java"],
-    ],
-    [
-      "api-no-match",
-      (o: typeof options) => o.check["api-precheck"].files = ["missing/*.java"],
-    ],
-    [
-      "trusted-starter",
-      (o: typeof options) => required(o.full.files[2]).reason = "starter",
-    ],
-    ["foreign-role", (o: typeof options) => required(o.full.files[4]).reason = "starter"],
-    ["changed-bytes", (o: typeof options) => required(o.full.files[4]).bytes[0] = 0],
-    ["non-source-helper", (o: typeof options) => {
-      required(o.full.files[4]).target = "author/alternate/src/main/java/evil.txt";
+)
+  throw Error("API/subject selection changed");
+for (const [name, mutate] of [
+  [
+    "api-all-tests",
+    (o: typeof options) => (o.check["api-precheck"].files = ["src/**/*.java"]),
+  ],
+  [
+    "api-no-match",
+    (o: typeof options) => (o.check["api-precheck"].files = ["missing/*.java"]),
+  ],
+  [
+    "trusted-starter",
+    (o: typeof options) => (required(o.full.files[2]).reason = "starter"),
+  ],
+  [
+    "foreign-role",
+    (o: typeof options) => (required(o.full.files[4]).reason = "starter"),
+  ],
+  [
+    "changed-bytes",
+    (o: typeof options) => (required(o.full.files[4]).bytes[0] = 0),
+  ],
+  [
+    "non-source-helper",
+    (o: typeof options) => {
+      required(o.full.files[4]).target =
+        "author/alternate/src/main/java/evil.txt";
       o.check.sourceProfile.include = ["**/*"];
-    }],
-    ["oversized-helper", async (o: typeof options) => {
+    },
+  ],
+  [
+    "oversized-helper",
+    async (o: typeof options) => {
       const f = o.full.files[4];
       required(f).bytes = new Uint8Array(1048577);
-    }],
-  ] as const
-) {
+    },
+  ],
+] as const) {
   const { core, ...copy } = options;
   const bad = { ...structuredClone(copy), core };
   await mutate(bad);
@@ -139,7 +155,9 @@ for (
 console.log(
   JSON.stringify(
     {
-      referenceHelpers: required(selected.references[0]).files.map((x) => x.name),
+      referenceHelpers: required(selected.references[0]).files.map(
+        (x) => x.name,
+      ),
       controls: 7,
       descriptor: selected.descriptor,
     },

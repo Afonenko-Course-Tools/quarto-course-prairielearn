@@ -13,7 +13,8 @@ import type {
 } from "course-core/public.ts";
 import type { NativeProjectCheck } from "./native-checks.ts";
 import type { RuntimeProfile } from "./runtime-descriptor.ts";
-const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+const record = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
 export type CheckedNativeProjectFact = Omit<NativeProjectFact, "check"> & {
   check?: NativeProjectCheck;
 };
@@ -32,13 +33,13 @@ async function projectReferences(
       ref.available &&
       // Явная Java reference-группа без student ZIP policy — полное решение,
       // а не копия списка starter-файлов. Выбор role/hash/limits уже проверен.
-      !(!extras &&
-        ["java25-junit-v1", "java25-gradle-junit-v1"].includes(
-          check.runtime,
-        )) &&
+      !(
+        !extras &&
+        ["java25-junit-v1", "java25-gradle-junit-v1"].includes(check.runtime)
+      ) &&
       ((!extras && [...names].some((n) => !primary.has(n))) ||
-        extras?.["primary-required"] !== false &&
-          [...primary].some((n) => !names.has(n)))
+        (extras?.["primary-required"] !== false &&
+          [...primary].some((n) => !names.has(n))))
     ) {
       throw Error(
         "PL.SELECTION_INVALID: reference primary/helper policy mismatch",
@@ -84,10 +85,12 @@ function contractFixtureFiles(
     }
     for (const item of mappings) {
       if (
-        !record(item) || !safePath(item.fixture) ||
+        !record(item) ||
+        !safePath(item.fixture) ||
         !item.fixture.startsWith("tests/fixtures/") ||
         !safePath(item.submission)
-      ) throw Error("PL.VERIFICATION_INVALID: fixture mapping");
+      )
+        throw Error("PL.VERIFICATION_INVALID: fixture mapping");
       const file = target(item.fixture);
       contractFixtures.push(origin(file, item.submission));
     }
@@ -97,21 +100,19 @@ function contractFixtureFiles(
 /** Только private projection непосредственно materialized A1 inventories.
  * Это не resolver/reader; все paths/data получены от public Core той же операции.
  */
-export async function projectNativeChecks(
-  input: {
-    Core: Pick<
-      typeof Core,
-      "ArtifactFilesSchema" | "ProjectPlanSchema" | "ArtifactFileSchema"
-    >;
-    fact: CheckedNativeProjectFact;
-    student: ArtifactFiles;
-    full: ArtifactFiles | undefined;
-    studentPlan: ProjectPlan;
-    fullPlan: ProjectPlan;
-    runtime: RuntimeProfile;
-    courseId: string;
-  },
-) {
+export async function projectNativeChecks(input: {
+  Core: Pick<
+    typeof Core,
+    "ArtifactFilesSchema" | "ProjectPlanSchema" | "ArtifactFileSchema"
+  >;
+  fact: CheckedNativeProjectFact;
+  student: ArtifactFiles;
+  full: ArtifactFiles | undefined;
+  studentPlan: ProjectPlan;
+  fullPlan: ProjectPlan;
+  runtime: RuntimeProfile;
+  courseId: string;
+}) {
   const check = NativeProjectCheckSchema.parse(input.fact.check),
     student = input.Core.ArtifactFilesSchema.parse(input.student),
     full = input.Core.ArtifactFilesSchema.parse(input.full);
@@ -129,20 +130,25 @@ export async function projectNativeChecks(
   );
   const references = await projectReferences(selection, check);
   const chosen = (files: ArtifactFile[], patterns: string[]) =>
-    files.filter((f) => patterns.some((p) => matchesGlob(f.target, p))).sort((
-      a,
-      b,
-    ) => a.target.localeCompare(b.target));
+    files
+      .filter((f) => patterns.some((p) => matchesGlob(f.target, p)))
+      .sort((a, b) => a.target.localeCompare(b.target));
   const publicFiles = chosen(student.files, check["verification-tests"] ?? []);
   if (
-    publicFiles.some((f) =>
-      f.reason !== "starter" &&
-      !(f.reason.startsWith("testset:") &&
-        input.studentPlan.testsets.includes(f.reason.slice(8))) &&
-      !(f.reason.startsWith("component:") &&
-        input.studentPlan.components.includes(f.reason.slice(10)))
+    publicFiles.some(
+      (f) =>
+        f.reason !== "starter" &&
+        !(
+          f.reason.startsWith("testset:") &&
+          input.studentPlan.testsets.includes(f.reason.slice(8))
+        ) &&
+        !(
+          f.reason.startsWith("component:") &&
+          input.studentPlan.components.includes(f.reason.slice(10))
+        ),
     )
-  ) throw Error("PL.SELECTION_INVALID: foreign public verification role");
+  )
+    throw Error("PL.SELECTION_INVALID: foreign public verification role");
   const verificationTests = await Promise.all(
     publicFiles.map((f) => origin(f, f.target)),
   );
@@ -161,9 +167,11 @@ export async function projectNativeChecks(
     };
   }
   if (
-    selection.descriptor.apiPrecheck && verificationTests.length &&
+    selection.descriptor.apiPrecheck &&
+    verificationTests.length &&
     !verificationApiPrecheck
-  ) throw Error("PL.SELECTION_INVALID: public API required");
+  )
+    throw Error("PL.SELECTION_INVALID: public API required");
   const missing: string[] = [];
   if ((check["verification-tests"] ?? []).length && !verificationTests.length) {
     missing.push("verificationTests");
@@ -191,7 +199,8 @@ export async function projectNativeChecks(
   let contractCases: (ArtifactFile & { name: string }) | undefined;
   const contractFixtures: SelectedCheckFile[] = [];
   if (check["contract-cases"]) {
-    const name = check["contract-cases"], file = target(name);
+    const name = check["contract-cases"],
+      file = target(name);
     contractCaseFile = origin(file, name);
     contractCases = { ...file, name };
     contractFixtures.push(...contractFixtureFiles(file, target));

@@ -19,9 +19,8 @@ export class OwnedExportOutput {
     privateOutput?: string,
   ) {
     const out = resolve(output),
-      privateOut = privateOutput === undefined
-        ? undefined
-        : resolve(privateOutput);
+      privateOut =
+        privateOutput === undefined ? undefined : resolve(privateOutput);
     await freshOutput(out);
     if (privateOut !== undefined) await freshOutput(privateOut);
     const stage = await Deno.makeTempDir({
@@ -69,7 +68,9 @@ export class OwnedExportOutput {
     this.scratch = undefined;
     try {
       await Deno.remove(path, { recursive: true });
-    } catch { /* Preserve primary failure. */ }
+    } catch {
+      /* Preserve primary failure. */
+    }
   }
   async discard() {
     if (this.state !== "prepared") return;
@@ -89,7 +90,9 @@ export class OwnedExportOutput {
   async discardAfterFailure() {
     try {
       await this.discard();
-    } catch { /* Preserve preparation/publication failure. */ }
+    } catch {
+      /* Preserve preparation/publication failure. */
+    }
   }
   async publish() {
     if (this.state !== "prepared") {
@@ -108,15 +111,19 @@ export class OwnedExportOutput {
         await publishDirectory(this.stage, this.output, this.environment);
       } catch (error) {
         if (
-          this.privateStage !== undefined && this.privateOutput !== undefined
+          this.privateStage !== undefined &&
+          this.privateOutput !== undefined
         ) {
           try {
             const source = await Deno.lstat(this.privateStage),
               target = await Deno.lstat(this.privateOutput);
             if (
-              source.dev !== null && source.ino !== null &&
-              source.dev === target.dev && source.ino === target.ino
-            ) await Deno.remove(this.privateOutput);
+              source.dev !== null &&
+              source.ino !== null &&
+              source.dev === target.dev &&
+              source.ino === target.ino
+            )
+              await Deno.remove(this.privateOutput);
           } catch {
             /* Preserve publication failure; never remove a replacement. */
           }

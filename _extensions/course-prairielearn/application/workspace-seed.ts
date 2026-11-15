@@ -3,9 +3,7 @@ type Artifact = {
   archive: Uint8Array;
 };
 
-export async function workspaceSeed(
-  artifact: Artifact | undefined,
-) {
+export async function workspaceSeed(artifact: Artifact | undefined) {
   if (!artifact || !artifact.archive.length || !artifact.files.length) {
     throw Error(
       "PL.WORKSPACE_SEED: требуется полный Core/Download student artifact",
@@ -15,15 +13,14 @@ export async function workspaceSeed(
   if (
     new Set(names).size !== names.length ||
     names.some((name) => name.startsWith(".pl-seed/"))
-  ) throw Error("PL.WORKSPACE_SEED: повтор либо служебный путь");
-  for (
-    const required of [
-      "work/.git/HEAD",
-      "work/.git/index",
-      "work/.git/config",
-      "work/README.md",
-    ]
-  ) {
+  )
+    throw Error("PL.WORKSPACE_SEED: повтор либо служебный путь");
+  for (const required of [
+    "work/.git/HEAD",
+    "work/.git/index",
+    "work/.git/config",
+    "work/README.md",
+  ]) {
     if (!names.includes(required)) {
       throw Error("PL.WORKSPACE_SEED: отсутствует " + required);
     }

@@ -12,22 +12,23 @@ Deno.test("выбранный ZIP условия сохраняет байты, 
     data: zip,
   });
   if (
-    !result || result.file.data !== zip ||
+    !result ||
+    result.file.data !== zip ||
     result.file.name !== "exr-a-conditions.zip" ||
     !result.html.includes(
       "{{options.client_files_question_url}}/exr-a-conditions.zip",
-    ) || publicationConditionFile("exr-a") !== undefined
-  ) throw Error("condition presentation lost");
+    ) ||
+    publicationConditionFile("exr-a") !== undefined
+  )
+    throw Error("condition presentation lost");
 });
 Deno.test("представление условия отвергает чужие пути и пустой архив", () => {
-  for (
-    const target of [
-      "../escape.zip",
-      "foreign.zip",
-      "starter.zip",
-      "exr-a-conditions.zip?x",
-    ]
-  ) {
+  for (const target of [
+    "../escape.zip",
+    "foreign.zip",
+    "starter.zip",
+    "exr-a-conditions.zip?x",
+  ]) {
     let denied = false;
     try {
       publicationConditionFile("exr-a", { target, data: zip });

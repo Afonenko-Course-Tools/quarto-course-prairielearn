@@ -6,9 +6,10 @@ const sp = required(Deno.args[0]),
   download = required(Deno.args[1]),
   root = await Deno.makeTempDir({ prefix: "pl-common-seed-" }),
   project = "projects/restore";
-const { zip }: Pick<typeof import("project-download/public.ts"), "zip"> = await import(
-  pathToFileURL(join(download, "_extensions/project-download/public.ts")).href
-);
+const { zip }: Pick<typeof import("project-download/public.ts"), "zip"> =
+  await import(
+    pathToFileURL(join(download, "_extensions/project-download/public.ts")).href
+  );
 const ref = "6b4ffbe35a018678a0bf6bb3e7f99bcf794bf204",
   prefix = "tasks/projects/version-control/restore-selected-state/";
 async function original(path: string) {
@@ -24,13 +25,12 @@ async function put(path: string, bytes: Uint8Array) {
   await Deno.mkdir(dirname(join(root, path)), { recursive: true });
   await Deno.writeFile(join(root, path), bytes);
 }
-for (
-  const path of [
-    "seed_recipe.py",
-    "student/work/README.md",
-    "student/work/notes.txt",
-  ]
-) await put(project + "/" + path, await original(path));
+for (const path of [
+  "seed_recipe.py",
+  "student/work/README.md",
+  "student/work/notes.txt",
+])
+  await put(project + "/" + path, await original(path));
 const common = new TextEncoder().encode(
   "Объясните выбранное состояние и сохраните историю.\n",
 );
@@ -67,11 +67,13 @@ const options = {
     projects: {
       "exr-restore": {
         "include-git": true,
-        "common-files": [{
-          source: "shared/explanation.md",
-          target: "student/explanation.md",
-          audience: "student",
-        }],
+        "common-files": [
+          {
+            source: "shared/explanation.md",
+            target: "student/explanation.md",
+            audience: "student",
+          },
+        ],
       },
     },
   },
@@ -81,21 +83,35 @@ const options = {
 };
 const result = await nativeWorkspaceArtifact(options);
 if (
-  !result.files.some((f) =>
-    f.name === "explanation.md" &&
-    new TextDecoder().decode(f.bytes).includes("Объясните")
+  !result.files.some(
+    (f) =>
+      f.name === "explanation.md" &&
+      new TextDecoder().decode(f.bytes).includes("Объясните"),
   )
-) throw Error("common file lost");
-for (
-  const [label, mutation] of [["changed-source", async (o: typeof options) => {
-    await put("shared/explanation.md", new TextEncoder().encode("tampered"));
-  }], ["missing-inventory-target", async (o: typeof options) => {
-    o.files = o.files.filter((f) => f.name !== "explanation.md");
-  }], ["foreign-common-target", async (o: typeof options) => {
-    required(o.materialization.projects["exr-restore"]["common-files"][0]).target =
-      "student/.git/config";
-  }]] as const
-) {
+)
+  throw Error("common file lost");
+for (const [label, mutation] of [
+  [
+    "changed-source",
+    async (o: typeof options) => {
+      await put("shared/explanation.md", new TextEncoder().encode("tampered"));
+    },
+  ],
+  [
+    "missing-inventory-target",
+    async (o: typeof options) => {
+      o.files = o.files.filter((f) => f.name !== "explanation.md");
+    },
+  ],
+  [
+    "foreign-common-target",
+    async (o: typeof options) => {
+      required(
+        o.materialization.projects["exr-restore"]["common-files"][0],
+      ).target = "student/.git/config";
+    },
+  ],
+] as const) {
   const bad = {
     ...options,
     files: files.map((f) => ({ ...f, bytes: new Uint8Array(f.bytes) })),
@@ -114,16 +130,18 @@ for (
     throw Error("accepted " + label + " " + error);
   }
 }
-console.log(JSON.stringify(
-  {
-    root,
-    initial: result.initial,
-    commonFiles: 1,
-    controls: 3,
-    files: result.files.map(({ bytes, ...f }) => f),
-    limits:
-      "Real immutable SP seed recipe with explicit common-file binding; lower-level host fixture only, no OCI/image/portal claim",
-  },
-  null,
-  2,
-));
+console.log(
+  JSON.stringify(
+    {
+      root,
+      initial: result.initial,
+      commonFiles: 1,
+      controls: 3,
+      files: result.files.map(({ bytes, ...f }) => f),
+      limits:
+        "Real immutable SP seed recipe with explicit common-file binding; lower-level host fixture only, no OCI/image/portal claim",
+    },
+    null,
+    2,
+  ),
+);

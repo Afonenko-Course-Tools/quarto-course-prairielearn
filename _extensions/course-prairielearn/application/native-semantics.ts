@@ -1,8 +1,9 @@
-import {createMetrics as __createMetrics} from "../observability/bridge.ts";
-const __metrics=__createMetrics("course-prairielearn");
+import { createMetrics as __createMetrics } from "../observability/bridge.ts";
+const __metrics = __createMetrics("course-prairielearn");
 // JSON Schema does not express this pinned Community sync rule:
 // PrairieLearn/PrairieLearn 92584fe, src/sync/course-db.ts:1368.
-const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+const record = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
 function validateQuestionSemantics(
   question: unknown,
   type: unknown,
@@ -10,8 +11,10 @@ function validateQuestionSemantics(
 ) {
   if (
     !record(question) ||
-    question.alternatives !== undefined && !Array.isArray(question.alternatives)
-  ) throw Error(`PL upstream semantic ${source}: invalid alternatives`);
+    (question.alternatives !== undefined &&
+      !Array.isArray(question.alternatives))
+  )
+    throw Error(`PL upstream semantic ${source}: invalid alternatives`);
   if (question.id !== undefined && question.alternatives !== undefined) {
     throw new Error(
       `PL upstream semantic ${source}: id and alternatives cannot coexist`,
@@ -41,9 +44,8 @@ function validateQuestionSemantics(
       throw Error(`PL upstream semantic ${source}: invalid alternative`);
     }
     if (
-      type === "Exam" && (
-        alternative.maxPoints != null || alternative.maxAutoPoints != null
-      )
+      type === "Exam" &&
+      (alternative.maxPoints != null || alternative.maxAutoPoints != null)
     ) {
       throw new Error(
         `PL upstream semantic ${source}: Exam question ${
@@ -53,11 +55,15 @@ function validateQuestionSemantics(
     }
     const points = alternative.autoPoints ?? alternative.points;
     if (
-      type === "Exam" && Array.isArray(points) &&
+      type === "Exam" &&
+      Array.isArray(points) &&
       points.some((p: unknown, i: number) => {
         const previous: unknown = points[i - 1];
-        return typeof p !== "number" || !Number.isFinite(p) ||
-          i > 0 && (typeof previous !== "number" || p > previous);
+        return (
+          typeof p !== "number" ||
+          !Number.isFinite(p) ||
+          (i > 0 && (typeof previous !== "number" || p > previous))
+        );
       })
     ) {
       throw new Error(
@@ -77,20 +83,34 @@ function validateQuestionSemantics(
     }
   }
 }
-function validateAssessmentSemanticsImplementation(assessment: unknown, source: string) {
-  if (!record(assessment) || !Array.isArray(assessment.zones)) throw Error(`PL upstream semantic ${source}: invalid assessment zones`);
+function validateAssessmentSemanticsImplementation(
+  assessment: unknown,
+  source: string,
+) {
+  if (!record(assessment) || !Array.isArray(assessment.zones))
+    throw Error(`PL upstream semantic ${source}: invalid assessment zones`);
   if (assessment.type === "Homework" && assessment.multipleInstance === true) {
     throw new Error(
       `PL upstream semantic ${source}: Homework cannot enable multipleInstance`,
     );
   }
   for (const zone of assessment.zones) {
-    if (!record(zone) || !Array.isArray(zone.questions)) throw Error(`PL upstream semantic ${source}: invalid zone questions`);
-    if(zone.numberChoose!=null)throw new Error(`PL upstream semantic ${source}: zone subset selection is unsupported`);
+    if (!record(zone) || !Array.isArray(zone.questions))
+      throw Error(`PL upstream semantic ${source}: invalid zone questions`);
+    if (zone.numberChoose != null)
+      throw new Error(
+        `PL upstream semantic ${source}: zone subset selection is unsupported`,
+      );
     for (const question of zone.questions) {
       validateQuestionSemantics(question, assessment.type, source);
     }
   }
 }
 
-export const validateAssessmentSemantics = __metrics.wrapSync({id:"course-prairielearn.application.native-semantics.validateAssessmentSemantics",kind:"phase"},validateAssessmentSemanticsImplementation);
+export const validateAssessmentSemantics = __metrics.wrapSync(
+  {
+    id: "course-prairielearn.application.native-semantics.validateAssessmentSemantics",
+    kind: "phase",
+  },
+  validateAssessmentSemanticsImplementation,
+);

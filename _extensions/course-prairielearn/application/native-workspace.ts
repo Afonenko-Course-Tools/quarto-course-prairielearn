@@ -28,7 +28,8 @@ async function ownerFile(root: string, path: string) {
     if (
       st.isSymlink ||
       !(i === path.split("/").length - 1 ? st.isFile : st.isDirectory)
-    ) throw Error("PL.WORKSPACE_SEED: unsafe owner file");
+    )
+      throw Error("PL.WORKSPACE_SEED: unsafe owner file");
   }
   return current;
 }
@@ -46,9 +47,12 @@ async function verifySeedHistory(
   );
   const sha = (value: unknown): value is string =>
     typeof value === "string" && /^[a-f0-9]{40}$/.test(value);
-  const single = sha(identity.A) &&
+  const single =
+    sha(identity.A) &&
     Object.keys(identity).sort().join() === "A,head,refs,status";
-  const pair = sha(identity.S0) && sha(identity.S1) &&
+  const pair =
+    sha(identity.S0) &&
+    sha(identity.S1) &&
     identity.S0 !== identity.S1 &&
     Object.keys(identity).sort().join() === "S0,S1,head,refs,status";
   if (!single && !pair) {
@@ -59,8 +63,8 @@ async function verifySeedHistory(
   // Прежнее исключение GIT_* сохраняется, но только из одного saved map.
   const gitEnvironment = Object.freeze({
     ...Object.fromEntries(
-      Object.entries(auxiliary.environment).filter(([key]) =>
-        !key.startsWith("GIT_")
+      Object.entries(auxiliary.environment).filter(
+        ([key]) => !key.startsWith("GIT_"),
       ),
     ),
     GIT_CONFIG_GLOBAL: "/dev/null",
@@ -95,27 +99,32 @@ async function verifySeedHistory(
     : initial + " " + parent + "\n" + parent;
   if (
     head !== "refs/heads/main" ||
-    await git(["rev-parse", "HEAD"]) !== initial ||
+    (await git(["rev-parse", "HEAD"])) !== initial ||
     refs !== initial + " refs/heads/main" ||
     JSON.stringify(identity.refs) !== JSON.stringify([refs]) ||
     identity.head !== head ||
-    identity.status !== status || status !== "" || graph !== expectedGraph ||
-    await git(["rev-list", "--all", "--count"]) !== (single ? "1" : "2")
+    identity.status !== status ||
+    status !== "" ||
+    graph !== expectedGraph ||
+    (await git(["rev-list", "--all", "--count"])) !== (single ? "1" : "2")
   ) {
-    throw Error(
-      "PL.WORKSPACE_SEED: exact initial clean history/main required",
-    );
+    throw Error("PL.WORKSPACE_SEED: exact initial clean history/main required");
   }
   await git(["fsck", "--strict", "--full", "--no-reflogs"]);
-  const all = (await git([
-    "cat-file",
-    "--batch-all-objects",
-    "--batch-check=%(objectname)",
-  ])).split("\n").sort();
-  const closure =
-    (await git(["rev-list", "--objects", "--no-object-names", "HEAD"])).split(
-      "\n",
-    ).sort();
+  const all = (
+    await git([
+      "cat-file",
+      "--batch-all-objects",
+      "--batch-check=%(objectname)",
+    ])
+  )
+    .split("\n")
+    .sort();
+  const closure = (
+    await git(["rev-list", "--objects", "--no-object-names", "HEAD"])
+  )
+    .split("\n")
+    .sort();
   if (JSON.stringify(all) !== JSON.stringify(closure)) {
     throw Error("PL.WORKSPACE_SEED: unreachable objects in initial seed");
   }
@@ -153,7 +162,8 @@ export async function nativeWorkspaceArtifact(options: {
     throw Error("PL.WORKSPACE_SEED: invalid materialization", { cause: error });
   }
   const declaration = materialization.projects[options.exerciseId];
-  if (declaration?.["include-git"] !== true) throw Error("PL.WORKSPACE_SEED: explicit include-git required");
+  if (declaration?.["include-git"] !== true)
+    throw Error("PL.WORKSPACE_SEED: explicit include-git required");
   const target = NativeSeedTargetSchema.parse(
     options.seedTarget === undefined ? "work" : options.seedTarget,
   );
@@ -162,12 +172,15 @@ export async function nativeWorkspaceArtifact(options: {
   }
   const below = (name: string) => name.startsWith(target + "/");
   function paths(files: File[], generated: boolean) {
-    const names = files.map((f) => f.name), known = new Set(names);
+    const names = files.map((f) => f.name),
+      known = new Set(names);
     if (
       known.size !== names.length ||
-      names.some((name) =>
-        !safePath(name) || name.split("/").includes(".pl-seed") ||
-        !generated && name.split("/").includes(".git")
+      names.some(
+        (name) =>
+          !safePath(name) ||
+          name.split("/").includes(".pl-seed") ||
+          (!generated && name.split("/").includes(".git")),
       )
     ) {
       throw Error("PL.WORKSPACE_SEED: duplicate/service/unsafe inventory");
@@ -185,8 +198,8 @@ export async function nativeWorkspaceArtifact(options: {
     }
   }
   paths(options.files, false);
-  const auxiliary = options.auxiliary ??
-    captureNativeAuxiliary(options.assertCurrent);
+  const auxiliary =
+    options.auxiliary ?? captureNativeAuxiliary(options.assertCurrent);
   const root = await Deno.realPath(options.root);
   await options.assertCurrent();
   const commonTargets = new Set<string>();
@@ -201,7 +214,7 @@ export async function nativeWorkspaceArtifact(options: {
     const selected = options.files.filter((file) => file.name === target);
     if (
       selected.length !== 1 ||
-      !isDeepStrictEqual(source,selected[0]?.bytes)
+      !isDeepStrictEqual(source, selected[0]?.bytes)
     ) {
       throw Error(
         "PL.WORKSPACE_SEED: common file lacks exact native inventory binding",
@@ -212,10 +225,10 @@ export async function nativeWorkspaceArtifact(options: {
   await options.assertCurrent();
   const stage = await Deno.makeTempDir({ prefix: "pl-native-seed-" });
   try {
-    const template = join(stage, "template"), work = join(stage, "work");
+    const template = join(stage, "template"),
+      work = join(stage, "work");
     await Deno.mkdir(template);
-    const script =
-      `import importlib.util,json,sys\nfrom pathlib import Path\nsys.path.insert(0,sys.argv[1])\nspec=importlib.util.spec_from_file_location('course_seed',sys.argv[2]);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)\nprint(json.dumps(module.generate(Path(sys.argv[3]),Path(sys.argv[4])),ensure_ascii=False))\n`;
+    const script = `import importlib.util,json,sys\nfrom pathlib import Path\nsys.path.insert(0,sys.argv[1])\nspec=importlib.util.spec_from_file_location('course_seed',sys.argv[2]);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)\nprint(json.dumps(module.generate(Path(sys.argv[3]),Path(sys.argv[4])),ensure_ascii=False))\n`;
     const run = await new Deno.Command("python3", {
       args: [
         "-I",
@@ -241,14 +254,17 @@ export async function nativeWorkspaceArtifact(options: {
       );
     }
     const initial = await verifySeedHistory(run.stdout, auxiliary, work);
-    const files = options.files.map((f) => ({
-      name: f.name,
-      bytes: new Uint8Array(f.bytes),
-    })).filter((f) => !below(f.name));
+    const files = options.files
+      .map((f) => ({
+        name: f.name,
+        bytes: new Uint8Array(f.bytes),
+      }))
+      .filter((f) => !below(f.name));
 
     async function walk(path: string, prefix: string) {
       for await (const entry of Deno.readDir(path)) {
-        const name = prefix + "/" + entry.name, actual = join(path, entry.name);
+        const name = prefix + "/" + entry.name,
+          actual = join(path, entry.name);
         if (!safePath(name) || entry.isSymlink) {
           throw Error("PL.WORKSPACE_SEED: unsafe generated file");
         }
@@ -259,13 +275,9 @@ export async function nativeWorkspaceArtifact(options: {
       }
     }
     await walk(work, target);
-    for (
-      const original of options.files.filter((f) => below(f.name))
-    ) {
+    for (const original of options.files.filter((f) => below(f.name))) {
       const generated = files.find((f) => f.name === original.name);
-      if (
-        !generated || !isDeepStrictEqual(generated.bytes,original.bytes)
-      ) {
+      if (!generated || !isDeepStrictEqual(generated.bytes, original.bytes)) {
         throw Error(
           "PL.WORKSPACE_SEED: recipe changes declared starter material",
         );
@@ -275,7 +287,8 @@ export async function nativeWorkspaceArtifact(options: {
     if (
       new Set(files.map((f) => f.name)).size !== files.length ||
       files.some((f) => !safePath(f.name) || f.name.startsWith(".pl-seed/"))
-    ) throw Error("PL.WORKSPACE_SEED: duplicate/service file");
+    )
+      throw Error("PL.WORKSPACE_SEED: duplicate/service file");
     paths(files, true);
     await options.assertCurrent();
     return {

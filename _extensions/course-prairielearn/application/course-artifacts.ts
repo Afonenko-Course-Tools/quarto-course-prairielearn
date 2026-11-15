@@ -12,11 +12,9 @@ import * as validators from "./native-validators.js";
 export async function inventoryNames(root: string) {
   const files: string[] = [];
   async function walk(dir: string) {
-    for (
-      const e of [...await Array.fromAsync(Deno.readDir(dir))].sort((a, b) =>
-        a.name.localeCompare(b.name)
-      )
-    ) {
+    for (const e of [...(await Array.fromAsync(Deno.readDir(dir)))].sort(
+      (a, b) => a.name.localeCompare(b.name),
+    )) {
       const path = join(dir, e.name);
       if (e.isDirectory) await walk(path);
       else if (e.isFile) {
@@ -40,7 +38,8 @@ async function sameQuestionFiles(
         await Deno.readFile(join(left, name)),
         await Deno.readFile(join(right, name)),
       )
-    ) return false;
+    )
+      return false;
   }
   return true;
 }
@@ -56,16 +55,18 @@ export class CourseArtifacts {
     const schema = path.endsWith("/info.json")
       ? "infoQuestion"
       : path.split("/").at(-1)?.replace(".json", "");
-    const validate = schema === "infoQuestion"
-      ? validators.infoQuestion
-      : schema === "infoCourse"
-      ? validators.infoCourse
-      : schema === "infoCourseInstance"
-      ? validators.infoCourseInstance
-      : schema === "infoAssessment"
-      ? validators.infoAssessment
-      : undefined;
-    const validationInput = schema === "infoCourse" ? upstreamCourseValidationInput(v) : v;
+    const validate =
+      schema === "infoQuestion"
+        ? validators.infoQuestion
+        : schema === "infoCourse"
+          ? validators.infoCourse
+          : schema === "infoCourseInstance"
+            ? validators.infoCourseInstance
+            : schema === "infoAssessment"
+              ? validators.infoAssessment
+              : undefined;
+    const validationInput =
+      schema === "infoCourse" ? upstreamCourseValidationInput(v) : v;
     if (validate && !validate(validationInput)) {
       throw new Error(
         "PL upstream schema " + path + ": " + JSON.stringify(validate.errors),
@@ -73,7 +74,10 @@ export class CourseArtifacts {
     }
     if (schema === "infoAssessment") validateAssessmentSemantics(v, path);
     if (
-      validate && v !== null && typeof v === "object" && "uuid" in v &&
+      validate &&
+      v !== null &&
+      typeof v === "object" &&
+      "uuid" in v &&
       typeof v.uuid === "string"
     ) {
       const key = v.uuid.toLowerCase(),
@@ -93,11 +97,11 @@ export class CourseArtifacts {
     deliveries: WorkInput["questions"],
     partial: string,
   ) {
-    const { input } = this.plan, stage = this.output.stage;
+    const { input } = this.plan,
+      stage = this.output.stage;
     for (const q of p.questions) {
       const base = "questions/" + q.key;
-      const c = input.checks.projects.find((f) => f.exerciseId === q.id)
-        ?.check;
+      const c = input.checks.projects.find((f) => f.exerciseId === q.id)?.check;
       const rawInfo: unknown = JSON.parse(
         await Deno.readTextFile(join(partial, base, "info.json")),
       );
@@ -110,8 +114,8 @@ export class CourseArtifacts {
       info.partialCredit = input.nativeAnswers?.[q.id]
         ? info.gradingMethod !== "Manual"
         : c
-        ? c.scoring.mode !== "all-pass"
-        : false;
+          ? c.scoring.mode !== "all-pass"
+          : false;
       // Pinned Community validates assessment overrides against this embedded
       // question schema. A sidecar preferences.schema.json is not loaded.
       info.preferences = {
@@ -131,12 +135,10 @@ export class CourseArtifacts {
         if (!nativeInput) {
           throw Error("PL.SELECTION_INVALID: native input missing");
         }
-        for (
-          const s of nativeInput.sources.map((file) => ({
-            name: file.name,
-            data: file.bytes,
-          }))
-        ) {
+        for (const s of nativeInput.sources.map((file) => ({
+          name: file.name,
+          data: file.bytes,
+        }))) {
           const path = join(
             partial,
             base,
@@ -148,16 +150,15 @@ export class CourseArtifacts {
         }
       }
       const nativeFiles = await inventoryNames(join(partial, base));
-      const resourceBindings = [...new Map<string, BodyResource>(
-        p.resources
-          .filter((resource) =>
-            nativeFiles.includes(
-              "clientFilesQuestion/" + resource.target,
+      const resourceBindings = [
+        ...new Map<string, BodyResource>(
+          p.resources
+            .filter((resource) =>
+              nativeFiles.includes("clientFilesQuestion/" + resource.target),
             )
-          )
-          .map((resource) => [resource.target, resource]),
-      ).values()]
-        .sort((left, right) => left.target.localeCompare(right.target));
+            .map((resource) => [resource.target, resource]),
+        ).values(),
+      ].sort((left, right) => left.target.localeCompare(right.target));
       const snapshot = canonical({
         question: q,
         binding: binding.questions[q.id],
@@ -167,20 +168,17 @@ export class CourseArtifacts {
       if (await exists(join(stage, base))) {
         if (
           this.questionSnapshots.get(q.key) !== snapshot ||
-          !await sameQuestionFiles(
+          !(await sameQuestionFiles(
             join(stage, base),
             join(partial, base),
             nativeFiles,
-          )
+          ))
         ) {
           throw Error("PL конфликт повторного вопроса: " + q.key);
         }
       } else {
         this.questionSnapshots.set(q.key, snapshot);
-        await Deno.rename(
-          join(partial, base),
-          await parent(join(stage, base)),
-        );
+        await Deno.rename(join(partial, base), await parent(join(stage, base)));
       }
       await this.write(base + "/info.json", info);
     }

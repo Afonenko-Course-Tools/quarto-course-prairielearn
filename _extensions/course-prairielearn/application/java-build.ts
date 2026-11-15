@@ -6,10 +6,7 @@ export interface JavaBuild {
   artifact: string;
 }
 export function javaBuild(
-  check: Pick<
-    RuntimeCheckInput,
-    "runtime" | "sourceProfile" | "java-build"
-  >,
+  check: Pick<RuntimeCheckInput, "runtime" | "sourceProfile" | "java-build">,
   profile?: {
     mode?: string;
     javaRelease?: number;
@@ -23,23 +20,29 @@ export function javaBuild(
   }
   if (value === undefined) return undefined;
   if (
-    !native || check.sourceProfile?.mode !== "implementation" || !profile ||
-    profile.mode !== "implementation" || profile.javaRelease !== 25 ||
-    profile.sourceExtensions !== undefined &&
+    !native ||
+    check.sourceProfile?.mode !== "implementation" ||
+    !profile ||
+    profile.mode !== "implementation" ||
+    profile.javaRelease !== 25 ||
+    (profile.sourceExtensions !== undefined &&
       (!Array.isArray(profile.sourceExtensions) ||
         profile.sourceExtensions.length !== 1 ||
-        profile.sourceExtensions[0] !== ".java") ||
-    !value || typeof value !== "object" || Array.isArray(value) ||
+        profile.sourceExtensions[0] !== ".java")) ||
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
     Object.keys(value).length !==
       (Object.hasOwn(value, "main-class") ? 3 : 2) ||
-    Object.keys(value).some((k) =>
-      !["kind", "main-class", "artifact"].includes(k)
-    ) || value.kind !== "gradle-jar-v1" ||
-    Object.hasOwn(value, "main-class") &&
+    Object.keys(value).some(
+      (k) => !["kind", "main-class", "artifact"].includes(k),
+    ) ||
+    value.kind !== "gradle-jar-v1" ||
+    (Object.hasOwn(value, "main-class") &&
       (typeof value["main-class"] !== "string" ||
         !/^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/.test(
           value["main-class"],
-        )) ||
+        ))) ||
     typeof value.artifact !== "string" ||
     !/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.jar$/.test(value.artifact)
   ) {
@@ -47,7 +50,9 @@ export function javaBuild(
       "PL java-build requires a closed native Gradle implementation record/profile",
     );
   }
-  const mainClass = Object.hasOwn(value, "main-class") ? value["main-class"] : undefined;
+  const mainClass = Object.hasOwn(value, "main-class")
+    ? value["main-class"]
+    : undefined;
   return {
     kind: value.kind,
     ...(typeof mainClass === "string" ? { mainClass } : {}),

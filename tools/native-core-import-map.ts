@@ -5,16 +5,17 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 export async function writeNativeCoreImportMap(
   root: string,
   destination: string,
-  dependencies: {"reference-catalog"?: string; "project-download"?: string} = {},
+  dependencies: {
+    "reference-catalog"?: string;
+    "project-download"?: string;
+  } = {},
 ) {
   let core: string | undefined;
-  for (
-    const path of [
-      resolve(root, "_extensions/course-core"),
-      resolve(root, "_extensions/Afonenko-Course-Tools/course-core"),
-      resolve(root),
-    ]
-  ) {
+  for (const path of [
+    resolve(root, "_extensions/course-core"),
+    resolve(root, "_extensions/Afonenko-Course-Tools/course-core"),
+    resolve(root),
+  ]) {
     try {
       if ((await Deno.stat(resolve(path, "public.ts"))).isFile) {
         core = await Deno.realPath(path);
@@ -29,10 +30,19 @@ export async function writeNativeCoreImportMap(
   for (const [name, input] of Object.entries(dependencies)) {
     if (input === undefined) continue;
     let found: string | undefined;
-    for (const path of [resolve(input, "_extensions", name), resolve(input, "_extensions/Afonenko-Course-Tools", name), resolve(input)]) {
+    for (const path of [
+      resolve(input, "_extensions", name),
+      resolve(input, "_extensions/Afonenko-Course-Tools", name),
+      resolve(input),
+    ]) {
       try {
-        if ((await Deno.stat(resolve(path, "public.ts"))).isFile) { found = await Deno.realPath(path); break; }
-      } catch (error) { if (!(error instanceof Deno.errors.NotFound)) throw error; }
+        if ((await Deno.stat(resolve(path, "public.ts"))).isFile) {
+          found = await Deno.realPath(path);
+          break;
+        }
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) throw error;
+      }
     }
     if (!found) throw Error("Публичное расширение не найдено: " + name);
     publicImports[name + "/"] = pathToFileURL(found + "/").href;
@@ -52,7 +62,8 @@ export async function writeNativeCoreImportMap(
     ];
     for (const [name, provider] of providers) {
       if (provider !== undefined) {
-        publicImports[pathToFileURL(resolve(siblings, name) + "/").href] = provider;
+        publicImports[pathToFileURL(resolve(siblings, name) + "/").href] =
+          provider;
       }
     }
   }
@@ -65,10 +76,9 @@ export async function writeNativeCoreImportMap(
         "pl-native/": pathToFileURL(
           resolve(repo, "_extensions/course-prairielearn/application") + "/",
         ).href,
-        "stdlib/path": import.meta.resolve("stdlib/path").replace(
-          "jsr:/",
-          "jsr:",
-        ),
+        "stdlib/path": import.meta
+          .resolve("stdlib/path")
+          .replace("jsr:/", "jsr:"),
         "stdlib/fs": import.meta.resolve("stdlib/fs").replace("jsr:/", "jsr:"),
       },
     }),
@@ -80,7 +90,7 @@ if (import.meta.main) {
     throw Error("Укажите фактический Core и путь type-only import map");
   }
   await writeNativeCoreImportMap(Deno.args[0], Deno.args[1], {
-    ...(Deno.args[2] ? {"reference-catalog":Deno.args[2]} : {}),
-    ...(Deno.args[3] ? {"project-download":Deno.args[3]} : {}),
+    ...(Deno.args[2] ? { "reference-catalog": Deno.args[2] } : {}),
+    ...(Deno.args[3] ? { "project-download": Deno.args[3] } : {}),
   });
 }

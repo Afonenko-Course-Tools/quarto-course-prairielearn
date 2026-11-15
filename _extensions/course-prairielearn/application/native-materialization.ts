@@ -2,39 +2,53 @@ import { posix } from "node:path";
 // @deno-types="../vendor/zod/v4/index.d.ts"
 import { z } from "../vendor/zod/v4/index.js";
 import { safePath } from "./source-selection.ts";
-const path = z.string().min(1).max(4096).refine(safePath).refine((p) =>
-  !p.split("/").some((s) =>
-    [".git", ".quarto", "_generated", "node_modules"].includes(s)
-  )
-);
+const path = z
+  .string()
+  .min(1)
+  .max(4096)
+  .refine(safePath)
+  .refine(
+    (p) =>
+      !p
+        .split("/")
+        .some((s) =>
+          [".git", ".quarto", "_generated", "node_modules"].includes(s),
+        ),
+  );
 /** C-owned target; не поле общей Core project-materialization. */
-export const NativeSeedTargetSchema = path.refine((p) =>
-  !/[\u0000-\u001f\u007f]/.test(p) &&
-  !p.split("/").includes(".pl-seed") &&
-  p !== "README.md" && !p.startsWith("README.md/")
+export const NativeSeedTargetSchema = path.refine(
+  (p) =>
+    !/[\u0000-\u001f\u007f]/.test(p) &&
+    !p.split("/").includes(".pl-seed") &&
+    p !== "README.md" &&
+    !p.startsWith("README.md/"),
 );
 export const NativeSeedTargetsSchema = z.record(
   z.string().regex(/^exr-[a-z0-9-]+$/),
   NativeSeedTargetSchema,
 );
-const common = z.strictObject({
-  source: z.string().min(1).max(4096).refine((p) =>
-    !/[\\\0]/.test(p) && !/^\w+:/.test(p)
-  ),
-  target: path,
-  audience: z.enum(["student", "grading"]),
-}).superRefine((c, ctx) => {
-  if (
-    c.audience === "student"
-      ? !c.target.startsWith("student/") || !safePath(c.target.slice(8))
-      : c.target.startsWith("student/")
-  ) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Common target должен сохранять явную аудиторию",
-    });
-  }
-});
+const common = z
+  .strictObject({
+    source: z
+      .string()
+      .min(1)
+      .max(4096)
+      .refine((p) => !/[\\\0]/.test(p) && !/^\w+:/.test(p)),
+    target: path,
+    audience: z.enum(["student", "grading"]),
+  })
+  .superRefine((c, ctx) => {
+    if (
+      c.audience === "student"
+        ? !c.target.startsWith("student/") || !safePath(c.target.slice(8))
+        : c.target.startsWith("student/")
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Common target должен сохранять явную аудиторию",
+      });
+    }
+  });
 export const NativeMaterializationSchema = z.strictObject({
   projects: z.record(
     z.string().regex(/^exr-[a-z0-9-]+$/),
@@ -59,9 +73,11 @@ export function decodeNativeMaterialization(value: unknown, source?: string) {
       }
       if (
         !safePath(common.source) ||
-        common.source.split("/").some((s) =>
-          [".git", ".quarto", "_generated", "node_modules"].includes(s)
-        )
+        common.source
+          .split("/")
+          .some((s) =>
+            [".git", ".quarto", "_generated", "node_modules"].includes(s),
+          )
       ) {
         throw Error("PL.MATERIALIZATION_INVALID: common source containment");
       }

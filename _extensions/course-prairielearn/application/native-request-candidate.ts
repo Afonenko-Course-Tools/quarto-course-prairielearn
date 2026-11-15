@@ -3,7 +3,10 @@ import { join, resolve } from "node:path";
 // Inert C entry: только builtin IO собственного correlation transport.
 // До публичного Core gate не импортировать exporter/metrics/runtime modules.
 const safe = (v: unknown): v is string =>
-  typeof v === "string" && !!v && !v.includes("\\") && !v.includes("\0") &&
+  typeof v === "string" &&
+  !!v &&
+  !v.includes("\\") &&
+  !v.includes("\0") &&
   !v.startsWith("/") &&
   !v.split("/").some((p) => !p || p === "." || p === "..");
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -13,8 +16,9 @@ const strings = (value: unknown): value is string[] =>
   value.every((item: unknown) => typeof item === "string");
 const uuid = (v: unknown): v is string =>
   typeof v === "string" &&
-  /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/
-    .test(v);
+  /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(
+    v,
+  );
 async function ownFile(root: string, path: string) {
   if (!safe(path)) throw Error("PL.CAPTURE_CHANGED: candidate path");
   let current = root;
@@ -22,9 +26,11 @@ async function ownFile(root: string, path: string) {
     current = join(current, part);
     const s = await Deno.lstat(current);
     if (
-      s.isSymlink || s.isFile && s.size > 4 * 1024 * 1024 ||
+      s.isSymlink ||
+      (s.isFile && s.size > 4 * 1024 * 1024) ||
       !(i === path.split("/").length - 1 ? s.isFile : s.isDirectory)
-    ) throw Error("PL.CAPTURE_CHANGED: candidate alias/type");
+    )
+      throw Error("PL.CAPTURE_CHANGED: candidate alias/type");
   }
   return current;
 }
@@ -61,20 +67,25 @@ export async function readNativeEntryCandidate(owner: string) {
     if (
       request.schema !== "pl-native-business-request-v1" ||
       request.owner !== root ||
-      Object.keys(id).some((key) =>
-        !["operation", "runtime", "projection", "profiles"].includes(key)
+      Object.keys(id).some(
+        (key) =>
+          !["operation", "runtime", "projection", "profiles"].includes(key),
       ) ||
-      id.operation !== active.operation || !uuid(id.operation) ||
+      id.operation !== active.operation ||
+      !uuid(id.operation) ||
       id.runtime !== "quarto-1.11.5" ||
       (id.projection !== "student" && id.projection !== "author") ||
-      !strings(id.profiles) || id.profiles.length > 16 ||
+      !strings(id.profiles) ||
+      id.profiles.length > 16 ||
       id.profiles.some((p) => !/^[-a-z0-9]+$/.test(p)) ||
       typeof request.outputDirectory !== "string" ||
       request.outputDirectory !== resolve(request.outputDirectory) ||
-      !request.outputDirectory.startsWith(root + "/") || !inputs.length ||
+      !request.outputDirectory.startsWith(root + "/") ||
+      !inputs.length ||
       inputs.length > 4096 ||
       new Set(inputs.map((i) => i.source)).size !== inputs.length
-    ) throw Error("PL.CAPTURE_CHANGED: candidate binding");
+    )
+      throw Error("PL.CAPTURE_CHANGED: candidate binding");
     const identity: NativeOperationIdentity = {
       operation: id.operation,
       runtime: id.runtime,

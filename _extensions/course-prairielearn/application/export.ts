@@ -72,7 +72,10 @@ async function preparePrairieLearn(
   }
 }
 
-const observedPrairieLearn = __metrics.wrapAsync({
-  id: "course-prairielearn.application.export.exportPrairieLearn",
-  kind: "phase",
-}, preparePrairieLearn);
+const observedPrairieLearn = __metrics.wrapAsync(
+  {
+    id: "course-prairielearn.application.export.exportPrairieLearn",
+    kind: "phase",
+  },
+  preparePrairieLearn,
+);

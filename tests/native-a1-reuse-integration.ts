@@ -27,9 +27,13 @@ let success = false;
 let expiredPair: CorePublic.NativeAssignmentProjectPlans | undefined;
 let expiredCondition: CorePublic.MaterializableCondition | undefined;
 let observer: ReturnType<typeof observeNativeHost> | undefined;
-type HostSnapshot = ReturnType<ReturnType<typeof observeNativeHost>["snapshot"]>;
-let captureStart: HostSnapshot | undefined, captureFinal: HostSnapshot | undefined,
-  parentStart: HostSnapshot | undefined, parentFinal: HostSnapshot | undefined;
+type HostSnapshot = ReturnType<
+  ReturnType<typeof observeNativeHost>["snapshot"]
+>;
+let captureStart: HostSnapshot | undefined,
+  captureFinal: HostSnapshot | undefined,
+  parentStart: HostSnapshot | undefined,
+  parentFinal: HostSnapshot | undefined;
 async function put(path: string, text: string) {
   await Deno.mkdir(dirname(join(root, path)), { recursive: true });
   const bytes = new TextEncoder().encode(text);
@@ -48,11 +52,13 @@ const policy = {
       runtime: "java25-junit-v1",
       "source-profile": "main",
       tests: ["src/api/java/**/*.java", "src/test/java/**/*.java"],
-      references: [{
-        name: "lawful",
-        root: "author/example/src/main/java",
-        optional: false,
-      }],
+      references: [
+        {
+          name: "lawful",
+          root: "author/example/src/main/java",
+          optional: false,
+        },
+      ],
       "additional-java-sources": {
         archive: "additional.zip",
         "max-files": 128,
@@ -98,11 +104,11 @@ filters:
   );
   await put(
     "pre.ts",
-    `import * as Core from ${
-      JSON.stringify(pathToFileURL(join(core, "public.ts")).href)
-    };import * as PL from ${
-      JSON.stringify(pathToFileURL(join(pl, "public.ts")).href)
-    };await PL.prepareNativeAdapter(Core,{root:Deno.cwd(),projection:'student',outputDirectory:Deno.cwd()+'/_site'});`,
+    `import * as Core from ${JSON.stringify(
+      pathToFileURL(join(core, "public.ts")).href,
+    )};import * as PL from ${JSON.stringify(
+      pathToFileURL(join(pl, "public.ts")).href,
+    )};await PL.prepareNativeAdapter(Core,{root:Deno.cwd(),projection:'student',outputDirectory:Deno.cwd()+'/_site'});`,
   );
   await put(
     "bank.qmd",
@@ -154,14 +160,13 @@ references: [{id: fixture-book, type: book, title: Публичная книга
     "import org.junit.jupiter.api.Test;import static org.junit.jupiter.api.Assertions.*;public class OfficialTest {@Test void result(){assertEquals(Api.expected(),Main.value());}}",
   );
   // Fixture installation only: immutable public Download with matching public Core schema.
-  for (
-    const [source, target] of [[core, join(out, "course-core")], [
-      required(Deno.args[1]),
-      join(out, "project-download"),
-    ]]
-  ) {
-    const r = await new Deno.Command("cp", { args: ["-R", required(source), required(target)] })
-      .output();
+  for (const [source, target] of [
+    [core, join(out, "course-core")],
+    [required(Deno.args[1]), join(out, "project-download")],
+  ]) {
+    const r = await new Deno.Command("cp", {
+      args: ["-R", required(source), required(target)],
+    }).output();
     if (!r.success) throw Error("fixture copy failed");
   }
   await new Deno.Command("chmod", { args: ["-R", "u+w", out] }).output();
@@ -219,12 +224,14 @@ references: [{id: fixture-book, type: book, title: Публичная книга
         },
         check: decodeNativeCheck(policy, "native"),
       };
-      const projectRows: ReturnType<typeof nativeProjectRows> = [{
-        source: "bank.qmd",
-        format: "html",
-        fact,
-        materialization: undefined,
-      }];
+      const projectRows: ReturnType<typeof nativeProjectRows> = [
+        {
+          source: "bank.qmd",
+          format: "html",
+          fact,
+          materialization: undefined,
+        },
+      ];
       const planned = await withNativeProjectPlans(
         Core,
         root,
@@ -267,14 +274,16 @@ references: [{id: fixture-book, type: book, title: Публичная книга
             required(observer).snapshot(),
           );
           console.log(
-            "MATERIALIZE_CHILDREN " + JSON.stringify({
-              milliseconds: Math.round(performance.now() - materializeTime),
-              commands: materializeCost.commands,
-            }),
+            "MATERIALIZE_CHILDREN " +
+              JSON.stringify({
+                milliseconds: Math.round(performance.now() - materializeTime),
+                commands: materializeCost.commands,
+              }),
           );
-          const pandocChildren = materializeCost.commands.filter((
-            child: { command: string; args: string[] },
-          ) => child.args[0] === "pandoc" || /\/pandoc$/.test(child.command));
+          const pandocChildren = materializeCost.commands.filter(
+            (child: { command: string; args: string[] }) =>
+              child.args[0] === "pandoc" || /\/pandoc$/.test(child.command),
+          );
           if (pandocChildren.length !== 4) {
             throw Error(
               "checked materialization must use two Pandoc passes: " +
@@ -303,25 +312,27 @@ references: [{id: fixture-book, type: book, title: Публичная книга
           }
           const p = materialized.project;
           if (!p) throw Error("selected project missing");
-          if (
-            !p.trustedTests.some((f) =>
-              f.target === "src/api/java/Api.java"
-            )
-          ) throw Error("shared API target not preserved");
+          if (!p.trustedTests.some((f) => f.target === "src/api/java/Api.java"))
+            throw Error("shared API target not preserved");
           if (
             required(p.references[0]).targets.join(",") !==
-              "author/example/src/main/java/Helper.java,author/example/src/main/java/Main.java"
-          ) throw Error("reference targets/helpers changed");
+            "author/example/src/main/java/Helper.java,author/example/src/main/java/Main.java"
+          )
+            throw Error("reference targets/helpers changed");
           if (
             materialized.files.some((f) =>
-              /Api.java|OfficialTest.java|Helper.java|author\//.test(f.name)
+              /Api.java|OfficialTest.java|Helper.java|author\//.test(f.name),
             )
-          ) throw Error("student privacy leaked");
+          )
+            throw Error("student privacy leaked");
           if (
-            !new TextDecoder().decode(
-              materialized.files.find((f) => f.name === "README.md")?.bytes,
-            ).includes("Позднее настоящее условие")
-          ) throw Error("late condition lost");
+            !new TextDecoder()
+              .decode(
+                materialized.files.find((f) => f.name === "README.md")?.bytes,
+              )
+              .includes("Позднее настоящее условие")
+          )
+            throw Error("late condition lost");
           await Deno.writeFile(
             join(artifactOut, "student.zip"),
             materialized.archive,
@@ -363,23 +374,32 @@ references: [{id: fixture-book, type: book, title: Публичная книга
       const cost = planned.projectContextMetrics.final;
       console.log("MATERIALIZE_LOADER_COST " + JSON.stringify(cost));
       if (
-        cost.yamlFileReads < 1 || cost.directoryLayers < 1 ||
+        cost.yamlFileReads < 1 ||
+        cost.directoryLayers < 1 ||
         !Object.isFrozen(planned.projectContextMetrics)
-      ) throw Error("loader cost observations missing");
+      )
+        throw Error("loader cost observations missing");
       checks.push({ operationMetrics: operation.metrics });
     },
   );
   parentFinal = required(observer).snapshot();
   const positiveHost = {
     capture: hostDelta(required(captureStart), required(captureFinal)),
-    parentIncludingFinal: hostDelta(required(parentStart), required(parentFinal)),
+    parentIncludingFinal: hostDelta(
+      required(parentStart),
+      required(parentFinal),
+    ),
     whole: hostDelta(required(captureStart), required(parentFinal)),
   };
   let expired = "";
   try {
-    await Core.materializeProject(required(expiredPair).student, required(expiredCondition), {
-      submission: { files: [], instructions: "Сдайте файлы." },
-    });
+    await Core.materializeProject(
+      required(expiredPair).student,
+      required(expiredCondition),
+      {
+        submission: { files: [], instructions: "Сдайте файлы." },
+      },
+    );
   } catch (e) {
     expired = String(e);
   }
@@ -395,8 +415,7 @@ references: [{id: fixture-book, type: book, title: Публичная книга
         positiveHost,
         parentFinalMetrics:
           "UNAVAILABLE after parent callback; host observation includes closing fence",
-        kind:
-          "ordinary-native-reuse-plus-A1-and-Download-separate-pipelines-NOT-assignment-qualification",
+        kind: "ordinary-native-reuse-plus-A1-and-Download-separate-pipelines-NOT-assignment-qualification",
         checks,
       },
       null,
@@ -409,7 +428,9 @@ references: [{id: fixture-book, type: book, title: Публичная книга
     console.error("Preserved failing fixture " + root);
     if (observer) {
       console.error(
-        JSON.stringify({ failedHostObservation: required(observer).snapshot() }),
+        JSON.stringify({
+          failedHostObservation: required(observer).snapshot(),
+        }),
       );
     }
   }

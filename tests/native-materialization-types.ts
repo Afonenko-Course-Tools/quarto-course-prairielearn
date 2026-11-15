@@ -16,11 +16,15 @@ import type {
 } from "../_extensions/course-prairielearn/application/native-materialize.ts";
 import type { runtimeDescriptor } from "../_extensions/course-prairielearn/application/runtime-descriptor.ts";
 
-type IsAny<T> = 0 extends (1 & T) ? true : false;
-type Exact<A, B> = IsAny<A> extends true ? false
-  : IsAny<B> extends true ? false
-  : [A, B] extends [B, A] ? true
-  : false;
+type IsAny<T> = 0 extends 1 & T ? true : false;
+type Exact<A, B> =
+  IsAny<A> extends true
+    ? false
+    : IsAny<B> extends true
+      ? false
+      : [A, B] extends [B, A]
+        ? true
+        : false;
 type Require<T extends true> = T;
 type Materialization = Parameters<typeof materializeNativeQuestion>[0];
 type Selection = Parameters<typeof selectNativeCompilerInputs>[0];

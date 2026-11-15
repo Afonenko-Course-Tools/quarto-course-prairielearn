@@ -1,7 +1,8 @@
 // @deno-types="../vendor/zod/v4/index.d.ts"
 import { z } from "../vendor/zod/v4/index.js";
 import { safePath } from "./source-selection.ts";
-const text = z.string().min(1).max(8192), path = text.refine(safePath);
+const text = z.string().min(1).max(8192),
+  path = text.refine(safePath);
 const strings = z.array(path).max(4096);
 const positive = z.number().positive().finite(),
   integer = z.number().int().positive();
@@ -23,11 +24,13 @@ const expectation = z.strictObject({
   "failed-tests": count.optional(),
   "executed-tests": count.optional(),
   "test-ids": z.array(text).optional(),
-  score: z.strictObject({
-    "less-than": z.number().nonnegative().optional(),
-    "at-least": z.number().nonnegative().optional(),
-    exactly: z.number().nonnegative().optional(),
-  }).optional(),
+  score: z
+    .strictObject({
+      "less-than": z.number().nonnegative().optional(),
+      "at-least": z.number().nonnegative().optional(),
+      exactly: z.number().nonnegative().optional(),
+    })
+    .optional(),
 });
 export const NativeSourceProfileSchema = z.strictObject({
   mode: z.enum(["implementation", "student-tests"]),
@@ -38,30 +41,36 @@ const fields = {
   runtime: text,
   "source-profile": text,
   tests: strings,
-  java: z.strictObject({
-    release: integer,
-    encoding: text.optional(),
-    "compiler-options": z.array(z.string()).max(128).optional(),
-  }).optional(),
-  limits: z.strictObject({
-    "outer-seconds": positive.optional(),
-    "compile-seconds": positive.optional(),
-    "run-seconds": positive.optional(),
-    networking: z.literal(false).optional(),
-    "max-output-bytes": integer.optional(),
-  }).optional(),
+  java: z
+    .strictObject({
+      release: integer,
+      encoding: text.optional(),
+      "compiler-options": z.array(z.string()).max(128).optional(),
+    })
+    .optional(),
+  limits: z
+    .strictObject({
+      "outer-seconds": positive.optional(),
+      "compile-seconds": positive.optional(),
+      "run-seconds": positive.optional(),
+      networking: z.literal(false).optional(),
+      "max-output-bytes": integer.optional(),
+    })
+    .optional(),
   scoring: z.discriminatedUnion("mode", [
     z.strictObject({ mode: z.literal("weighted") }),
     z.strictObject({ mode: z.literal("all-pass") }),
     z.strictObject({
       mode: z.literal("contract-groups"),
-      groups: z.array(
-        z.strictObject({
-          id: text,
-          weight: positive,
-          tests: z.array(text).min(1),
-        }),
-      ).min(1),
+      groups: z
+        .array(
+          z.strictObject({
+            id: text,
+            weight: positive,
+            tests: z.array(text).min(1),
+          }),
+        )
+        .min(1),
     }),
     z.strictObject({
       mode: z.literal("threshold"),
@@ -69,62 +78,77 @@ const fields = {
       value: z.number().nonnegative().finite(),
     }),
   ]),
-  references: z.array(
-    z.strictObject({ name: text, root: path, optional: z.boolean() }),
-  ).max(256).optional(),
+  references: z
+    .array(z.strictObject({ name: text, root: path, optional: z.boolean() }))
+    .max(256)
+    .optional(),
   "verification-tests": strings.optional(),
   "contract-cases": path.optional(),
-  "verification-expectations": z.strictObject({
-    reference: expectation.optional(),
-    starter: expectation.optional(),
-  }).optional(),
-  discovery: z.strictObject({
-    "min-executed": integer.optional(),
-    "allow-skipped": z.boolean().optional(),
-  }).optional(),
-  variants: z.strictObject({
-    correct: z.array(text).min(1),
-    mutants: z.array(text).min(1),
-  }).optional(),
-  "java-build": z.strictObject({
-    kind: z.literal("gradle-jar-v1"),
-    "main-class": text.regex(
-      /^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/,
-    ).optional(),
-    artifact: text.regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.jar$/),
-  }).optional(),
-  "additional-java-sources": z.strictObject({
-    "primary-required": z.boolean().optional(),
-    "allow-additional": z.boolean().optional(),
-    archive: text.regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.zip$/),
-    "max-files": integer.max(128),
-    "max-file-bytes": integer.max(1048576),
-    "max-total-bytes": integer.max(4194304),
-    "max-archive-bytes": integer.max(2097152),
-  }).optional(),
+  "verification-expectations": z
+    .strictObject({
+      reference: expectation.optional(),
+      starter: expectation.optional(),
+    })
+    .optional(),
+  discovery: z
+    .strictObject({
+      "min-executed": integer.optional(),
+      "allow-skipped": z.boolean().optional(),
+    })
+    .optional(),
+  variants: z
+    .strictObject({
+      correct: z.array(text).min(1),
+      mutants: z.array(text).min(1),
+    })
+    .optional(),
+  "java-build": z
+    .strictObject({
+      kind: z.literal("gradle-jar-v1"),
+      "main-class": text
+        .regex(/^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/)
+        .optional(),
+      artifact: text.regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.jar$/),
+    })
+    .optional(),
+  "additional-java-sources": z
+    .strictObject({
+      "primary-required": z.boolean().optional(),
+      "allow-additional": z.boolean().optional(),
+      archive: text.regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.zip$/),
+      "max-files": integer.max(128),
+      "max-file-bytes": integer.max(1048576),
+      "max-total-bytes": integer.max(4194304),
+      "max-archive-bytes": integer.max(2097152),
+    })
+    .optional(),
   "api-precheck": api.optional(),
   "verification-api-precheck": api.optional(),
 };
-export const NativeProjectCheckSchema = z.strictObject({
-  ...fields,
-  profile: text,
-  sourceProfile: NativeSourceProfileSchema,
-}).superRefine((c, ctx) => {
-  const native = c.runtime === "java25-gradle-junit-v1",
-    java = ["java25-junit-v1", "java25-gradle-junit-v1"].includes(c.runtime);
-  if (
-    native !== Boolean(c["java-build"]) ||
-    (c["java-build"] || c["additional-java-sources"] || c["api-precheck"] ||
+export const NativeProjectCheckSchema = z
+  .strictObject({
+    ...fields,
+    profile: text,
+    sourceProfile: NativeSourceProfileSchema,
+  })
+  .superRefine((c, ctx) => {
+    const native = c.runtime === "java25-gradle-junit-v1",
+      java = ["java25-junit-v1", "java25-gradle-junit-v1"].includes(c.runtime);
+    if (
+      native !== Boolean(c["java-build"]) ||
+      ((c["java-build"] ||
+        c["additional-java-sources"] ||
+        c["api-precheck"] ||
         c["verification-api-precheck"]) &&
-      (!java || c.sourceProfile.mode !== "implementation")
-  ) {
-    ctx.addIssue({
-      code: "custom",
-      message:
-        "Java Gradle/API/extra sources require explicit implementation policy",
-    });
-  }
-});
+        (!java || c.sourceProfile.mode !== "implementation"))
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Java Gradle/API/extra sources require explicit implementation policy",
+      });
+    }
+  });
 export const NativeProjectChecksSchema = z.strictObject({
   defaults: z.strictObject(fields).partial().default({}),
   "source-profiles": z.record(text, NativeSourceProfileSchema),
@@ -139,10 +163,15 @@ function merge(base: unknown, local: unknown): Record<string, unknown> {
   const out: Record<string, unknown> = isRecord(base) ? { ...base } : {};
   if (!isRecord(local)) return out;
   for (const [k, v] of Object.entries(local)) {
-    out[k] = v && typeof v === "object" && !Array.isArray(v) && out[k] &&
-        typeof out[k] === "object" && !Array.isArray(out[k])
-      ? merge(out[k], v)
-      : v;
+    out[k] =
+      v &&
+      typeof v === "object" &&
+      !Array.isArray(v) &&
+      out[k] &&
+      typeof out[k] === "object" &&
+      !Array.isArray(out[k])
+        ? merge(out[k], v)
+        : v;
   }
   return out;
 }
@@ -173,8 +202,11 @@ export function nativeCheckScalars(value: unknown): unknown {
         "at-least",
         "exactly",
         "less-than",
-      ].includes(key) && v.trim() !== "" && Number.isFinite(Number(v))
-    ) return Number(v);
+      ].includes(key) &&
+      v.trim() !== "" &&
+      Number.isFinite(Number(v))
+    )
+      return Number(v);
     return v;
   }
   return visit(out);
@@ -194,8 +226,10 @@ export function nativeCheck(config: NativeProjectChecks, profile: string) {
     merge(config.defaults, config.profiles[profile]),
   );
   const sourceProfileId = check["source-profile"];
-  const sourceProfile = typeof sourceProfileId === "string"
-    ? config["source-profiles"][sourceProfileId] : undefined;
+  const sourceProfile =
+    typeof sourceProfileId === "string"
+      ? config["source-profiles"][sourceProfileId]
+      : undefined;
   if (!sourceProfile) {
     throw Error("PL.PROJECT_CHECK_INVALID: unknown source profile");
   }

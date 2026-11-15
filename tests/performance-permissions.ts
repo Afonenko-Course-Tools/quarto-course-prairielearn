@@ -1,9 +1,11 @@
 import { strict as assert } from "node:assert";
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 const extension = Deno.args[0]
   ? resolve(Deno.args[0])
-  : new URL("../_extensions/course-prairielearn", import.meta.url).pathname;
+  : fileURLToPath(
+      new URL("../_extensions/course-prairielearn", import.meta.url),
+    );
 const root = await Deno.makeTempDir();
 try {
   await Deno.mkdir(join(root, "tasks"));
@@ -36,11 +38,9 @@ exit 23
       "PRAIRIELEARN_RUNTIME_REGISTRY",
       ...(state === "denied-mode" ? [] : ["COURSE_PERF_MODE"]),
     ];
-    for (
-      const boundary of ["render-public-body"].filter((name) =>
-        !Deno.args[1] || name === Deno.args[1]
-      )
-    ) {
+    for (const boundary of ["render-public-body"].filter(
+      (name) => !Deno.args[1] || name === Deno.args[1],
+    )) {
       await Deno.writeTextFile(join(root, "children"), "");
       const entrypoint = join(
         extension,
@@ -52,9 +52,9 @@ exit 23
       await Deno.writeTextFile(
         wrapper,
         boundary === "render-public-body"
-          ? `import {renderPublicBody} from ${
-            JSON.stringify(pathToFileURL(entrypoint).href)
-          }; await renderPublicBody({owner:"demo",resources:[],apiVersion:[1,23,1]},[{t:'Para',c:[{t:'Str',c:'PUBLIC'}]}],'demo/exr-test',{},'resources','client');`
+          ? `import {renderPublicBody} from ${JSON.stringify(
+              pathToFileURL(entrypoint).href,
+            )}; await renderPublicBody({owner:"demo",resources:[],apiVersion:[1,23,1]},[{t:'Para',c:[{t:'Str',c:'PUBLIC'}]}],'demo/exr-test',{},'resources','client');`
           : `await import(${JSON.stringify(pathToFileURL(entrypoint).href)});`,
       );
       const args = [root];
@@ -88,15 +88,17 @@ exit 23
         `${boundary}/${state}: ${stderr}`,
       );
       assert.doesNotMatch(stderr, /Requires env access/);
-      const rows = (await Deno.readTextFile(join(root, "children"))).trim()
+      const rows = (await Deno.readTextFile(join(root, "children")))
+        .trim()
         .split("\n");
       const commands = [
         boundary === "render-public-body" ? "pandoc" : "inspect",
       ];
       assert.deepEqual(
         rows,
-        commands.map((command) =>
-          `functional|student|preserve-original-inheritance|${command}`
+        commands.map(
+          (command) =>
+            `functional|student|preserve-original-inheritance|${command}`,
         ),
       );
       if (boundary === "render-public-body") {

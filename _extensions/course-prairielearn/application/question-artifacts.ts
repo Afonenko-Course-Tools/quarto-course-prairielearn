@@ -13,6 +13,7 @@ import { publicationConditionFile } from "./publication-conditions.ts";
 import { validateAdditionalJavaSources } from "./runtime-descriptor.ts";
 import { gradingMethod } from "./declarations.ts";
 import type { SelectedExportPlan } from "./selected-export-plan.ts";
+import { additionalStudentFiles } from "./student-artifact.ts";
 function metadata(
   q: Pick<PublicBodyPackage["questions"][number], "difficulty" | "time">,
 ): string {
@@ -44,9 +45,11 @@ export class QuestionArtifactReuse {
   async find(key: string, snapshot: unknown, auxiliary?: NativeAuxiliary) {
     const previous = this.entries.get(key);
     if (
-      !previous || previous.auxiliary !== auxiliary ||
+      !previous ||
+      previous.auxiliary !== auxiliary ||
       !isDeepStrictEqual(previous.snapshot, snapshot)
-    ) return undefined;
+    )
+      return undefined;
     await auxiliary?.before();
     await auxiliary?.after();
     return structuredClone(previous.files);
@@ -64,9 +67,8 @@ export class QuestionArtifactReuse {
     });
   }
 }
-type QuestionTask =
-  & SelectedExportPlan["questions"][number]
-  & Pick<SelectedExportPlan, "p" | "context" | "root">;
+type QuestionTask = SelectedExportPlan["questions"][number] &
+  Pick<SelectedExportPlan, "p" | "context" | "root">;
 type QuestionFile = { name: string; data: Uint8Array };
 const questionFailure =
   (task: QuestionTask) =>
@@ -80,34 +82,41 @@ async function answerArtifacts(
   task: QuestionTask,
   answer: NonNullable<SelectedExportPlan["context"]["nativeAnswers"]>[string],
 ) {
-  const { p, context, question: q, binding: b, diagnostic: questionContext } =
-    task;
-  const questionFail = questionFailure(task), prepared: QuestionFile[] = [];
+  const {
+    p,
+    context,
+    question: q,
+    binding: b,
+    diagnostic: questionContext,
+  } = task;
+  const questionFail = questionFailure(task),
+    prepared: QuestionFile[] = [];
   const text = (name: string, data: string) =>
     prepared.push(encode(name, data));
   if (
     answer.type !== q.answerType ||
-    !fields(b, ["topic", "files"], [
-      "grading",
-      "submission",
-      "singleVariant",
-    ]) || typeof b.topic !== "string" || !b.topic.trim() ||
-    !Array.isArray(b.files) || b.files.length
+    !fields(
+      b,
+      ["topic", "files"],
+      ["grading", "submission", "singleVariant"],
+    ) ||
+    typeof b.topic !== "string" ||
+    !b.topic.trim() ||
+    !Array.isArray(b.files) ||
+    b.files.length
   ) {
     questionFail(
       "Форма ответа требует canonical Core answer без файлов и runtime",
       "answer",
     );
   }
-  const manualAnswer = answer.type === "manual" ||
-    answer.type === "multipart" &&
-      answer.parts.every((part: { type: string }) => part.type === "manual");
+  const manualAnswer =
+    answer.type === "manual" ||
+    (answer.type === "multipart" &&
+      answer.parts.every((part: { type: string }) => part.type === "manual"));
   const method = gradingMethod(b.grading).method;
   if (manualAnswer !== (method === "manual")) {
-    questionFail(
-      "Метод оценивания не соответствует форме ответа",
-      "answer",
-    );
+    questionFail("Метод оценивания не соответствует форме ответа", "answer");
   }
   const rendered = await renderPublicBody(
     p,
@@ -122,12 +131,17 @@ async function answerArtifacts(
     },
   );
   prepared.push(...rendered.files);
-  const native = renderNativeAnswer(answer), base = "questions/" + q.key;
+  const native = renderNativeAnswer(answer),
+    base = "questions/" + q.key;
   text(base + "/server.py", native.server);
   text(
     base + "/question.html",
-    "<pl-question-panel>\n" + metadata(q) + rendered.html + "\n" +
-      native.controls + "\n</pl-question-panel>\n",
+    "<pl-question-panel>\n" +
+      metadata(q) +
+      rendered.html +
+      "\n" +
+      native.controls +
+      "\n</pl-question-panel>\n",
   );
   text(
     base + "/info.json",
@@ -155,27 +169,33 @@ function validateExternalGrading(task: QuestionTask, manual: boolean) {
   const questionFail = questionFailure(task);
   const grading = b.externalGradingOptions;
   if (
-    !manual && (
-      !fields(grading, ["image"], [
-        "entrypoint",
-        "timeout",
-        "enableNetworking",
-        "environment",
-      ]) || typeof grading.image !== "string" || !grading.image.trim() ||
-      grading.timeout !== undefined &&
+    !manual &&
+    (!fields(
+      grading,
+      ["image"],
+      ["entrypoint", "timeout", "enableNetworking", "environment"],
+    ) ||
+      typeof grading.image !== "string" ||
+      !grading.image.trim() ||
+      (grading.timeout !== undefined &&
         (typeof grading.timeout !== "number" ||
-          !Number.isInteger(grading.timeout) || grading.timeout < 1 ||
-          grading.timeout > 600) ||
-      grading.enableNetworking !== undefined &&
-        typeof grading.enableNetworking !== "boolean" ||
-      grading.entrypoint !== undefined &&
-        !(typeof grading.entrypoint === "string" ||
-          Array.isArray(grading.entrypoint) && grading.entrypoint.length &&
-            grading.entrypoint.every((x: unknown) => typeof x === "string")) ||
-      grading.environment !== undefined &&
+          !Number.isInteger(grading.timeout) ||
+          grading.timeout < 1 ||
+          grading.timeout > 600)) ||
+      (grading.enableNetworking !== undefined &&
+        typeof grading.enableNetworking !== "boolean") ||
+      (grading.entrypoint !== undefined &&
+        !(
+          typeof grading.entrypoint === "string" ||
+          (Array.isArray(grading.entrypoint) &&
+            grading.entrypoint.length &&
+            grading.entrypoint.every((x: unknown) => typeof x === "string"))
+        )) ||
+      (grading.environment !== undefined &&
         (!record(grading.environment) ||
-          Object.values(grading.environment).some((x) => typeof x !== "string"))
-    )
+          Object.values(grading.environment).some(
+            (x) => typeof x !== "string",
+          ))))
   ) {
     questionFail(
       "Неверная привязка внешнего проверяющего инструмента",
@@ -192,21 +212,17 @@ function projectPolicy(task: QuestionTask) {
   }
   const manual = gradingMethod(b?.grading).method === "manual";
   if (
-    !fields(b, [
-      "topic",
-      "files",
-      ...(manual ? [] : ["externalGradingOptions"]),
-    ], [
-      "submission",
-      "singleVariant",
-      "additionalJavaSources",
-      "grading",
-    ]) ||
-    b.singleVariant !== undefined && typeof b.singleVariant !== "boolean" ||
-    typeof b.topic !== "string" || !b.topic.trim() ||
+    !fields(
+      b,
+      ["topic", "files", ...(manual ? [] : ["externalGradingOptions"])],
+      ["submission", "singleVariant", "additionalJavaSources", "grading"],
+    ) ||
+    (b.singleVariant !== undefined && typeof b.singleVariant !== "boolean") ||
+    typeof b.topic !== "string" ||
+    !b.topic.trim() ||
     !Array.isArray(b.files) ||
     !b.files.every((name: unknown) => typeof name === "string") ||
-    !manual && !b.files.length ||
+    (!manual && !b.files.length) ||
     new Set(b.files).size !== b.files.length ||
     b.files.some((f: unknown) => !safe(f) || /[",<>]/.test(String(f)))
   ) {
@@ -221,16 +237,15 @@ function projectPolicy(task: QuestionTask) {
   } catch (cause) {
     questionFail("Неверный договор submission", "submission", cause);
   }
-  const workspace = submission.mode === "workspace"
-    ? submission.workspaceOptions
-    : undefined;
+  const workspace =
+    submission.mode === "workspace" ? submission.workspaceOptions : undefined;
   if (
     manual &&
     (b.additionalJavaSources !== undefined ||
       b.externalGradingOptions !== undefined ||
-      submission.mode === "editor" &&
+      (submission.mode === "editor" &&
         (!b.files.length ||
-          b.files.some((name: string) => !name.endsWith(".java"))))
+          b.files.some((name: string) => !name.endsWith(".java")))))
   ) {
     questionFail(
       "Manual требует настоящие Java starter-файлы для editor и не допускает автоматический runtime",
@@ -263,7 +278,8 @@ async function readProject(task: QuestionTask, manual: boolean) {
   const questionFail = questionFailure(task);
   const project = context.projects[q.id];
   if (
-    typeof project !== "string" || !project.startsWith("/") ||
+    typeof project !== "string" ||
+    !project.startsWith("/") ||
     !safe(project.slice(1))
   ) {
     return questionFail(
@@ -276,27 +292,27 @@ async function readProject(task: QuestionTask, manual: boolean) {
   for (const part of project.slice(1).split("/")) {
     walk = join(walk, part);
     if ((await Deno.lstat(walk)).isSymlink) {
-      questionFail(
-        "Символьная ссылка в пути проекта",
-        "project",
-      );
+      questionFail("Символьная ссылка в пути проекта", "project");
     }
   }
   if ((await Deno.realPath(source)) !== source) {
-    questionFail(
-      "Проект выходит за пределы выбранного проекта",
-      "project",
-    );
+    questionFail("Проект выходит за пределы выбранного проекта", "project");
   }
-  const student = await files(join(source, "student"), {
-      ...questionContext,
-      field: "project.student",
-    }, true),
-    tests = manual ? [] : await files(join(source, "tests"), {
-      ...questionContext,
-      field: "project.tests",
-    });
-  if (!student.length || !manual && !tests.length) {
+  const student = await files(
+      join(source, "student"),
+      {
+        ...questionContext,
+        field: "project.student",
+      },
+      true,
+    ),
+    tests = manual
+      ? []
+      : await files(join(source, "tests"), {
+          ...questionContext,
+          field: "project.tests",
+        });
+  if (!student.length || (!manual && !tests.length)) {
     questionFail(
       "Требуются стартовые файлы student и проверяющие файлы tests",
       "project",
@@ -311,30 +327,37 @@ async function starterArtifacts(
   project: ProjectFiles,
 ) {
   const { question: q, context } = task;
-  const { submission } = policy, { student, tests } = project;
-  const questionFail = questionFailure(task), prepared: QuestionFile[] = [];
+  const { submission } = policy,
+    { student, tests } = project;
+  const questionFail = questionFailure(task),
+    prepared: QuestionFile[] = [];
   const base = "questions/" + q.key;
   const artifact = context.studentArtifacts?.[q.id];
   if (artifact) {
     if (
-      !Array.isArray(artifact.files) || !artifact.files.length ||
-      !(artifact.archive instanceof Uint8Array) || !artifact.archive.length
-    ) questionFail("Пустой комплект Core/Download", "studentArtifact");
+      !Array.isArray(artifact.files) ||
+      !artifact.files.length ||
+      !(artifact.archive instanceof Uint8Array) ||
+      !artifact.archive.length
+    )
+      questionFail("Пустой комплект Core/Download", "studentArtifact");
     for (const file of artifact.files) {
       if (
         !safe(file.name) ||
-        !file.name.split("/").includes(".git") &&
-          file.name.split("/").some((part) =>
-            [
-              "private",
-              "reference",
-              "solution",
-              "solutions",
-              "grading-notes",
-              "rubric.md",
-              "contract.md",
-            ].includes(part)
-          )
+        (!file.name.split("/").includes(".git") &&
+          file.name
+            .split("/")
+            .some((part) =>
+              [
+                "private",
+                "reference",
+                "solution",
+                "solutions",
+                "grading-notes",
+                "rubric.md",
+                "contract.md",
+              ].includes(part),
+            ))
       ) {
         questionFail(
           "Закрытый или небезопасный файл в student artifact",
@@ -371,7 +394,9 @@ async function starterArtifacts(
       });
     }
   }
-  for (const f of submission.mode === "editor" || artifact ? [] : student) {
+  for (const f of submission.mode === "editor"
+    ? []
+    : additionalStudentFiles(student, artifact)) {
     prepared.push({
       name: base + "/clientFilesQuestion/" + f.name,
       data: f.data,
@@ -391,17 +416,20 @@ function javaSubmission(
   const { question: q } = task,
     { b, workspace, manual } = policy,
     { student, tests } = project;
-  const base = "questions/" + q.key, questionFail = questionFailure(task);
+  const base = "questions/" + q.key,
+    questionFail = questionFailure(task);
   let submission = policy.submission;
-  const extras = b.additionalJavaSources === undefined
-    ? undefined
-    : validateAdditionalJavaSources(
-      b.additionalJavaSources,
-      b.files,
-      tests.map((f) => f.name),
-    );
+  const extras =
+    b.additionalJavaSources === undefined
+      ? undefined
+      : validateAdditionalJavaSources(
+          b.additionalJavaSources,
+          b.files,
+          tests.map((f) => f.name),
+        );
   if (
-    !workspace && b.files.length &&
+    !workspace &&
+    b.files.length &&
     b.files.every((name: string) => name.endsWith(".java")) &&
     (extras || manual)
   ) {
@@ -411,7 +439,8 @@ function javaSubmission(
     );
   }
   if (
-    manual && b.files.length &&
+    manual &&
+    b.files.length &&
     b.files.every((name: string) => name.endsWith(".java"))
   ) {
     for (const name of b.files) {
@@ -431,49 +460,57 @@ function javaSubmission(
   return { submission, extras };
 }
 function escape(v: string) {
-  return v.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll(
-    "<",
-    "&lt;",
-  ).replaceAll(">", "&gt;").replaceAll("{{", "&#123;&#123;").replaceAll(
-    "}}",
-    "&#125;&#125;",
-  );
+  return v
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("{{", "&#123;&#123;")
+    .replaceAll("}}", "&#125;&#125;");
 }
 function editorControls(
   task: QuestionTask,
   policy: ProjectPolicy,
   student: ProjectFiles["student"],
 ) {
-  const { b, submission } = policy, questionFail = questionFailure(task);
+  const { b, submission } = policy,
+    questionFail = questionFailure(task);
   if (submission.mode !== "editor") throw Error("PL editor plan required");
   const aceMode = submission.aceMode;
-  return b.files.map((name: string) => {
-    const starter = student.find((file) => file.name === name);
-    if (!starter || starter.data.length > 1024 * 1024) {
-      return questionFail(
-        "Требуется UTF-8 starter для каждого editor файла",
-        "project.student." + name,
+  return b.files
+    .map((name: string) => {
+      const starter = student.find((file) => file.name === name);
+      if (!starter || starter.data.length > 1024 * 1024) {
+        return questionFail(
+          "Требуется UTF-8 starter для каждого editor файла",
+          "project.student." + name,
+        );
+      }
+      let source = "";
+      try {
+        source = new TextDecoder("utf-8", { fatal: true }).decode(starter.data);
+        if (source.includes("\0")) throw new Error("NUL in source");
+      } catch (cause) {
+        questionFail(
+          "Editor starter должен быть текстом UTF-8",
+          "project.student." + name,
+          cause,
+        );
+      }
+      const code = escape(source)
+        .replaceAll("{{", "&#123;&#123;")
+        .replaceAll("}}", "&#125;&#125;");
+      return (
+        '<pl-file-editor file-name="' +
+        escape(name) +
+        '"' +
+        (aceMode ? ' ace-mode="' + escape(aceMode) + '"' : "") +
+        ' normalize-to-ascii="false">' +
+        code +
+        "</pl-file-editor>"
       );
-    }
-    let source = "";
-    try {
-      source = new TextDecoder("utf-8", { fatal: true }).decode(
-        starter.data,
-      );
-      if (source.includes("\0")) throw new Error("NUL in source");
-    } catch (cause) {
-      questionFail(
-        "Editor starter должен быть текстом UTF-8",
-        "project.student." + name,
-        cause,
-      );
-    }
-    const code = escape(source).replaceAll("{{", "&#123;&#123;")
-      .replaceAll("}}", "&#125;&#125;");
-    return '<pl-file-editor file-name="' + escape(name) + '"' +
-      (aceMode ? ' ace-mode="' + escape(aceMode) + '"' : "") +
-      ' normalize-to-ascii="false">' + code + "</pl-file-editor>";
-  }).join("\n");
+    })
+    .join("\n");
 }
 function uploadControls(
   task: QuestionTask,
@@ -484,30 +521,45 @@ function uploadControls(
   const { b, submission, manual } = policy,
     questionFail = questionFailure(task);
 
-  const downloads = task.context.studentArtifacts?.[task.question.id] ? "" : student.map((f) =>
-    '<pl-file-download file-name="' + escape(f.name) +
-    '"></pl-file-download>'
-  ).join("\n");
+  const downloads = additionalStudentFiles(
+    student,
+    task.context.studentArtifacts?.[task.question.id],
+  )
+    .map(
+      (f) =>
+        '<pl-file-download file-name="' +
+        escape(f.name) +
+        '"></pl-file-download>',
+    )
+    .join("\n");
   const layout = submission.mode === "upload" ? submission.layout : undefined;
-  const zip = layout === "zip" || layout === undefined &&
-      b.files.length >= 3 && b.files.some((name: string) => name.includes("/"));
+  const zip =
+    layout === "zip" ||
+    (layout === undefined &&
+      b.files.length >= 3 &&
+      b.files.some((name: string) => name.includes("/")));
   if (zip && !manual && !extras) {
     questionFail(
       "Для вложенного ответа требуется явный ZIP transport в additional-java-sources",
       "submission",
     );
   }
-  return downloads +
+  return (
+    downloads +
     (zip
       ? '\n<pl-file-upload file-names="' +
-        escape(extras?.archive ?? "solution.zip") + '"></pl-file-upload>'
-      : layout === "files"
-      ? '\n<pl-file-upload file-names="' + escape(b.files.join(",")) +
+        escape(extras?.archive ?? "solution.zip") +
         '"></pl-file-upload>'
-      : manual
-      ? '\n<pl-file-upload file-patterns="*" optional-file-patterns="*"></pl-file-upload>'
-      : '\n<pl-file-upload file-names="' + escape(b.files.join(",")) +
-        '"></pl-file-upload>');
+      : layout === "files"
+        ? '\n<pl-file-upload file-names="' +
+          escape(b.files.join(",")) +
+          '"></pl-file-upload>'
+        : manual
+          ? '\n<pl-file-upload file-patterns="*" optional-file-patterns="*"></pl-file-upload>'
+          : '\n<pl-file-upload file-names="' +
+            escape(b.files.join(",")) +
+            '"></pl-file-upload>')
+  );
 }
 function submissionControls(
   task: QuestionTask,
@@ -515,7 +567,8 @@ function submissionControls(
   student: ProjectFiles["student"],
   extras: ReturnType<typeof validateAdditionalJavaSources> | undefined,
 ) {
-  const { question: q, context } = task, { workspace, submission } = policy;
+  const { question: q, context } = task,
+    { workspace, submission } = policy;
   const artifact = context.studentArtifacts?.[q.id];
   let controls: string;
   if (workspace) {
@@ -537,7 +590,8 @@ function submissionControls(
       (artifact.files.some((f) => f.name === "README.md")
         ? ' · <a href="{{options.client_files_question_url}}/starter/README.md">README</a>'
         : "") +
-      "</p>\n" + controls;
+      "</p>\n" +
+      controls;
   }
   return controls;
 }
@@ -569,7 +623,8 @@ async function projectArtifacts(
     project,
     prepared,
   );
-  const { b, manual, workspace, grading } = policy, base = "questions/" + q.key;
+  const { b, manual, workspace, grading } = policy,
+    base = "questions/" + q.key;
   let controls = submissionControls(
     task,
     { ...policy, submission },
@@ -605,13 +660,17 @@ async function projectArtifacts(
   }
   text(
     base + "/question.html",
-    "<pl-question-panel>\n" + metadata(q) + html + "\n" + controls +
+    "<pl-question-panel>\n" +
+      metadata(q) +
+      html +
+      "\n" +
+      controls +
       "\n</pl-question-panel>\n" +
       (workspace
         ? "<pl-submission-panel><pl-file-preview></pl-file-preview></pl-submission-panel>\n"
         : manual
-        ? ""
-        : "<pl-submission-panel><pl-external-grader-results></pl-external-grader-results></pl-submission-panel>\n"),
+          ? ""
+          : "<pl-submission-panel><pl-external-grader-results></pl-external-grader-results></pl-submission-panel>\n"),
   );
   text(
     base + "/info.json",
@@ -639,14 +698,19 @@ async function projectArtifacts(
   reuse?.remember(q.key, projectIdentity, prepared, context.nativeAuxiliary);
   return prepared;
 }
-export async function questionArtifacts(plan: SelectedExportPlan, options?: {
-  reuse: QuestionArtifactReuse;
-  identities: Readonly<Record<string, unknown>>;
-}) {
+export async function questionArtifacts(
+  plan: SelectedExportPlan,
+  options?: {
+    reuse: QuestionArtifactReuse;
+    identities: Readonly<Record<string, unknown>>;
+  },
+) {
   const { p, context, root } = plan;
-  const prepared: QuestionFile[] = [], keys: string[] = [];
+  const prepared: QuestionFile[] = [],
+    keys: string[] = [];
   for (const selected of plan.questions) {
-    const task = { ...selected, p, context, root }, q = selected.question;
+    const task = { ...selected, p, context, root },
+      q = selected.question;
     const identity = {
       owner: p.owner,
       release: p.release,
@@ -666,7 +730,7 @@ export async function questionArtifacts(plan: SelectedExportPlan, options?: {
         identity,
         context.nativeAuxiliary,
       );
-      const files = cached ?? await answerArtifacts(task, answer);
+      const files = cached ?? (await answerArtifacts(task, answer));
       if (!cached) {
         options?.reuse.remember(
           q.key,
@@ -676,9 +740,11 @@ export async function questionArtifacts(plan: SelectedExportPlan, options?: {
         );
       }
       prepared.push(...files);
-    } else {prepared.push(
-        ...await projectArtifacts(task, identity, options?.reuse),
-      );}
+    } else {
+      prepared.push(
+        ...(await projectArtifacts(task, identity, options?.reuse)),
+      );
+    }
     keys.push(q.key);
   }
   if (new Set(prepared.map((file) => file.name)).size !== prepared.length) {

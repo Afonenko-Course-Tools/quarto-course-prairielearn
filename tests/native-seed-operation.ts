@@ -1,11 +1,17 @@
-import { required, record, string, array, fixtureAt } from "./fixture-values.ts";
+import {
+  required,
+  record,
+  string,
+  array,
+  fixtureAt,
+} from "./fixture-values.ts";
 import type * as CorePublic from "course-core/public.ts";
 // Настоящий ordinary Core/A1 → два seed artifacts одной операции. Не assignment/P.
 import { strict as assert } from "node:assert";
 import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 const source = resolve(required(Deno.args[0])),
-  repo = resolve(new URL("../", import.meta.url).pathname),
+  repo = resolve(fileURLToPath(new URL("../", import.meta.url))),
   root = await Deno.makeTempDir({ prefix: "c9-seed-op-" });
 const core = join(root, "_extensions/course-core"),
   pl = join(root, "_extensions/course-prairielearn");
@@ -24,7 +30,9 @@ async function quarto(args: string[], env: Record<string, string> = {}) {
   }).output();
   if (!r.success) {
     throw Error(
-      root + "\n" + new TextDecoder().decode(r.stdout) +
+      root +
+        "\n" +
+        new TextDecoder().decode(r.stdout) +
         new TextDecoder().decode(r.stderr),
     );
   }
@@ -76,11 +84,13 @@ project-materialization:
     "index.qmd",
     '::: {#exr-gh project="/projects/github-ssh" prairielearn-submission=upload}\n## GitHub\nПолное условие GitHub.\n:::\n\n::: {#exr-rest project="/projects/restore-selected-state"}\n## Восстановление\nПолное условие восстановления.\n:::\n',
   );
-  const provenance = record(JSON.parse(
-    await Deno.readTextFile(
-      new URL("./fixtures/git-recipes/provenance.json", import.meta.url),
+  const provenance = record(
+    JSON.parse(
+      await Deno.readTextFile(
+        new URL("./fixtures/git-recipes/provenance.json", import.meta.url),
+      ),
     ),
-  ));
+  );
   for (const row of array(provenance.files).map(record)) {
     await put(
       "projects/" + string(row.path),
@@ -100,11 +110,11 @@ project-materialization:
   }
   await put(
     "pre.ts",
-    `import * as Core from ${
-      JSON.stringify(pathToFileURL(join(core, "public.ts")).href)
-    };import * as PL from ${
-      JSON.stringify(pathToFileURL(join(pl, "public.ts")).href)
-    };await PL.prepareNativeAdapter(Core,{root:Deno.cwd(),projection:'student',outputDirectory:Deno.cwd()+'/_site'});`,
+    `import * as Core from ${JSON.stringify(
+      pathToFileURL(join(core, "public.ts")).href,
+    )};import * as PL from ${JSON.stringify(
+      pathToFileURL(join(pl, "public.ts")).href,
+    )};await PL.prepareNativeAdapter(Core,{root:Deno.cwd(),projection:'student',outputDirectory:Deno.cwd()+'/_site'});`,
   );
   await quarto(["add", source, "--no-prompt"]);
   await quarto(["add", repo, "--no-prompt"]);
@@ -113,84 +123,83 @@ project-materialization:
     ),
     PL: typeof import("../_extensions/course-prairielearn/public.ts") =
       await import(pathToFileURL(join(pl, "public.ts")).href);
-  const Entry:
-    typeof import("../_extensions/course-prairielearn/application/native-adapter.ts") =
-      await import(
-        pathToFileURL(join(pl, "application/native-adapter.ts")).href
-      );
+  const Entry: typeof import("../_extensions/course-prairielearn/application/native-adapter.ts") =
+    await import(pathToFileURL(join(pl, "application/native-adapter.ts")).href);
   const zip = Deno.args[1]
-    ? (await import(
-      pathToFileURL(
-        join(
-          resolve(Deno.args[1]),
-          "_extensions/project-download/domain/zip.ts",
-        ),
-      ).href
-    )).zip
+    ? (
+        await import(
+          pathToFileURL(
+            join(
+              resolve(Deno.args[1]),
+              "_extensions/project-download/domain/zip.ts",
+            ),
+          ).href
+        )
+      ).zip
     : () => new Uint8Array();
   await Core.withNativeCaptureScope(
     { root, projection: "student", outputDirectory: root + "/_site" },
     { expectedSources: ["index.qmd"] },
     async (scope) =>
-      scope.captureInputs(
-        ["index.qmd"],
-        (token: string) =>
-          quarto(["render", "index.qmd"], {
-            COURSE_CORE_CAPTURE_TOKEN: token,
-            QUARTO_RUN_NO_NETWORK: "true",
-          }),
+      scope.captureInputs(["index.qmd"], (token: string) =>
+        quarto(["render", "index.qmd"], {
+          COURSE_CORE_CAPTURE_TOKEN: token,
+          QUARTO_RUN_NO_NETWORK: "true",
+        }),
       ),
   );
   const candidate = await Entry.readNativeAdapterExpectation(Core, root);
-  await Core.withCurrentNativeOperation(
-    candidate.expectation,
-    async (op) => {
-      let validations = 0, currents = 0, zips = 0;
-      const observed = {
-        ...op,
-        validateRelease: (...args: Parameters<typeof op.validateRelease>) => {
-          validations++;
-          return op.validateRelease(...args);
+  await Core.withCurrentNativeOperation(candidate.expectation, async (op) => {
+    let validations = 0,
+      currents = 0,
+      zips = 0;
+    const observed = {
+      ...op,
+      validateRelease: (...args: Parameters<typeof op.validateRelease>) => {
+        validations++;
+        return op.validateRelease(...args);
+      },
+      assertCurrent: () => {
+        currents++;
+        return op.assertCurrent();
+      },
+    };
+    const adapter = PL.createNativeAdapter({
+      root,
+      core: Core,
+      preparedIdentity: candidate.identity,
+    });
+    const request = { expectedSources: ["index.qmd"] };
+    await adapter.validateCourse(observed, request);
+    const artifacts: Record<string, unknown>[] = [];
+    let batchFinal: CorePublic.NativeOperationProjectContextBatch | undefined;
+    await op.withProjectContracts(
+      [
+        {
+          owner: root,
+          profiles: op.identity.profiles,
+          format: "html",
+          directories: [
+            "projects/github-ssh",
+            "projects/restore-selected-state",
+          ],
         },
-        assertCurrent: () => {
-          currents++;
-          return op.assertCurrent();
-        },
-      };
-      const adapter = PL.createNativeAdapter({
-        root,
-        core: Core,
-        preparedIdentity: candidate.identity,
-      });
-      const request = { expectedSources: ["index.qmd"] };
-      await adapter.validateCourse(observed, request);
-      const artifacts: Record<string, unknown>[] = [];
-      let batchFinal: CorePublic.NativeOperationProjectContextBatch | undefined;
-      await op.withProjectContracts([{
-        owner: root,
-        profiles: op.identity.profiles,
-        format: "html",
-        directories: [
-          "projects/github-ssh",
-          "projects/restore-selected-state",
-        ],
-      }], async (batch) => {
+      ],
+      async (batch) => {
         batchFinal = batch;
-        for (
-          const [i, id, target, expected] of [[
+        for (const [i, id, target, expected] of [
+          [
             0,
             "exr-gh",
             "versioning/project",
             "033fe30534573e2d05256fca0f619e2629b2bfab",
-          ], [
-            1,
-            "exr-rest",
-            "work",
-            "2f12c0ccccc3c10c483502559fa7efee33a52607",
-          ]] as const
-        ) {
+          ],
+          [1, "exr-rest", "work", "2f12c0ccccc3c10c483502559fa7efee33a52607"],
+        ] as const) {
           const context = required(batch.groups[0]).contexts[i],
-            plan = await Core.planProject(required(context), { audience: "student" }),
+            plan = await Core.planProject(required(context), {
+              audience: "student",
+            }),
             condition = op.condition({
               source: "index.qmd",
               exerciseId: id,
@@ -211,9 +220,7 @@ project-materialization:
             },
           });
           assert.equal(artifact.initial, expected);
-          assert(
-            artifact.files.some((f) => f.name === target + "/.git/HEAD"),
-          );
+          assert(artifact.files.some((f) => f.name === target + "/.git/HEAD"));
           assert(!artifact.files.some((f) => f.name === "seed_recipe.py"));
           artifacts.push({
             id,
@@ -223,11 +230,13 @@ project-materialization:
             archiveBytes: artifact.archive.length,
           });
         }
-      });
-      assert.equal(validations, 1);
-      assert.equal(zips, 2);
-      assert.equal(artifacts.length, 2);
-      console.log(JSON.stringify(
+      },
+    );
+    assert.equal(validations, 1);
+    assert.equal(zips, 2);
+    assert.equal(artifacts.length, 2);
+    console.log(
+      JSON.stringify(
         {
           artifacts,
           validations,
@@ -242,9 +251,9 @@ project-materialization:
         },
         null,
         2,
-      ));
-    },
-  );
+      ),
+    );
+  });
 } finally {
   if (Deno.env.get("C35_KEEP_FIXTURE")) console.log("RETAINED", root);
   else await Deno.remove(root, { recursive: true });

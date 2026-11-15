@@ -26,10 +26,7 @@ export async function prepareStandaloneCourse(input: {
   const { settings, nativeInputs, nativeAnswers, artifacts, projects } =
     input.state;
   let result: Awaited<ReturnType<typeof exportPrairieLearn>>;
-  if (
-    options.checksOutput || !options.bindingPath ||
-    deliveries.length !== 1
-  ) {
+  if (options.checksOutput || !options.bindingPath || deliveries.length !== 1) {
     throw Error(
       "PL.INPUT_INVALID: standalone binding and one selected work required",
     );
@@ -53,12 +50,13 @@ export async function prepareStandaloneCourse(input: {
       if (
         !record(provided) ||
         canonical({
-            topic: provided.topic,
-            submission: provided.submission,
-            grading: provided.grading ?? { method: "external" },
-            singleVariant: provided.singleVariant,
-          }) !== canonical(expected)
-      ) throw Error("PL.BINDING_CHANGED: authored settings");
+          topic: provided.topic,
+          submission: provided.submission,
+          grading: provided.grading ?? { method: "external" },
+          singleVariant: provided.singleVariant,
+        }) !== canonical(expected)
+      )
+        throw Error("PL.BINDING_CHANGED: authored settings");
       if (nativeAnswers[q.id]) continue;
       paths[q.id] = "/" + q.id;
       for (const folder of ["student", "tests"]) {
@@ -79,14 +77,13 @@ export async function prepareStandaloneCourse(input: {
       if (selected) {
         if (
           canonical(provided.files) !==
-            canonical(selected.sources.map((f) => f.name))
-        ) throw Error("PL.BINDING_CHANGED: primary files");
-        for (
-          const [folder, files] of [["student", selected.sources], [
-            "tests",
-            selected.tests,
-          ]] as const
-        ) {
+          canonical(selected.sources.map((f) => f.name))
+        )
+          throw Error("PL.BINDING_CHANGED: primary files");
+        for (const [folder, files] of [
+          ["student", selected.sources],
+          ["tests", selected.tests],
+        ] as const) {
           for (const f of files) {
             const path = join(scratch, q.id, folder, f.name);
             await Deno.mkdir(dirname(path), { recursive: true });
@@ -103,7 +100,8 @@ export async function prepareStandaloneCourse(input: {
           : undefined;
         const external = provided.externalGradingOptions;
         if (
-          !profile?.image || !record(external) ||
+          !profile?.image ||
+          !record(external) ||
           external.image !== profile.image ||
           external.enableNetworking !== false
         ) {

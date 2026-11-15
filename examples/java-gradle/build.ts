@@ -14,12 +14,10 @@ async function extension(name: string) {
 }
 const gradleHome = Deno.env.get("GRADLE_USER_HOME");
 if (!gradleHome) throw Error("Задайте постоянный GRADLE_USER_HOME");
-for (
-  const [solution, success] of [["../reference", true], [
-    "../student",
-    false,
-  ]] as const
-) {
+for (const [solution, success] of [
+  ["../reference", true],
+  ["../student", false],
+] as const) {
   const checked = await new Deno.Command("gradle", {
     args: ["--offline", "-Psolution=" + solution, "test"],
     cwd: join(root, "bank/projects/clamp/tests"),
@@ -31,7 +29,12 @@ for (
   }
 }
 const adapter = await extension("course-prairielearn");
-const { nativeEntry }: Pick<typeof import("../../_extensions/course-prairielearn/application/native-entry.ts"), "nativeEntry"> = await import(
+const {
+  nativeEntry,
+}: Pick<
+  typeof import("../../_extensions/course-prairielearn/application/native-entry.ts"),
+  "nativeEntry"
+> = await import(
   pathToFileURL(join(adapter, "application/native-entry.ts")).href
 );
 for (const variant of ["a", "b"]) {
@@ -60,7 +63,8 @@ await Deno.writeTextFile(
   JSON.stringify(
     {
       sourceRepository: "Afonenko-Course-Tools/quarto-course-prairielearn",
-      commit: Deno.env.get("DEMO_SOURCE_COMMIT") ||
+      commit:
+        Deno.env.get("DEMO_SOURCE_COMMIT") ||
         (revision.success
           ? new TextDecoder().decode(revision.stdout).trim()
           : ""),

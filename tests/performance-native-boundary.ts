@@ -13,9 +13,9 @@ try {
     join(core, "capture.ts"),
     `
 export async function withNativeCaptureScope(request,options,use){
- await Deno.writeTextFile(${
-      JSON.stringify(log)
-    },JSON.stringify({request,mode:options.assignment.mode,prepare:typeof options.assignment.prepare,use:typeof use}));
+ await Deno.writeTextFile(${JSON.stringify(
+   log,
+ )},JSON.stringify({request,mode:options.assignment.mode,prepare:typeof options.assignment.prepare,use:typeof use}));
  throw Error('PUBLIC_CORE_GATE_REFUSAL');
 }`,
   );
@@ -25,9 +25,9 @@ export async function withNativeCaptureScope(request,options,use){
 export {withNativeCaptureScope} from "./capture.ts";
 export const NativeOperationIdentitySchema={parse:v=>v};
 export async function withNativePublication(expectation,selection,use){
- await Deno.writeTextFile(${
-      JSON.stringify(log)
-    },JSON.stringify({expectation,use:typeof use}));
+ await Deno.writeTextFile(${JSON.stringify(
+   log,
+ )},JSON.stringify({expectation,use:typeof use}));
  throw Error('PUBLIC_CORE_GATE_REFUSAL');
 }`,
   );
@@ -58,31 +58,25 @@ export async function withNativePublication(expectation,selection,use){
   await Deno.writeTextFile(
     worker,
     `
-import {installTsAgent} from ${
-      JSON.stringify(
-        new URL("./fixtures/performance-agent.ts", import.meta.url).href,
-      )
-    };
-if(Deno.args[1]==='active')installTsAgent({processId:'native-negative',outputDirectory:${
-      JSON.stringify(root)
-    }});
+import {installTsAgent} from ${JSON.stringify(
+      new URL("./fixtures/performance-agent.ts", import.meta.url).href,
+    )};
+if(Deno.args[1]==='active')installTsAgent({processId:'native-negative',outputDirectory:${JSON.stringify(
+      root,
+    )}});
 const Command=Deno.Command;Deno.Command=new Proxy(Command,{construct(){throw Error('UNEXPECTED_NATIVE_CHILD')}});
-if(Deno.args[2]==='inspect'){Deno.args.splice(0,Deno.args.length,Deno.args[0]+'/tasks','--projection','author','--output-directory','_generated/prairielearn-native-render');await import(${
-      JSON.stringify(
-        new URL(
-          "../_extensions/course-prairielearn/entrypoints/inspect-publication.ts",
-          import.meta.url,
-        ).href,
-      )
-    });}else{
-const {nativeEntry}=await import(${
-      JSON.stringify(
-        new URL(
-          "../_extensions/course-prairielearn/application/native-entry.ts",
-          import.meta.url,
-        ).href,
-      )
-    });
+if(Deno.args[2]==='inspect'){Deno.args.splice(0,Deno.args.length,Deno.args[0]+'/tasks','--projection','author','--output-directory','_generated/prairielearn-native-render');await import(${JSON.stringify(
+      new URL(
+        "../_extensions/course-prairielearn/entrypoints/inspect-publication.ts",
+        import.meta.url,
+      ).href,
+    )});}else{
+const {nativeEntry}=await import(${JSON.stringify(
+      new URL(
+        "../_extensions/course-prairielearn/application/native-entry.ts",
+        import.meta.url,
+      ).href,
+    )});
 await nativeEntry({root:Deno.args[0],book:'tasks',instance:'fixture'});}
 `,
   );
@@ -133,7 +127,8 @@ await nativeEntry({root:Deno.args[0],book:'tasks',instance:'fixture'});}
           },
           use: "function",
         });
-      } else {assert.deepEqual(gate, {
+      } else {
+        assert.deepEqual(gate, {
           request: {
             root: join(root, "tasks"),
             projection: "author",
@@ -145,7 +140,8 @@ await nativeEntry({root:Deno.args[0],book:'tasks',instance:'fixture'});}
           mode: "new",
           prepare: "function",
           use: "function",
-        });}
+        });
+      }
       console.log(
         `PASS ${boundary}/${state}: public Core gate, no native child/full-env read before rejection`,
       );

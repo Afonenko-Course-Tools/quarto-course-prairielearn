@@ -2,7 +2,6 @@
 
 Кандидат заменён линией 9.0.0; приведённые ниже pins — исторические, не текущий release contract.
 
-
 Статус unreleased. Native `prairielearn.seed-targets` явно размещает Git seed
 в upload artifact; отсутствие записи сохраняет `work`. Workspace сохраняет
 прежний `work` и собственный контракт образа. Recipe A/S0/S1, история,

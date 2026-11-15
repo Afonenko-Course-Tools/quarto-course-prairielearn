@@ -1,0 +1,15 @@
+# Внешние и генерируемые байты: существующие provenance/reproduction contracts.
+**/vendor/**
+**/node_modules/**
+**/generated/**
+**/_generated/**
+.ci-deps/
+.ci/
+.quarto/
+_extensions/course-prairielearn/spec/upstream/
+_extensions/course-prairielearn/application/native-validators.js
+_extensions/course-prairielearn/application/native-validators.d.ts
+_extensions/course-prairielearn/application/trusted-git/
+tests/fixtures/git-recipes/
+# Копия общего ABI форматируется в canonical Performance и синхронизируется владельцем.
+_extensions/course-prairielearn/observability/bridge.ts

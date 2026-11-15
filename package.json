@@ -10,11 +10,19 @@
   },
   "devDependencies": {
     "@types/node": "24.19.0",
-    "ajv": "8.17.1",
+    "ajv": "8.20.0",
     "esbuild": "0.25.10",
     "typescript": "6.0.3",
-    "eslint": "^9.39.1",
+    "eslint": "^10.14.0",
     "typescript-eslint": "^8.72.2",
     "dependency-cruiser": "^18.7.2"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.8"
+    },
+    "eslint": {
+      "minimatch": "^11.0.8"
+    }
   }
 }

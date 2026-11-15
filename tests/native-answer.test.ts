@@ -18,10 +18,8 @@ function fixtureSlots(a: AnswerFacts): NativeResponseSlot[] {
     ...extra,
   });
   if (a.type === "single-choice") {
-    return Array.from(
-      { length: a.count },
-      (_, i) =>
-        slot("answer", a.type, i, { ordinal: i, labelAnchor: "option-" + i }),
+    return Array.from({ length: a.count }, (_, i) =>
+      slot("answer", a.type, i, { ordinal: i, labelAnchor: "option-" + i }),
     );
   }
   if (a.type === "matching") {
@@ -33,12 +31,12 @@ function fixtureSlots(a: AnswerFacts): NativeResponseSlot[] {
           anchor: "option-" + j,
           ordinal: j,
         })),
-      })
+      }),
     );
   }
   if (a.type === "multipart") {
     return a.parts.map((p, i) =>
-      slot(p.name, p.type, i, { labelAnchor: "part-" + i })
+      slot(p.name, p.type, i, { labelAnchor: "part-" + i }),
     );
   }
   return [slot("answer", a.type, 0)];
@@ -56,98 +54,120 @@ import {
 } from "../_extensions/course-prairielearn/application/export-course.ts";
 import { exportPrairieLearn } from "../_extensions/course-prairielearn/application/export.ts";
 import { infoQuestion } from "../_extensions/course-prairielearn/application/native-validators.js";
-const forms: AnswerFacts[] = [{ type: "manual", submission: "text" }, {
-  type: "numeric",
-  key: { value: 734129, tolerance: { absolute: 0.1 } },
-}, {
-  type: "multipart",
-  parts: [{
+const forms: AnswerFacts[] = [
+  { type: "manual", submission: "text" },
+  {
     type: "numeric",
-    name: "first",
-    label: "Часть 1",
-    key: { value: 7, tolerance: { absolute: 0 } },
-  }, {
-    type: "manual",
-    name: "reason",
-    label: "Объяснение",
-    submission: "text",
-  }, {
-    type: "numeric",
-    name: "second",
-    label: "Часть 2",
-    key: { value: 9, tolerance: { absolute: 0 } },
-  }],
-}, {
-  type: "matching",
-  prompts: ["Кошка", "Собака"],
-  options: ["Мяу", "Гав"],
-  key: { pairs: { "Кошка": "Мяу", "Собака": "Гав" } },
-}, { type: "single-choice", count: 3, correct: 1 }];
-forms.push(...[1, 2].map((count) => ({
-  type: "multipart" as const,
-  parts: Array.from({ length: count }, (_, i) => ({
-    type: "manual" as const,
-    name: "reason-" + i,
-    label: "Объяснение " + i,
-    submission: "text" as const,
+    key: { value: 734129, tolerance: { absolute: 0.1 } },
+  },
+  {
+    type: "multipart",
+    parts: [
+      {
+        type: "numeric",
+        name: "first",
+        label: "Часть 1",
+        key: { value: 7, tolerance: { absolute: 0 } },
+      },
+      {
+        type: "manual",
+        name: "reason",
+        label: "Объяснение",
+        submission: "text",
+      },
+      {
+        type: "numeric",
+        name: "second",
+        label: "Часть 2",
+        key: { value: 9, tolerance: { absolute: 0 } },
+      },
+    ],
+  },
+  {
+    type: "matching",
+    prompts: ["Кошка", "Собака"],
+    options: ["Мяу", "Гав"],
+    key: { pairs: { Кошка: "Мяу", Собака: "Гав" } },
+  },
+  { type: "single-choice", count: 3, correct: 1 },
+];
+forms.push(
+  ...[1, 2].map((count) => ({
+    type: "multipart" as const,
+    parts: Array.from({ length: count }, (_, i) => ({
+      type: "manual" as const,
+      name: "reason-" + i,
+      label: "Объяснение " + i,
+      submission: "text" as const,
+    })),
   })),
-})));
+);
 for (const answer of forms) {
   Deno.test(
-    "native canonical " + answer.type + (answer.type === "multipart"
-      ? " " + answer.parts.map((p) =>
-        p.type
-      ).join("+")
-      : "") +
+    "native canonical " +
+      answer.type +
+      (answer.type === "multipart"
+        ? " " + answer.parts.map((p) => p.type).join("+")
+        : "") +
       " exports private grading and finite equal leaves",
     async () => {
       const root = await Deno.makeTempDir({ prefix: "pl-answer-" });
       try {
         const id = "exr-answer",
           key = "fixture/" + id,
-          manual = answer.type === "manual" ||
-            answer.type === "multipart" &&
-              answer.parts.every((p) => p.type === "manual"),
+          manual =
+            answer.type === "manual" ||
+            (answer.type === "multipart" &&
+              answer.parts.every((p) => p.type === "manual")),
           pkg: PublicBodyPackage = {
             schema: "course-body-package-v2",
             owner: "fixture",
             release: "native",
             apiVersion: [1, 23, 1],
-            questions: [{
-              owner: "fixture",
-              id,
-              key,
-              title: "Форма ответа",
-              source: "bank.qmd",
-              visibility: "public",
-              statementVisibility: "open",
-              hasPublicSolution: false,
-              answerType: answer.type,
-              condition: [{ t: "Para", c: [{ t: "Str", c: "Условие" }] }],
-              publicAnswer: [],
-            }],
-            works: [{
-              owner: "fixture",
-              id: "sec-work",
-              key: "fixture/sec-work",
-              source: "work.qmd",
-              kind: "lab",
-              title: "Работа",
-              slots: [{
-                id: "fixture/sec-work/" + id,
-                selection: "fixed",
-                candidates: [key],
-                assignment: { requirement: "required", workMode: "individual" },
-              }],
-            }],
+            questions: [
+              {
+                owner: "fixture",
+                id,
+                key,
+                title: "Форма ответа",
+                source: "bank.qmd",
+                visibility: "public",
+                statementVisibility: "open",
+                hasPublicSolution: false,
+                answerType: answer.type,
+                condition: [{ t: "Para", c: [{ t: "Str", c: "Условие" }] }],
+                publicAnswer: [],
+              },
+            ],
+            works: [
+              {
+                owner: "fixture",
+                id: "sec-work",
+                key: "fixture/sec-work",
+                source: "work.qmd",
+                kind: "lab",
+                title: "Работа",
+                slots: [
+                  {
+                    id: "fixture/sec-work/" + id,
+                    selection: "fixed",
+                    candidates: [key],
+                    assignment: {
+                      requirement: "required",
+                      workMode: "individual",
+                    },
+                  },
+                ],
+              },
+            ],
             resources: [],
           };
         AnswerFactsSchema.parse(answer);
         const method = manual
           ? "manual"
           : answer.type === "multipart"
-          ? "mixed"
-          : "external";
+            ? "mixed"
+            : "external";
         const nativeBinding = nativeAnswerBinding(
           "fixture",
           method,
@@ -156,25 +176,30 @@ for (const answer of forms) {
         );
         if (
           nativeBinding.upstreamGradingMethod !==
-            (manual ? "Manual" : "Internal")
+          (manual ? "Manual" : "Internal")
         ) {
           throw Error("Producer изменил native метод");
         }
-        const prepared = await exportPrairieLearn(pkg, {
-          projectRoot: root,
-          projects: {},
-          nativeAnswers: { [id]: answer },
-          deferPublish: true,
-        }, {
-          questions: {
-            [id]: {
-              topic: "Java",
-              ...(manual ? { grading: { method: "manual" } } : {}),
-              submission: { mode: "upload" },
-              files: [],
+        const prepared = await exportPrairieLearn(
+          pkg,
+          {
+            projectRoot: root,
+            projects: {},
+            nativeAnswers: { [id]: answer },
+            deferPublish: true,
+          },
+          {
+            questions: {
+              [id]: {
+                topic: "Java",
+                ...(manual ? { grading: { method: "manual" } } : {}),
+                submission: { mode: "upload" },
+                files: [],
+              },
             },
           },
-        }, root + "/out");
+          root + "/out",
+        );
         try {
           await Deno.lstat(root + "/out");
           throw Error("native question output escaped before final fence");
@@ -182,37 +207,40 @@ for (const answer of forms) {
           if (!(error instanceof Deno.errors.NotFound)) throw error;
         }
         await prepared!.publish();
-        for (
-          const wrongMethod of ["manual", "mixed", "external"].filter((
-            candidate,
-          ) => manual ? candidate !== "manual" : candidate === "manual")
-        ) {
+        for (const wrongMethod of ["manual", "mixed", "external"].filter(
+          (candidate) =>
+            manual ? candidate !== "manual" : candidate === "manual",
+        )) {
           let refused = false;
           try {
-            await exportPrairieLearn(pkg, {
-              projectRoot: root,
-              projects: {},
-              nativeAnswers: { [id]: answer },
-            }, {
-              questions: {
-                [id]: {
-                  topic: "Java",
-                  files: [],
-                  grading: wrongMethod === "external"
-                    ? "external"
-                    : { method: wrongMethod },
+            await exportPrairieLearn(
+              pkg,
+              {
+                projectRoot: root,
+                projects: {},
+                nativeAnswers: { [id]: answer },
+              },
+              {
+                questions: {
+                  [id]: {
+                    topic: "Java",
+                    files: [],
+                    grading:
+                      wrongMethod === "external"
+                        ? "external"
+                        : { method: wrongMethod },
+                  },
                 },
               },
-            }, root + "/wrong");
+              root + "/wrong",
+            );
           } catch (error) {
             refused = String(error).includes(
               "Метод оценивания не соответствует форме ответа",
             );
           }
           if (!refused) {
-            throw Error(
-              "Несовместимый grading принят: " + wrongMethod,
-            );
+            throw Error("Несовместимый grading принят: " + wrongMethod);
           }
           try {
             await Deno.lstat(root + "/wrong");
@@ -225,19 +253,21 @@ for (const answer of forms) {
         const policy = manual
           ? { "auto-points": 0, "manual-points": 20 }
           : answer.type === "multipart"
-          ? { "auto-points": 80, "manual-points": 20 }
-          : { "question-points": 1 };
+            ? { "auto-points": 80, "manual-points": 20 }
+            : { "question-points": 1 };
         const work: ExportCourseContent["assessments"][number] = {
           id: "sec-work",
           source: "work.qmd",
           kind: "lab",
           title: "Работа",
-          slots: [{
-            id,
-            selection: "fixed",
-            candidates: [id],
-            assignment: { requirement: "required", workMode: "individual" },
-          }],
+          slots: [
+            {
+              id,
+              selection: "fixed",
+              candidates: [id],
+              assignment: { requirement: "required", workMode: "individual" },
+            },
+          ],
           extensions: {
             prairielearn: {
               attempts: 3,
@@ -278,15 +308,17 @@ for (const answer of forms) {
           projectRoot: root,
           content: {
             assessments: [work],
-            exercises: [{
-              id,
-              target: "prairielearn",
-              extensions: {
-                prairielearn: {
-                  grading: method === "external" ? "external" : { method },
+            exercises: [
+              {
+                id,
+                target: "prairielearn",
+                extensions: {
+                  prairielearn: {
+                    grading: method === "external" ? "external" : { method },
+                  },
                 },
               },
-            }],
+            ],
             projects: [],
           },
           checks: {
@@ -310,48 +342,54 @@ for (const answer of forms) {
         });
         const evidence = Deno.env.get("PL_DELIVERY4_FIXTURES");
         if (evidence) {
-          const form = manual && answer.type === "multipart"
-            ? "multipart-manual-" + answer.parts.length
-            : answer.type;
+          const form =
+            manual && answer.type === "multipart"
+              ? "multipart-manual-" + answer.parts.length
+              : answer.type;
           await copyTree(root + "/course", evidence + "/" + form);
         }
-        const courseInfo = record(JSON.parse(
-          await Deno.readTextFile(
-            root + "/course/questions/" + key + "/info.json",
+        const courseInfo = record(
+          JSON.parse(
+            await Deno.readTextFile(
+              root + "/course/questions/" + key + "/info.json",
+            ),
           ),
-        ));
+        );
         if (
           courseInfo.gradingMethod !== (manual ? "Manual" : "Internal") ||
           courseInfo.partialCredit !== !manual
-        ) throw Error("course exporter lost native form");
+        )
+          throw Error("course exporter lost native form");
         const base = root + "/out/questions/" + key,
-          info = record(JSON.parse(await Deno.readTextFile(base + "/info.json"))),
+          info = record(
+            JSON.parse(await Deno.readTextFile(base + "/info.json")),
+          ),
           html = await Deno.readTextFile(base + "/question.html");
         if (
           !infoQuestion(info) ||
           info.gradingMethod !== (manual ? "Manual" : "Internal") ||
           info.partialCredit !== !manual ||
           info.externalGradingOptions
-        ) throw Error("native answer requires fake external runtime");
+        )
+          throw Error("native answer requires fake external runtime");
         if (
-          html.includes("734129") || html.includes('correct="true"') ||
+          html.includes("734129") ||
+          html.includes('correct="true"') ||
           html.includes("pl-file-upload")
-        ) throw Error("answer key/upload leaked to UI");
+        )
+          throw Error("answer key/upload leaked to UI");
         if (manual) {
-          const names = answer.type === "multipart"
-            ? answer.parts.map((p) => p.name)
-            : ["answer"];
+          const names =
+            answer.type === "multipart"
+              ? answer.parts.map((p) => p.name)
+              : ["answer"];
           for (const name of names) {
             if (!html.includes('file-name="' + name + '.html"')) {
-              throw Error(
-                "Нет ручного поля: " + name,
-              );
+              throw Error("Нет ручного поля: " + name);
             }
           }
           if (html.includes("pl-string-input")) {
-            throw Error(
-              "Ручной ответ получил автоматическое поле",
-            );
+            throw Error("Ручной ответ получил автоматическое поле");
           }
         }
         const run = await new Deno.Command("python3", {

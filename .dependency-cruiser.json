@@ -10,9 +10,7 @@
       "to": {
         "circular": true,
         "viaOnly": {
-          "dependencyTypesNot": [
-            "type-only"
-          ]
+          "dependencyTypesNot": ["type-only"]
         }
       }
     },

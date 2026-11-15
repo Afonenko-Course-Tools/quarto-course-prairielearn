@@ -25,40 +25,53 @@ const project = (id: string): NativeCheckProject => ({
   bankMember: true,
   check,
   sources: [
-    selectedCheckFile({
-      target: "src/Study.java",
-      bytes: new TextEncoder().encode("class Study {}"),
-    }, "Study.java"),
+    selectedCheckFile(
+      {
+        target: "src/Study.java",
+        bytes: new TextEncoder().encode("class Study {}"),
+      },
+      "Study.java",
+    ),
   ],
   trustedTests: [
-    selectedCheckFile({
-      target: "tests/Check.java",
-      bytes: new TextEncoder().encode("class Check {}"),
-    }, "tests/Check.java"),
+    selectedCheckFile(
+      {
+        target: "tests/Check.java",
+        bytes: new TextEncoder().encode("class Check {}"),
+      },
+      "tests/Check.java",
+    ),
   ],
   verificationTests: [],
   references: [],
   contractFixtures: [],
   readiness: { ready: true, missing: [] },
 });
-Deno.test("selected v3 сохраняет содержимое и детерминированный порядок проектов", () => {
-  const a = project("exr-a"), b = project("exr-b");
-  const result = nativeChecksManifest({
-    courseId: "course",
-    bookRoot: "tasks",
-    projects: [b, a],
-  });
-  if (
-    result.schemaVersion !== 3 || result.projects[0] !== a ||
-    result.projects[1] !== b ||
-    required(result.projects[0].sources[0]).name !== "Study.java" ||
-    !required(result.projects[0].trustedTests[0]).data
-  ) throw Error("functional selected data lost");
-  if (
-    Object.keys(result).sort().join(",") !==
+Deno.test(
+  "selected v3 сохраняет содержимое и детерминированный порядок проектов",
+  () => {
+    const a = project("exr-a"),
+      b = project("exr-b");
+    const result = nativeChecksManifest({
+      courseId: "course",
+      bookRoot: "tasks",
+      projects: [b, a],
+    });
+    if (
+      result.schemaVersion !== 3 ||
+      result.projects[0] !== a ||
+      result.projects[1] !== b ||
+      required(result.projects[0].sources[0]).name !== "Study.java" ||
+      !required(result.projects[0].trustedTests[0]).data
+    )
+      throw Error("functional selected data lost");
+    if (
+      Object.keys(result).sort().join(",") !==
       "bookRoot,courseId,projects,schemaVersion"
-  ) throw Error("selected contract includes obsolete proof fields");
-});
+    )
+      throw Error("selected contract includes obsolete proof fields");
+  },
+);
 Deno.test("selected v3 отклоняет неоднозначный ID вопроса", () => {
   let denied = false;
   try {

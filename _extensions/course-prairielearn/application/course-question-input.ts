@@ -1,5 +1,7 @@
 import type { PublicBodyPackage } from "course-core/public.ts";
 import type { StudentArtifact } from "./export-types.ts";
+import { Buffer } from "node:buffer";
+import { withStudentSubmissionNames } from "./student-artifact.ts";
 import type {
   CourseExportPlan,
   NativeCompilerInput,
@@ -28,8 +30,7 @@ type AnswerDelivery = ReturnType<typeof nativeAnswerBinding> & {
 };
 type QuestionBinding = ReturnType<typeof question> & {
   files: string[];
-  additionalJavaSources?:
-    NativeCompilerInput["descriptor"]["additionalJavaSources"];
+  additionalJavaSources?: NativeCompilerInput["descriptor"]["additionalJavaSources"];
   externalGradingOptions?: {
     image: string;
     timeout: number;
@@ -50,36 +51,40 @@ function questionSettings(plan: CourseExportPlan, q: QuestionTask["q"]) {
   }
   return question({
     topic: e.extensions?.prairielearn?.topic ?? d.defaults.topic,
-    submission: e.extensions?.prairielearn?.submission ??
+    submission:
+      e.extensions?.prairielearn?.submission ??
       d.raw["question-defaults"].submission,
     ...(e.extensions?.prairielearn?.grading !== undefined
       ? { grading: e.extensions.prairielearn.grading }
       : d.raw["question-defaults"].grading
-      ? { grading: d.raw["question-defaults"].grading }
-      : {}),
+        ? { grading: d.raw["question-defaults"].grading }
+        : {}),
     ...(Object.hasOwn(e.extensions?.prairielearn ?? {}, "single-variant")
       ? {
-        "single-variant": e.extensions?.prairielearn?.["single-variant"],
-      }
+          "single-variant": e.extensions?.prairielearn?.["single-variant"],
+        }
       : Object.hasOwn(d.raw["question-defaults"], "single-variant")
-      ? {
-        "single-variant": d.raw["question-defaults"]["single-variant"],
-      }
-      : {}),
+        ? {
+            "single-variant": d.raw["question-defaults"]["single-variant"],
+          }
+        : {}),
   });
 }
 async function manualProjectInput(
   task: QuestionTask,
   studentArtifact: StudentArtifact,
 ) {
-  const { plan: { input, content }, q, settings, scratch } = task;
-  const fact = content.projects?.find((f) =>
-    f.exerciseId === q.id && f.bankMember
+  const {
+    plan: { input, content },
+    q,
+    settings,
+    scratch,
+  } = task;
+  const fact = content.projects?.find(
+    (f) => f.exerciseId === q.id && f.bankMember,
   );
   if (!fact || fact.check || !safePath(fact.projectRoot)) {
-    throw Error(
-      "PL.MANUAL_INVALID: manual требует project без project-check",
-    );
+    throw Error("PL.MANUAL_INVALID: manual требует project без project-check");
   }
   let actual = input.projectRoot;
   for (const part of fact.projectRoot.split("/")) {
@@ -99,17 +104,17 @@ async function manualProjectInput(
     await Deno.mkdir(dirname(path), { recursive: true });
     await Deno.writeFile(path, file.data);
   }
-  const javaSources = studentArtifact.files.filter((file) =>
-    file.reason === "starter" && applicationJavaTarget(file.name)
+  const javaSources = studentArtifact.files.filter(
+    (file) => file.reason === "starter" && applicationJavaTarget(file.name),
   );
   const selectedSubmission =
     settings.submission.mode !== "workspace" && javaSources.length
       ? fileSubmission(
-        javaSources.map((file) => file.name),
-        settings.submission.mode === "editor"
-          ? settings.submission.aceMode
-          : undefined,
-      )
+          javaSources.map((file) => file.name),
+          settings.submission.mode === "editor"
+            ? settings.submission.aceMode
+            : undefined,
+        )
       : settings.submission;
   const binding: QuestionBinding = {
     ...settings,
@@ -126,10 +131,15 @@ async function manualProjectInput(
   return { binding, delivery };
 }
 async function externalProjectInput(task: QuestionTask) {
-  const { plan: { input }, q, settings, scratch } = task;
+  const {
+    plan: { input },
+    q,
+    settings,
+    scratch,
+  } = task;
   const method = gradingMethod(settings.grading).method;
-  const fact = input.checks.projects.find((p) =>
-    p.exerciseId === q.id && p.bankMember
+  const fact = input.checks.projects.find(
+    (p) => p.exerciseId === q.id && p.bankMember,
   );
   if (!fact?.check || fact.readiness?.ready === false) {
     throw new Error("PL selected_pl_without_check_rejected: " + q.id);
@@ -154,9 +164,11 @@ async function externalProjectInput(task: QuestionTask) {
     data: file.bytes,
   }));
   if (
-    ![1, 2].includes(input.registry.schemaVersion) || !profile ||
+    ![1, 2].includes(input.registry.schemaVersion) ||
+    !profile ||
     profile.mode !== fact.check.sourceProfile.mode
-  ) throw new Error("PL runtime profile unavailable");
+  )
+    throw new Error("PL runtime profile unavailable");
   const image = profile.image ?? input.candidateImage;
   if (
     !image ||
@@ -190,16 +202,19 @@ async function externalProjectInput(task: QuestionTask) {
     await Deno.mkdir(dirname(target), { recursive: true });
     await Deno.writeFile(target, file.bytes);
   }
-  const c = fact.check, descriptor = nativeSelection.descriptor;
-  const selectedSubmission =
-    ["java25-junit-v1", "java25-gradle-junit-v1"].includes(c.runtime)
-      ? fileSubmission(
+  const c = fact.check,
+    descriptor = nativeSelection.descriptor;
+  const selectedSubmission = [
+    "java25-junit-v1",
+    "java25-gradle-junit-v1",
+  ].includes(c.runtime)
+    ? fileSubmission(
         sources.map((source) => source.name),
         settings.submission.mode === "editor"
           ? settings.submission.aceMode
           : undefined,
       )
-      : settings.submission;
+    : settings.submission;
   await Deno.writeTextFile(
     join(project, "tests/grading-job.json"),
     JSON.stringify(descriptor, null, 2) + "\n",
@@ -263,16 +278,26 @@ export async function courseQuestionInput(
       };
       continue;
     }
-    const fact = content.projects?.find((f) =>
-      f.exerciseId === q.id && f.bankMember
+    const fact = content.projects?.find(
+      (f) => f.exerciseId === q.id && f.bankMember,
     );
     if (!fact) throw Error("PL student artifact project fact missing");
     const artifact = await input.studentArtifact(fact);
-    studentArtifacts[q.id] = artifact;
+    studentArtifacts[q.id] = withStudentSubmissionNames(
+      artifact,
+      input.checks.projects
+        .find((project) => project.exerciseId === q.id)
+        ?.sources.map((file) => ({
+          name: file.name,
+          target: file.target,
+          bytes: new Uint8Array(Buffer.from(file.data, "base64")),
+        })) ?? [],
+    );
     const task = { plan, q, settings, scratch };
-    const projection = method === "manual"
-      ? await manualProjectInput(task, artifact)
-      : await externalProjectInput(task);
+    const projection =
+      method === "manual"
+        ? await manualProjectInput(task, artifact)
+        : await externalProjectInput(task);
     binding.questions[q.id] = projection.binding;
     questions[key] = projection.delivery;
     projects[q.id] = "/" + q.id;

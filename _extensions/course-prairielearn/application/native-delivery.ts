@@ -7,12 +7,15 @@ const slotSchema: z.ZodType<NativeResponseSlot> = z.strictObject({
   anchor: z.string().min(1),
   labelAnchor: z.string().min(1).optional(),
   ordinal: z.number().int().nonnegative().optional(),
-  options: z.array(
-    z.strictObject({
-      anchor: z.string().min(1),
-      ordinal: z.number().int().nonnegative(),
-    }),
-  ).min(1).optional(),
+  options: z
+    .array(
+      z.strictObject({
+        anchor: z.string().min(1),
+        ordinal: z.number().int().nonnegative(),
+      }),
+    )
+    .min(1)
+    .optional(),
 });
 /** Public bindings: только уже проверенные selected Core slots; ключ ответа сюда не попадает. */
 export function nativeAnswerBinding(
@@ -34,26 +37,30 @@ export function nativeAnswerBinding(
       metadataMismatch = slots.some((s) => Object.keys(s).length !== 3);
       break;
     case "single-choice":
-      expected = Array.from(
-        { length: answer.count },
-        () => ["answer", "single-choice"],
-      );
-      metadataMismatch = slots.some((s, i) =>
-        s.ordinal !== i || !s.labelAnchor || s.options !== undefined
+      expected = Array.from({ length: answer.count }, () => [
+        "answer",
+        "single-choice",
+      ]);
+      metadataMismatch = slots.some(
+        (s, i) => s.ordinal !== i || !s.labelAnchor || s.options !== undefined,
       );
       break;
     case "matching":
       expected = answer.prompts.map((_, i) => ["match-" + i, "matching"]);
-      metadataMismatch = slots.some((s, i) =>
-        s.ordinal !== i || !s.labelAnchor || !s.options ||
-        s.options.length !== answer.options.length ||
-        s.options.some((o, j) => o.ordinal !== j)
+      metadataMismatch = slots.some(
+        (s, i) =>
+          s.ordinal !== i ||
+          !s.labelAnchor ||
+          !s.options ||
+          s.options.length !== answer.options.length ||
+          s.options.some((o, j) => o.ordinal !== j),
       );
       break;
     case "multipart":
       expected = answer.parts.map((p) => [p.name, p.type]);
-      metadataMismatch = slots.some((s) =>
-        !s.labelAnchor || s.ordinal !== undefined || s.options !== undefined
+      metadataMismatch = slots.some(
+        (s) =>
+          !s.labelAnchor || s.ordinal !== undefined || s.options !== undefined,
       );
       break;
     default:
@@ -62,11 +69,15 @@ export function nativeAnswerBinding(
   }
   if (
     JSON.stringify(slots.map((s) => [s.name, s.type])) !==
-      JSON.stringify(expected) || metadataMismatch
-  ) throw Error("PL.NATIVE_SLOT_MISMATCH");
+      JSON.stringify(expected) ||
+    metadataMismatch
+  )
+    throw Error("PL.NATIVE_SLOT_MISMATCH");
   const types = new Set(slots.map((s) => s.type));
   const expectedMethod = types.has("manual")
-    ? types.size === 1 ? "manual" : "mixed"
+    ? types.size === 1
+      ? "manual"
+      : "mixed"
     : "external";
   if (method !== expectedMethod) throw Error("PL.NATIVE_METHOD_MISMATCH");
   const allowed = new Set([
@@ -78,10 +89,12 @@ export function nativeAnswerBinding(
     "options",
   ]);
   if (
-    slots.some((s) =>
-      Object.keys(s).some((k) => !allowed.has(k)) || !s.anchor
-    ) || new Set(slots.map((s) => s.anchor)).size !== slots.length
-  ) throw Error("PL.NATIVE_SLOT_MISMATCH");
+    slots.some(
+      (s) => Object.keys(s).some((k) => !allowed.has(k)) || !s.anchor,
+    ) ||
+    new Set(slots.map((s) => s.anchor)).size !== slots.length
+  )
+    throw Error("PL.NATIVE_SLOT_MISMATCH");
   return {
     kind: "native-answer",
     uuid,

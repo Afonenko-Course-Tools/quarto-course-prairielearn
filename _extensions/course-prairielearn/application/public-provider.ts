@@ -23,11 +23,13 @@ function coreProvider(value: unknown): value is typeof CorePublic {
     "NativeOperationIdentitySchema",
     "NativePreparedOperationSchema",
   ] satisfies (keyof typeof CorePublic)[];
-  return functions.every((key) => typeof value[key] === "function") &&
+  return (
+    functions.every((key) => typeof value[key] === "function") &&
     schemas.every((key) => {
       const schema = value[key];
       return record(schema) && typeof schema.parse === "function";
-    });
+    })
+  );
 }
 export async function installedCore(path: string): Promise<typeof CorePublic> {
   const value: unknown = await import(pathToFileURL(path).href);

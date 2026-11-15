@@ -7,8 +7,10 @@ const [coreArg, catalogArg, downloadArg, mapArg] = Deno.args;
 if (!coreArg || !catalogArg || !downloadArg || !mapArg) {
   throw Error("Требуются Source Core, QRC, Download и фактическая import map");
 }
-const core = resolve(coreArg), catalog = resolve(catalogArg),
-  download = resolve(downloadArg), map = resolve(mapArg);
+const core = resolve(coreArg),
+  catalog = resolve(catalogArg),
+  download = resolve(downloadArg),
+  map = resolve(mapArg);
 const repo = dirname(dirname(fileURLToPath(import.meta.url)));
 
 async function copy(source: string, target: string): Promise<void> {
@@ -43,14 +45,23 @@ try {
   const book = join(root, "tasks");
   await copy(join(core, "tests/fixtures/native-readable-titles-book"), book);
   for (const [source, name] of [
-    [core, "course-core"], [repo, "course-prairielearn"],
-    [catalog, "reference-catalog"], [download, "project-download"],
+    [core, "course-core"],
+    [repo, "course-prairielearn"],
+    [catalog, "reference-catalog"],
+    [download, "project-download"],
   ] as const) {
-    await copy(join(source, "_extensions", name), join(book, "_extensions", name));
+    await copy(
+      join(source, "_extensions", name),
+      join(book, "_extensions", name),
+    );
   }
-  await Deno.writeTextFile(join(book, ".gitignore"),
-    "/.quarto/\n/_generated/\n/_site/\n/_extensions/\n");
-  await Deno.writeTextFile(join(book, "_quarto.yml"), `project:
+  await Deno.writeTextFile(
+    join(book, ".gitignore"),
+    "/.quarto/\n/_generated/\n/_site/\n/_extensions/\n",
+  );
+  await Deno.writeTextFile(
+    join(book, "_quarto.yml"),
+    `project:
   type: book
   output-dir: _site
   pre-render: [_extensions/course-core/entrypoints/pre.ts]
@@ -98,27 +109,55 @@ prairielearn:
         self-enrollment: false
         works: [sec-work]
         publishing: {start-date: '2026-01-01T00:00:00Z', end-date: '2027-01-01T00:00:00Z'}
-`);
-  await Deno.writeTextFile(join(book, "_quarto-full.yml"),
-    "course-core-projection: author\ncourse:\n  view: full\n");
+`,
+  );
+  await Deno.writeTextFile(
+    join(book, "_quarto-full.yml"),
+    "course-core-projection: author\ncourse:\n  view: full\n",
+  );
   const workPath = join(book, "work.qmd");
   const work = await Deno.readTextFile(workPath);
   assert(work.includes("assessment: {id: sec-work, kind: lab}"));
-  await Deno.writeTextFile(workPath, work.replace(
-    "assessment: {id: sec-work, kind: lab}",
-    "assessment:\n  id: sec-work\n  kind: lab\n  prairielearn:\n    auto-points: 0\n    manual-points: 20",
-  ));
+  await Deno.writeTextFile(
+    workPath,
+    work.replace(
+      "assessment: {id: sec-work, kind: lab}",
+      "assessment:\n  id: sec-work\n  kind: lab\n  prairielearn:\n    auto-points: 0\n    manual-points: 20",
+    ),
+  );
   const output = join(root, "native");
   const result = await new Deno.Command(Deno.execPath(), {
-    args: ["run", "--no-config", "--no-lock", "--import-map", map, "-A",
-      join(book, "_extensions/course-prairielearn/entrypoints/export-course.ts"),
-      root, output, "--instance", "fixture", "--checks-output",
-      join(root, "private-checks.json"), "--book", "tasks"],
-    cwd: root, stdout: "piped", stderr: "piped",
+    args: [
+      "run",
+      "--no-config",
+      "--no-lock",
+      "--import-map",
+      map,
+      "-A",
+      join(
+        book,
+        "_extensions/course-prairielearn/entrypoints/export-course.ts",
+      ),
+      root,
+      output,
+      "--instance",
+      "fixture",
+      "--checks-output",
+      join(root, "private-checks.json"),
+      "--book",
+      "tasks",
+    ],
+    cwd: root,
+    stdout: "piped",
+    stderr: "piped",
   }).output();
   assert(result.success, new TextDecoder().decode(result.stderr));
-  const assessment = await readObject(join(output,
-    "courseInstances/fixture/assessments/sec-work/infoAssessment.json"));
+  const assessment = await readObject(
+    join(
+      output,
+      "courseInstances/fixture/assessments/sec-work/infoAssessment.json",
+    ),
+  );
   const questionPath = join(output, "questions/readable-titles/exr-one");
   const question = await readObject(join(questionPath, "info.json"));
   const html = await Deno.readTextFile(join(questionPath, "question.html"));
@@ -126,8 +165,14 @@ prairielearn:
   assert.equal(question.title, "7. Число Main.java ссылка ёж");
   const visible = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
   assert(visible.includes("Авторское условие с числом 24.0.8."));
-  assert(!/chapter-number|chapter-title|quarto-section-identifier|question-link|question-span|authored-id|key=value/.test(visible));
-  console.log("PASS: публичный PL CLI сохранил названия и авторское условие настоящей нумерованной книги");
+  assert(
+    !/chapter-number|chapter-title|quarto-section-identifier|question-link|question-span|authored-id|key=value/.test(
+      visible,
+    ),
+  );
+  console.log(
+    "PASS: публичный PL CLI сохранил названия и авторское условие настоящей нумерованной книги",
+  );
 } finally {
   await Deno.remove(root, { recursive: true });
 }
